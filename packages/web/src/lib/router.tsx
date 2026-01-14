@@ -2,14 +2,16 @@ import { createBrowserRouter } from 'react-router-dom';
 import { SignIn, SignUp } from '@clerk/clerk-react';
 import { Home } from '../pages/Home';
 import { Login } from '../pages/Login';
-import { Dashboard } from '../pages/Dashboard';
-import { TopicSelection } from '../pages/TopicSelection';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Home />
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    )
   },
   {
     path: '/login',
@@ -22,7 +24,7 @@ export const router = createBrowserRouter([
       <SignIn 
         routing="path" 
         path="/sign-in"
-        afterSignInUrl="/dashboard"
+        afterSignInUrl="/"
       />
     )
   },
@@ -32,24 +34,8 @@ export const router = createBrowserRouter([
       <SignUp 
         routing="path" 
         path="/sign-up"
-        afterSignUpUrl="/dashboard"
+        afterSignUpUrl="/"
       />
-    )
-  },
-  {
-    path: '/dashboard',
-    element: (
-      <ProtectedRoute>
-        <Dashboard />
-      </ProtectedRoute>
-    )
-  },
-  {
-    path: '/topics',
-    element: (
-      <ProtectedRoute>
-        <TopicSelection />
-      </ProtectedRoute>
     )
   }
 ]);

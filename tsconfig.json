@@ -8,7 +8,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "allowImportingTsExtensions": true
+    "resolveJsonModule": true
   }
 }
