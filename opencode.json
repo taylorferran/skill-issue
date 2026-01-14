@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "docs/architecture.md",
+    "docs/monorepo-structure.md",
+    "docs/authentication.md",
+    "docs/integrations.md",
+    "docs/coding-standards.md"
+  ]
+}
