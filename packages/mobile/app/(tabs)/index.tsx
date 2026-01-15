@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { MaterialIcons } from '@expo/vector-icons';
+import { Theme } from '@/theme/Theme';
 
 const { width } = Dimensions.get('window');
 
@@ -32,7 +33,11 @@ export default function SkillIssueDashboard() {
         <View style={[styles.card, styles.backCard1]}>
           <View style={styles.lockedContent}>
             <Text style={styles.lockedText}>Next: System Design Fundamentals</Text>
-            <MaterialIcons name="lock" size={20} color="#8d705e" />
+            <MaterialIcons 
+              name="lock" 
+              size={Theme.iconSize.md} 
+              color={Theme.colors.text.secondary} 
+            />
           </View>
         </View>
 
@@ -45,7 +50,11 @@ export default function SkillIssueDashboard() {
                   <Text style={styles.badgeText}>ACTIVE MODULE</Text>
                 </View>
                 <View style={styles.aiIconContainer}>
-                  <MaterialIcons name="psychology" size={12} color="#ff8b42" />
+                  <MaterialIcons 
+                    name="psychology" 
+                    size={Theme.iconSize.xs} 
+                    color={Theme.colors.primary.main} 
+                  />
                 </View>
               </View>
 
@@ -64,10 +73,18 @@ export default function SkillIssueDashboard() {
             <View style={styles.cardActions}>
               <TouchableOpacity style={styles.primaryButton}>
                 <Text style={styles.primaryButtonText}>Continue Learning</Text>
-                <MaterialIcons name="play-arrow" size={24} color="#fff" />
+                <MaterialIcons 
+                  name="play-arrow" 
+                  size={Theme.iconSize.lg} 
+                  color={Theme.colors.text.inverse} 
+                />
               </TouchableOpacity>
               <TouchableOpacity style={styles.bookmarkButton}>
-                <MaterialIcons name="bookmark-border" size={24} color="#ff8b42" />
+                <MaterialIcons 
+                  name="bookmark-border" 
+                  size={Theme.iconSize.lg} 
+                  color={Theme.colors.primary.main} 
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -78,7 +95,11 @@ export default function SkillIssueDashboard() {
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
-            <MaterialIcons name="workspace-premium" size={20} color="#ff8b42" />
+            <MaterialIcons 
+              name="workspace-premium" 
+              size={Theme.iconSize.md} 
+              color={Theme.colors.primary.main} 
+            />
             <Text style={styles.statLabel}>Mastered</Text>
           </View>
           <View style={styles.statContent}>
@@ -91,7 +112,11 @@ export default function SkillIssueDashboard() {
 
         <View style={styles.statCard}>
           <View style={styles.statHeader}>
-            <MaterialIcons name="local-fire-department" size={20} color="#ff8b42" />
+            <MaterialIcons 
+              name="local-fire-department" 
+              size={Theme.iconSize.md} 
+              color={Theme.colors.primary.main} 
+            />
             <Text style={styles.statLabel}>Streak</Text>
           </View>
           <View style={styles.statContent}>
@@ -109,7 +134,11 @@ export default function SkillIssueDashboard() {
       <View style={styles.aiCallout}>
         <View style={styles.aiCalloutContent}>
           <View style={styles.aiCalloutHeader}>
-            <MaterialIcons name="auto-awesome" size={20} color="#ff8b42" />
+            <MaterialIcons 
+              name="auto-awesome" 
+              size={Theme.iconSize.md} 
+              color={Theme.colors.primary.main} 
+            />
             <Text style={styles.aiCalloutTitle}>AI Assessment Ready</Text>
           </View>
           <Text style={styles.aiCalloutText}>
@@ -117,13 +146,17 @@ export default function SkillIssueDashboard() {
           </Text>
           <TouchableOpacity style={styles.aiCalloutButton}>
             <Text style={styles.aiCalloutButtonText}>Start Assessment</Text>
-            <MaterialIcons name="arrow-forward" size={16} color="#ff8b42" />
+            <MaterialIcons 
+              name="arrow-forward" 
+              size={Theme.iconSize.sm} 
+              color={Theme.colors.primary.main} 
+            />
           </TouchableOpacity>
         </View>
         <MaterialIcons 
           name="quiz" 
-          size={100} 
-          color="rgba(255, 139, 66, 0.1)" 
+          size={Theme.iconSize.xl} 
+          color={Theme.colors.primary.light} 
           style={styles.aiCalloutIcon}
         />
       </View>
@@ -141,7 +174,11 @@ export default function SkillIssueDashboard() {
         <TouchableOpacity style={styles.skillItem}>
           <View style={styles.skillItemLeft}>
             <View style={styles.skillIcon}>
-              <MaterialIcons name="storage" size={24} color="#ff8b42" />
+              <MaterialIcons 
+                name="storage" 
+                size={Theme.iconSize.lg} 
+                color={Theme.colors.primary.main} 
+              />
             </View>
             <View style={styles.skillInfo}>
               <Text style={styles.skillName}>State Management</Text>
@@ -153,13 +190,21 @@ export default function SkillIssueDashboard() {
               </View>
             </View>
           </View>
-          <MaterialIcons name="chevron-right" size={24} color="#8d705e" />
+          <MaterialIcons 
+            name="chevron-right" 
+            size={Theme.iconSize.lg} 
+            color={Theme.colors.text.secondary} 
+          />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.skillItem}>
           <View style={styles.skillItemLeft}>
             <View style={styles.skillIcon}>
-              <MaterialIcons name="api" size={24} color="#ff8b42" />
+              <MaterialIcons 
+                name="api" 
+                size={Theme.iconSize.lg} 
+                color={Theme.colors.primary.main} 
+              />
             </View>
             <View style={styles.skillInfo}>
               <Text style={styles.skillName}>GraphQL Basics</Text>
@@ -171,7 +216,11 @@ export default function SkillIssueDashboard() {
               </View>
             </View>
           </View>
-          <MaterialIcons name="chevron-right" size={24} color="#8d705e" />
+          <MaterialIcons 
+            name="chevron-right" 
+            size={Theme.iconSize.lg} 
+            color={Theme.colors.text.secondary} 
+          />
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -181,81 +230,82 @@ export default function SkillIssueDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fcf9f3',
+    backgroundColor: Theme.colors.background.primary,
   },
   contentContainer: {
-    padding: 24,
-    paddingBottom: 128,
+    padding: Theme.spacing['2xl'],
+    paddingBottom: Theme.spacing['5xl'],
   },
   
   // Headline
   headline: {
-    marginBottom: 32,
+    marginBottom: Theme.spacing['3xl'],
   },
   headlineTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#181310',
-    lineHeight: 32,
+    fontSize: Theme.typography.fontSize['2xl'],
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
+    lineHeight: Theme.typography.lineHeight.normal,
   },
   headlineSubtitle: {
-    fontSize: 14,
-    color: '#8d705e',
-    marginTop: 4,
+    fontSize: Theme.typography.fontSize.base,
+    color: Theme.colors.text.secondary,
+    marginTop: Theme.spacing.xs,
   },
 
   // Stack Container
   stackContainer: {
     height: 420,
-    marginBottom: 48,
+    marginBottom: Theme.spacing['4xl'],
     position: 'relative',
   },
   card: {
     position: 'absolute',
     width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    ...Theme.shadows.card,
   },
   backCard2: {
-    top: 32,
+    top: Theme.components.card.stackedTop.back2,
     height: 388,
-    opacity: 0.4,
-    transform: [{ scale: 0.88 }, { translateY: 16 }],
-    borderColor: 'rgba(255, 139, 66, 0.05)',
+    opacity: Theme.opacity.low,
+    transform: [
+      { scale: Theme.components.card.stackedScale.back2 }, 
+      { translateY: Theme.components.card.stackedTranslateY.back2 }
+    ],
+    borderColor: Theme.colors.primary.light,
   },
   backCard1: {
-    top: 16,
+    top: Theme.components.card.stackedTop.back1,
     height: 404,
-    opacity: 0.8,
-    transform: [{ scale: 0.94 }, { translateY: 8 }],
-    borderColor: 'rgba(255, 139, 66, 0.1)',
+    opacity: Theme.opacity.high,
+    transform: [
+      { scale: Theme.components.card.stackedScale.back1 }, 
+      { translateY: Theme.components.card.stackedTranslateY.back1 }
+    ],
+    borderColor: Theme.colors.primary.medium,
     justifyContent: 'flex-end',
-    padding: 24,
+    padding: Theme.spacing['2xl'],
   },
   lockedContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    opacity: 0.5,
+    opacity: Theme.opacity.medium,
   },
   lockedText: {
-    fontWeight: '700',
-    fontSize: 14,
-    color: '#181310',
+    fontWeight: Theme.typography.fontWeight.bold,
+    fontSize: Theme.typography.fontSize.base,
+    color: Theme.colors.text.primary,
   },
   primaryCard: {
-    top: 0,
+    top: Theme.components.card.stackedTop.front,
     height: 420,
-    borderColor: 'rgba(255, 139, 66, 0.2)',
-    padding: 24,
-    shadowColor: '#ff8b42',
-    shadowOpacity: 0.15,
+    borderColor: Theme.colors.primary.border,
+    padding: Theme.spacing['2xl'],
+    ...Theme.shadows.primaryCard,
   },
   cardContent: {
     flex: 1,
@@ -265,73 +315,73 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
+    marginBottom: Theme.spacing.lg,
   },
   badge: {
-    backgroundColor: 'rgba(255, 139, 66, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
+    backgroundColor: Theme.colors.primary.medium,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.borderRadius.xl,
   },
   badgeText: {
-    color: '#ff8b42',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    color: Theme.colors.primary.main,
+    fontSize: Theme.typography.fontSize.xs,
+    fontWeight: Theme.typography.fontWeight.bold,
+    letterSpacing: Theme.typography.letterSpacing.wide,
   },
   aiIconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 139, 66, 0.2)',
-    borderWidth: 2,
-    borderColor: '#fff',
+    width: Theme.spacing['2xl'],
+    height: Theme.spacing['2xl'],
+    borderRadius: Theme.spacing.md,
+    backgroundColor: Theme.colors.primary.border,
+    borderWidth: Theme.borderWidth.medium,
+    borderColor: Theme.colors.background.secondary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardImage: {
     width: '100%',
     height: 160,
-    borderRadius: 12,
-    marginBottom: 24,
+    borderRadius: Theme.borderRadius.lg,
+    marginBottom: Theme.spacing['2xl'],
   },
   cardTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#181310',
-    marginBottom: 8,
+    fontSize: Theme.typography.fontSize.xl,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
+    marginBottom: Theme.spacing.sm,
   },
   cardDescription: {
-    fontSize: 14,
-    color: '#8d705e',
-    lineHeight: 20,
+    fontSize: Theme.typography.fontSize.base,
+    color: Theme.colors.text.secondary,
+    lineHeight: Theme.typography.lineHeight.tight,
   },
   cardActions: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 24,
+    gap: Theme.spacing.lg,
+    marginTop: Theme.spacing['2xl'],
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#ff8b42',
+    backgroundColor: Theme.colors.primary.main,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.lg,
+    gap: Theme.spacing.sm,
   },
   primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
+    color: Theme.colors.text.inverse,
+    fontWeight: Theme.typography.fontWeight.bold,
+    fontSize: Theme.typography.fontSize.base,
   },
   bookmarkButton: {
-    width: 56,
-    height: 56,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 139, 66, 0.2)',
-    borderRadius: 12,
+    width: Theme.components.button.height,
+    height: Theme.components.button.height,
+    borderWidth: Theme.borderWidth.medium,
+    borderColor: Theme.colors.primary.border,
+    borderRadius: Theme.borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -339,27 +389,27 @@ const styles = StyleSheet.create({
   // Stats
   statsContainer: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 32,
+    gap: Theme.spacing.lg,
+    marginBottom: Theme.spacing['3xl'],
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 139, 66, 0.1)',
+    backgroundColor: Theme.colors.background.secondary,
+    padding: Theme.spacing.xl,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
   },
   statHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: Theme.spacing.sm,
+    marginBottom: Theme.spacing.md,
   },
   statLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#181310',
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.medium,
+    color: Theme.colors.text.primary,
   },
   statContent: {
     flexDirection: 'row',
@@ -367,47 +417,47 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   statNumber: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: '#181310',
+    fontSize: Theme.typography.fontSize['3xl'],
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
   },
   statUnit: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: '#8d705e',
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.regular,
+    color: Theme.colors.text.secondary,
   },
   successBadge: {
-    backgroundColor: 'rgba(160, 217, 177, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
+    backgroundColor: Theme.colors.success.light,
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.xs / 2,
+    borderRadius: Theme.borderRadius.lg,
   },
   successBadgeText: {
-    color: '#A0D9B1',
-    fontSize: 10,
-    fontWeight: '700',
+    color: Theme.colors.success.main,
+    fontSize: Theme.typography.fontSize.xs,
+    fontWeight: Theme.typography.fontWeight.bold,
   },
   primaryBadge: {
-    backgroundColor: 'rgba(255, 139, 66, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
+    backgroundColor: Theme.colors.primary.border,
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.xs / 2,
+    borderRadius: Theme.borderRadius.lg,
   },
   primaryBadgeText: {
-    color: '#ff8b42',
-    fontSize: 10,
-    fontWeight: '700',
+    color: Theme.colors.primary.main,
+    fontSize: Theme.typography.fontSize.xs,
+    fontWeight: Theme.typography.fontWeight.bold,
   },
 
   // AI Callout
   aiCallout: {
-    backgroundColor: 'rgba(255, 139, 66, 0.05)',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 139, 66, 0.3)',
+    backgroundColor: Theme.colors.primary.light,
+    borderWidth: Theme.borderWidth.medium,
+    borderColor: Theme.colors.primary.borderMedium,
     borderStyle: 'dashed',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 32,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing['3xl'],
     position: 'relative',
     overflow: 'hidden',
   },
@@ -418,29 +468,29 @@ const styles = StyleSheet.create({
   aiCalloutHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
+    gap: Theme.spacing.sm,
+    marginBottom: Theme.spacing.sm,
   },
   aiCalloutTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#181310',
+    fontSize: Theme.typography.fontSize.lg,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
   },
   aiCalloutText: {
-    fontSize: 14,
-    color: '#8d705e',
-    lineHeight: 20,
-    marginBottom: 16,
+    fontSize: Theme.typography.fontSize.base,
+    color: Theme.colors.text.secondary,
+    lineHeight: Theme.typography.lineHeight.tight,
+    marginBottom: Theme.spacing.lg,
   },
   aiCalloutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: Theme.spacing.xs,
   },
   aiCalloutButtonText: {
-    color: '#ff8b42',
-    fontWeight: '700',
-    fontSize: 14,
+    color: Theme.colors.primary.main,
+    fontWeight: Theme.typography.fontWeight.bold,
+    fontSize: Theme.typography.fontSize.base,
   },
   aiCalloutIcon: {
     position: 'absolute',
@@ -453,29 +503,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: Theme.spacing.lg,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#181310',
+    fontSize: Theme.typography.fontSize.lg,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
   },
   sectionLink: {
-    color: '#ff8b42',
-    fontSize: 14,
-    fontWeight: '700',
+    color: Theme.colors.primary.main,
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.bold,
   },
 
   // Skills List
   skillsList: {
-    gap: 16,
+    gap: Theme.spacing.lg,
   },
   skillItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 139, 66, 0.1)',
+    backgroundColor: Theme.colors.background.secondary,
+    padding: Theme.spacing.lg,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -483,43 +533,43 @@ const styles = StyleSheet.create({
   skillItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: Theme.spacing.lg,
     flex: 1,
   },
   skillIcon: {
-    backgroundColor: '#fcf9f3',
-    padding: 8,
-    borderRadius: 8,
+    backgroundColor: Theme.colors.background.primary,
+    padding: Theme.spacing.sm,
+    borderRadius: Theme.borderRadius.md,
   },
   skillInfo: {
     flex: 1,
   },
   skillName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#181310',
-    marginBottom: 8,
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
+    marginBottom: Theme.spacing.sm,
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Theme.spacing.sm,
   },
   progressBar: {
-    width: 96,
-    height: 6,
-    backgroundColor: 'rgba(255, 139, 66, 0.2)',
-    borderRadius: 3,
+    width: Theme.components.progressBar.width,
+    height: Theme.components.progressBar.height,
+    backgroundColor: Theme.colors.primary.border,
+    borderRadius: Theme.borderRadius.sm,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#ff8b42',
-    borderRadius: 3,
+    backgroundColor: Theme.colors.primary.main,
+    borderRadius: Theme.borderRadius.sm,
   },
   progressText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#8d705e',
+    fontSize: Theme.typography.fontSize.xs,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.secondary,
   },
 });

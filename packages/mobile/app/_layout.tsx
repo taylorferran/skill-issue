@@ -4,7 +4,7 @@ import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
 import * as SecureStore from 'expo-secure-store';
 import 'react-native-reanimated';
 import { use } from 'react';
-import { AuthContext, AuthProvider } from '@/contexts/AuthContext';
+import { AuthContext} from '@/contexts/AuthContext';
 
 const tokenCache = {
   async getToken(key: string) {

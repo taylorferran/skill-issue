@@ -2,68 +2,49 @@ import React from "react";
 import { View, Text, Image, StyleSheet, Pressable } from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { IconSymbol } from "./ui/icon-symbol";
 
 export function CustomHeader() {
   const { user } = useUser();
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  
-  const backgroundColor =  'rgba(252, 249, 243, 0.95)';
-  const textColor =  '#181310';
-  const borderColor = 'rgba(255, 139, 66, 0.1)';
-  
+
+  const backgroundColor = "rgba(252, 249, 243, 0.95)";
+  const textColor = "#181310";
+  const borderColor = "rgba(255, 139, 66, 0.1)";
+
   return (
-    <View style={[styles.container, { backgroundColor, borderBottomColor: borderColor }]}>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor, borderBottomColor: borderColor },
+      ]}
+    >
       {/* Logo Section */}
       <View style={styles.logoContainer}>
         <View style={styles.logoBox}>
           <IconSymbol name="bolt" color="#fff" size={20} />
         </View>
-        <Text style={[styles.title, { color: textColor }]}>
-          Skill Issue
-        </Text>
+        <Text style={[styles.title, { color: textColor }]}>Skill Issue</Text>
       </View>
 
       {/* Right Actions */}
       <View style={styles.actionsContainer}>
         {/* Notifications Button */}
-        <Pressable 
+        <Pressable
           style={({ pressed }) => [
             styles.notificationButton,
-            { 
-              backgroundColor: pressed 
-                ? 'rgba(255, 139, 66, 0.1)' 
-                : 'transparent' 
-            }
+            {
+              backgroundColor: pressed
+                ? "rgba(255, 139, 66, 0.1)"
+                : "transparent",
+            },
           ]}
           onPress={() => {
             // Handle notifications
-            console.log('Notifications pressed');
+            console.log("Notifications pressed");
           }}
         >
-          <IconSymbol name="bell.badge" color={'black'} size={26} />
-        </Pressable>
-
-        {/* User Profile */}
-        <Pressable 
-          onPress={() => router.push("/profile")}
-          style={styles.profileContainer}
-        >
-          {user?.imageUrl ? (
-            <Image
-              source={{ uri: user.imageUrl }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: '#ff8b42' }]}>
-              <Text style={styles.avatarText}>
-                {user?.firstName?.[0] || user?.emailAddresses[0]?.emailAddress[0] || "U"}
-              </Text>
-            </View>
-          )}
+          <IconSymbol name="bell.badge" color={"black"} size={26} />
         </Pressable>
       </View>
     </View>
@@ -88,7 +69,7 @@ const styles = StyleSheet.create({
   logoBox: {
     width: 32,
     height: 32,
-    backgroundColor: '#ff8b42',
+    backgroundColor: "#ff8b42",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -115,14 +96,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: 'rgba(255, 139, 66, 0.2)',
+    borderColor: "rgba(255, 139, 66, 0.2)",
   },
   avatarPlaceholder: {
     width: 40,
     height: 40,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: 'rgba(255, 139, 66, 0.2)',
+    borderColor: "rgba(255, 139, 66, 0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
