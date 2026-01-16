@@ -1,19 +1,84 @@
-.login-container {
+.loginContainer {
+  min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  padding: 1rem;
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  padding: 2rem;
 }
 
-.login-container h1 {
-  font-size: 2rem;
-  margin-bottom: 2rem;
+.loginContent {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  padding: 3rem;
+  max-width: 400px;
+  width: 100%;
   text-align: center;
 }
 
-.login-container form {
+.loginHeader {
+  margin-bottom: 2rem;
+}
+
+.loginHeader h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.025em;
+}
+
+.loginHeader p {
+  font-size: 1.125rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.loginButtonContainer {
+  margin-bottom: 2rem;
+}
+
+.loginButton {
   width: 100%;
-  max-width: 400px;
+  font-weight: 600;
+}
+
+.loginFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  text-align: left;
+}
+
+.featureIcon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .loginContainer {
+    padding: 1rem;
+  }
+  
+  .loginContent {
+    padding: 2rem;
+  }
+  
+  .loginHeader h1 {
+    font-size: 1.75rem;
+  }
+  
+  .loginHeader p {
+    font-size: 1rem;
+  }
 }
