@@ -33,7 +33,7 @@ export default function TabLayout() {
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
-        header: () => <CustomHeader />,
+        header: (props) => <CustomHeader {...props} />,
         headerShown: true,
         tabBarButton: HapticTab,
       }}

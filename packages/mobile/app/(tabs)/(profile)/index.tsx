@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { SettingItem } from "@/components/setting-item/SettingItem";
-import { styles } from "./_index.styles";
+import { styles } from "./index.styles";
 
 export default function ProfileScreen() {
   const { user: clerkUser } = useUser();

@@ -14,6 +14,11 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flex: 1,
+    marginRight: 16,
+  },
+  backButton: {
+    paddingRight: 4,
   },
   logoBox: {
     width: 32,
@@ -22,11 +27,13 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   title: {
     fontSize: 18,
     fontWeight: "700",
     letterSpacing: -0.5,
+    flexShrink: 1,
   },
   actionsContainer: {
     flexDirection: "row",

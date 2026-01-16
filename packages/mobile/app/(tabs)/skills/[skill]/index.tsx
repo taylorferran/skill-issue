@@ -1,6 +1,6 @@
 import { Theme } from '@/theme/Theme';
 import { flex } from '@/theme/ThemeUtils';
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { navigateTo } from '@/navigation/navigation';
+import { useNavigation } from 'expo-router';
+import { navigateTo, useRouteParams } from '@/navigation/navigation';
 import { SubtopicCard } from '@/components/topic-card/TopicCard';
 import { styles } from './_index.styles';
 
@@ -22,8 +23,17 @@ const Icon = ({ name, size = 24, color = Theme.colors.text.primary }: {
 );
 
 export const TopicSelectScreen: React.FC = () => {
+  const { skill } = useRouteParams('topicSelection');
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: skill,
+    });
+  }, [navigation, skill]);
+
   const handleAssess = (topic: string) => {
-    navigateTo('learnTopic', {skill: 'rust', topic: 'topic'})
+    navigateTo('learnTopic', { skill: skill, topic: topic });
     // Handle navigation or modal opening
   };
 
