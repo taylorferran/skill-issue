@@ -1,5 +1,6 @@
 .npmrc
 opencode.json
+node_modules
 docs/
 *.local
 dist
