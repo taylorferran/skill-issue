@@ -6,11 +6,11 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { styles } from "./LearnTopic.styles";
 import { Theme } from "@/theme/Theme";
 import { Module } from "@/types/Module";
-import { ModuleCard } from "./components/ModuleCard";
 import { flex } from "@/theme/ThemeUtils";
+import { ModuleCard } from "@/components/module-card/ModuleCard";
+import { styles } from "./_index.styles";
 
 // Icon component placeholder - replace with your actual icon component
 const Icon = ({
@@ -132,3 +132,5 @@ export const LearnTopicScreen: React.FC = () => {
     </ScrollView>
   );
 };
+
+export default LearnTopicScreen;

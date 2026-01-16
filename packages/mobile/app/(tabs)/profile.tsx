@@ -1,4 +1,4 @@
-import ProfileScreen from "@/screens/profile/Profile";
+import ProfileScreen from "@/app/(tabs)/(profile)/index";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function Profile() {

@@ -46,7 +46,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="skills"
+        name="skills/index"
         options={{
           title: "Skills",
           href: "/skills",

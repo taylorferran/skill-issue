@@ -1,6 +1,6 @@
 import React from 'react';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import DashboardScreen from '@/screens/dashboard/Dashboard';
+import DashboardScreen from '@/app/(tabs)/(dashboard)/index';
 
 
 export default function Dashboard() {
