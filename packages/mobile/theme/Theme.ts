@@ -2,7 +2,6 @@
  * Design System Theme
  * Central location for all design tokens including colors, typography, spacing, and more.
  */
-
 export const Theme = {
   // ============= COLORS =============
   colors: {
@@ -10,6 +9,7 @@ export const Theme = {
     background: {
       primary: '#fcf9f3',
       secondary: '#fff',
+      tertiary: 'rgba(255, 255, 255, 0.5)',
     },
     
     // Text Colors
@@ -39,8 +39,38 @@ export const Theme = {
       default: '#000',
       primary: '#ff8b42',
     },
+    
+    // Accent Colors (for special UI elements)
+    accent: {
+      teal: '#22c3c3',
+      tealDark: '#18a4a4',
+      tealLight: 'rgba(107, 199, 184, 0.2)',
+      orange: '#FF6F00',
+      orangeLight: 'rgba(255, 111, 0, 0.1)',
+    },
+    
+    // Pastel Colors (for category backgrounds)
+    pastel: {
+      peach: '#F7D4CC',
+      yellow: '#F9F1C5',
+      lavender: '#E5E5F2',
+      mint: '#D1F2EB',
+      grey: '#F0F0F0',
+    },
+    
+    // Timeline/Progress Colors
+    timeline: {
+      trackInactive: 'rgba(0, 0, 0, 0.05)',
+      borderInactive: 'rgba(0, 0, 0, 0.05)',
+    },
+    
+    // Settings Screen Colors
+    settings: {
+      chevron: 'rgba(0, 0, 0, 0.2)',
+      progressBarBg: 'rgba(0, 0, 0, 0.1)',
+    },
   },
-
+  
   // ============= TYPOGRAPHY =============
   typography: {
     // Font Sizes
@@ -72,7 +102,7 @@ export const Theme = {
       wide: 1,
     },
   },
-
+  
   // ============= SPACING =============
   spacing: {
     xs: 4,
@@ -85,7 +115,7 @@ export const Theme = {
     '4xl': 48,
     '5xl': 128,
   },
-
+  
   // ============= BORDER RADIUS =============
   borderRadius: {
     sm: 3,
@@ -93,7 +123,7 @@ export const Theme = {
     lg: 12,
     xl: 16,
   },
-
+  
   // ============= ICON SIZES =============
   iconSize: {
     xs: 12,
@@ -102,7 +132,7 @@ export const Theme = {
     lg: 24,
     xl: 100,
   },
-
+  
   // ============= SHADOWS =============
   shadows: {
     card: {
@@ -120,20 +150,20 @@ export const Theme = {
       elevation: 4,
     },
   },
-
+  
   // ============= BORDER WIDTHS =============
   borderWidth: {
     thin: 1,
     medium: 2,
   },
-
+  
   // ============= OPACITY =============
   opacity: {
     low: 0.4,
     medium: 0.5,
     high: 0.8,
   },
-
+  
   // ============= COMPONENT SPECIFIC =============
   components: {
     card: {

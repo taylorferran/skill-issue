@@ -1,10 +1,10 @@
-import ProfileScreen from "@/screens/profile/Profile";
+import SkillSelectScreen from "@/screens/skill-select/SkillSelect";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 export default function Profile() {
   return (
     <SafeAreaProvider>
-      <ProfileScreen />
+      <SkillSelectScreen/>
     </SafeAreaProvider>
   );
 }
