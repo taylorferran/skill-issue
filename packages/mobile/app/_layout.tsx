@@ -27,7 +27,7 @@ export default function RootLayout() {
   const {isAuthenticated} = use(AuthContext)
   return (
     <ClerkProvider
-      publishableKey={"pk_test_YW1hemVkLW1hcm1vc2V0LTcwLmNsZXJrLmFjY291bnRzLmRldiQ"}
+      publishableKey={""}
       tokenCache={tokenCache}
     >
 
