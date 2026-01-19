@@ -103,7 +103,7 @@ export const LearnTopicScreen: React.FC = () => {
             module={module}
             isLast={index === modules.length - 1}
             onPress={() =>
-              navigateTo("questions", { skill: skill, topic: module.title })
+              navigateTo("questions", { skill: skill })
             }
           />
         ))}

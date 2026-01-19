@@ -47,25 +47,4 @@ export const styles = StyleSheet.create({
   profileContainer: {
     padding: 0,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "rgba(255, 139, 66, 0.2)",
-  },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "rgba(255, 139, 66, 0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
 });

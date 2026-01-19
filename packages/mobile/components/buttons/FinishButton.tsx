@@ -15,10 +15,10 @@ export const FinishButton: React.FC<FinishButtonProps> = ({
     <TouchableOpacity
       style={styles.finishButton}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.98}
     >
       <Text style={styles.finishButtonText}>
-        {isLastQuestion ? "Finish" : "Next Question"}
+        Confirm Answer
       </Text>
     </TouchableOpacity>
   );

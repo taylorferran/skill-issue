@@ -1,5 +1,5 @@
 import { Theme } from "@/theme/Theme";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { styles } from "./QuestionCard.styles";
@@ -25,12 +25,14 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   totalQuestions,
 }) => {
   const getAnswerStyle = (answerId: number) => {
-    if (!hasAnswered && !isTimeUp) {
-      return styles.answerOption;
-    }
-
     const isCorrect = answerId === question.correctAnswerId;
     const isSelected = answerId === selectedAnswerId;
+
+    if (!hasAnswered && !isTimeUp) {
+      return isSelected 
+        ? [styles.answerOption, styles.answerOptionSelected]
+        : styles.answerOption;
+    }
 
     if (isCorrect) {
       return [styles.answerOption, styles.answerOptionCorrect];
@@ -43,45 +45,49 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     return styles.answerOption;
   };
 
-  const getAnswerIcon = (answerId: number) => {
-    if (!hasAnswered && !isTimeUp) return null;
-
+  const getAnswerIndicator = (answerId: number) => {
     const isCorrect = answerId === question.correctAnswerId;
     const isSelected = answerId === selectedAnswerId;
 
-    if (isCorrect) {
+    // Show checkmark for correct answer after answering
+    if ((hasAnswered || isTimeUp) && isCorrect) {
       return (
-        <MaterialIcons
-          name="check-circle"
-          size={24}
-          color={Theme.colors.success.main}
-        />
+        <View style={[styles.radioContainer, styles.radioSelected]}>
+          <Ionicons
+            name="checkmark"
+            size={16}
+            color={Theme.colors.text.inverse}
+          />
+        </View>
       );
     }
 
-    if (isSelected && !isCorrect) {
+    // Show radio button for selection state
+    if (isSelected) {
       return (
-        <MaterialIcons
-          name="cancel"
-          size={24}
-          color={Theme.colors.primary.main}
-        />
+        <View style={[styles.radioContainer, styles.radioSelected]}>
+          {!hasAnswered && !isTimeUp && <View style={styles.radioInner} />}
+          {(hasAnswered || isTimeUp) && !isCorrect && (
+            <Ionicons
+              name="checkmark"
+              size={16}
+              color={Theme.colors.text.inverse}
+            />
+          )}
+        </View>
       );
     }
 
-    return null;
+    // Default radio button
+    return <View style={styles.radioContainer} />;
   };
 
   return (
     <View style={styles.questionCard}>
-      <View style={styles.questionHeader}>
-        <Text style={styles.questionNumber}>
-          Question {questionNumber} of {totalQuestions}
-        </Text>
-      </View>
-
+      {/* Question Text (large, prominent iOS style) */}
       <Text style={styles.questionText}>{question.question}</Text>
 
+      {/* Answer Options */}
       <View style={styles.answersContainer}>
         {question.answers.map((answer: any) => (
           <TouchableOpacity
@@ -89,7 +95,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             style={getAnswerStyle(answer.id)}
             onPress={() => onAnswerSelect(answer.id)}
             disabled={hasAnswered || isTimeUp}
-            activeOpacity={0.7}
+            activeOpacity={0.98}
           >
             <Text
               style={[
@@ -105,7 +111,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             >
               {answer.text}
             </Text>
-            {getAnswerIcon(answer.id)}
+            {getAnswerIndicator(answer.id)}
           </TouchableOpacity>
         ))}
       </View>

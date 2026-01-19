@@ -3,61 +3,71 @@ import React, { useState } from "react";
 import {
   View,
   ScrollView,
-  TextInput,
+  Text,
+  SafeAreaView,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons"; // or react-native-vector-icons
+import { Ionicons } from "@expo/vector-icons";
 import { Theme } from "@/theme/Theme";
-import { Language, languageMock } from "@/types/Language";
-import { LanguageCard } from "@/components/language-card/LanguageCard";
+import { Skill, skillsMock, calculateTotalSkills, getActivePath } from "@/types/Skill";
+import { SkillCard } from "@/components/skill-card/SkillCard";
+import { StatsCard } from "@/components/stats-card/StatsCard";
 import { navigateTo } from "@/navigation/navigation";
 import { styles } from "./_index.styles";
 
 
 export default function SkillSelectScreen() {
-  const [searchQuery, setSearchQuery] = useState("");
-
-  const handleLanguageSelect = (language: Language) => {
+  const handleSkillSelect = (skill: Skill) => {
     navigateTo('questions', {
-        skill: language.name,
+        skill: skill.name,
     })
   };
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons
-            name="search"
-            size={Theme.iconSize.lg}
-            color={Theme.colors.primary.main}
-            style={styles.searchIcon}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search languages or frameworks..."
-            placeholderTextColor={Theme.colors.text.secondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.innerContainer}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Stats Cards Section */}
+          <View style={styles.statsSection}>
+            <View style={styles.statsContainer}>
+              <StatsCard 
+                label="TOTAL SKILLS" 
+                value={calculateTotalSkills()} 
+              />
+              <StatsCard 
+                label="ACTIVE PATH" 
+                value={getActivePath().split(' ')[0]} 
+              />
+            </View>
+          </View>
 
-      {/* Language Cards */}
-      <View style={styles.cardsContainer}>
-        {languageMock.map((language) => (
-          <LanguageCard
-            key={language.id}
-            language={language}
-            onSelect={handleLanguageSelect}
-          />
-        ))}
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Section Header */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Professional Mastery</Text>
+            <View style={styles.sortBadge}>
+              <Text style={styles.sortBadgeText}>SORT BY LEVEL</Text>
+            </View>
+          </View>
+
+          {/* Skills Cards */}
+          <View style={styles.cardsContainer}>
+            {skillsMock.map((skill) => (
+              <SkillCard
+                key={skill.id}
+                skill={skill}
+                onSelect={handleSkillSelect}
+              />
+            ))}
+          </View>
+        </ScrollView>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 }
 

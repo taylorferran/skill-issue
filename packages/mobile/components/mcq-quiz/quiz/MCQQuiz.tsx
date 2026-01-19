@@ -102,18 +102,18 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.contentContainer}
-    >
-      <View style={spacing.containerPadding}>
+    <ScrollView style={styles.container}>
+      {/* Header with Close and Timer */}
+      <View style={styles.header}>
         <QuizTimer
           timeLeft={timeLeft}
           totalTime={timePerQuestion}
           isTimeUp={isTimeUp}
         />
+      </View>
 
+      {/* Main Content */}
+      <View style={styles.mainContent}>
         <QuestionCard
           question={currentQuestion}
           selectedAnswerId={selectedAnswerId}
@@ -138,7 +138,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
 
             {/* Only show continue button after rating is given */}
             {rating !== null && (
-              <View style={{ marginTop: spacing.containerPadding.padding }}>
+              <View style={styles.buttonContainer}>
                 <FinishButton onPress={onFinish} isLastQuestion={true} />
               </View>
             )}
@@ -147,7 +147,9 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
 
         {/* MULTIPLE QUESTION MODE: Show next/finish button */}
         {!isSingleQuestion && hasAnswered && (
-          <FinishButton onPress={handleNext} isLastQuestion={isLastQuestion} />
+          <View style={styles.buttonContainer}>
+            <FinishButton onPress={handleNext} isLastQuestion={isLastQuestion} />
+          </View>
         )}
       </View>
     </ScrollView>

@@ -10,7 +10,7 @@ import { styles } from "./Header.styles";
 export function CustomHeader({ navigation, route, options }: BottomTabHeaderProps) {
   const router = useRouter();
 
-  const backgroundColor = "rgba(252, 249, 243, 0.95)";
+  const backgroundColor = "white";
   const borderColor = "rgba(255, 139, 66, 0.1)";
 
   // Root routes that should not show a back button
@@ -30,7 +30,7 @@ export function CustomHeader({ navigation, route, options }: BottomTabHeaderProp
     <View
       style={[
         styles.container,
-        { backgroundColor, borderBottomColor: borderColor },
+        { backgroundColor, borderBottomColor: "white"},
       ]}
     >
       {/* Logo Section */}
@@ -73,7 +73,7 @@ export function CustomHeader({ navigation, route, options }: BottomTabHeaderProp
             styles.notificationButton,
             {
               backgroundColor: pressed
-                ? "rgba(255, 139, 66, 0.1)"
+                ? Theme.colors.background.primary
                 : "transparent",
             },
           ]}

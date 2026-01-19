@@ -1,5 +1,4 @@
 import { Theme } from "@/theme/Theme";
-import { MaterialIcons } from "@expo/vector-icons";
 import React from "react";
 import { View, Text } from "react-native";
 import { styles } from "./QuizTimer.styles";
@@ -20,12 +19,8 @@ export const QuizTimer: React.FC<QuizTimerProps> = ({
 
   return (
     <View style={styles.timerContainer}>
-      {/* Circular Progress Ring */}
-      <View style={styles.circularTimer}>
-        {/* Background Circle */}
-        <View style={styles.backgroundCircle} />
-        
-        {/* Progress Circle */}
+      {/* Linear Progress Bar */}
+      <View style={styles.progressBarContainer}>
         <View 
           style={[
             styles.progressFill,
@@ -34,12 +29,21 @@ export const QuizTimer: React.FC<QuizTimerProps> = ({
               backgroundColor: isTimeUp
                 ? Theme.colors.primary.main
                 : isWarning
-                ? "#F59E0B"
-                : Theme.colors.success.main,
-            },
-          ]}
+                ? '#F59E0B'
+                : Theme.colors.primary.main,
+            }
+          ]} 
         />
       </View>
+      
+      {/* Time Text */}
+      <Text style={[
+        styles.timeText,
+        isWarning && styles.timeTextWarning,
+        isTimeUp && styles.timeTextTimeUp,
+      ]}>
+        {isTimeUp ? '0s' : `${timeLeft}s`}
+      </Text>
     </View>
   );
 };
