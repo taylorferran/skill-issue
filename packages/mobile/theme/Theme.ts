@@ -41,6 +41,12 @@ export const Theme = {
       medium: 'rgba(255, 139, 66, 0.3)',
     },
     
+    // Warning Colors (for timer warnings)
+    warning: {
+      main: '#F59E0B', // Amber-500
+      light: 'rgba(245, 158, 11, 0.1)',
+    },
+    
     // Shadow Colors
     shadow: {
       default: '#000',
@@ -108,6 +114,7 @@ export const Theme = {
     lineHeight: {
       tight: 20,
       normal: 32,
+      relaxed: 24,
     },
     
     // Letter Spacing
@@ -135,6 +142,7 @@ export const Theme = {
     md: 8,
     lg: 12,
     xl: 16,
+    full: 9999,
   },
   
   // ============= ICON SIZES =============
@@ -168,6 +176,7 @@ export const Theme = {
   borderWidth: {
     thin: 1,
     medium: 2,
+    thick: 3,
   },
   
   // ============= OPACITY =============

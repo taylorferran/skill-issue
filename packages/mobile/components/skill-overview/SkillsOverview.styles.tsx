@@ -15,7 +15,6 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
 
-
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background.primary,
@@ -27,7 +26,6 @@ export const styles = StyleSheet.create({
 
   scrollContent: {
     padding: Theme.spacing["2xl"],
-    paddingBottom: 120,
     gap: Theme.spacing.lg,
   },
 
@@ -102,6 +100,7 @@ export const styles = StyleSheet.create({
     position: "absolute",
     width: "100%",
     height: "100%",
+
     alignItems: "center",
     justifyContent: "center",
   },
@@ -139,7 +138,6 @@ export const styles = StyleSheet.create({
     backgroundColor: Theme.colors.primary.light,
     borderWidth: Theme.borderWidth.thin,
     borderColor: Theme.colors.primary.border,
-    marginBottom: Theme.spacing.sm,
   },
 
   proTipIcon: {
@@ -166,12 +164,7 @@ export const styles = StyleSheet.create({
 
   // Bottom CTA with Gradient
   bottomCTA: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     padding: Theme.spacing["2xl"],
-    paddingTop: Theme.spacing["4xl"],
   },
 
   ctaButton: {

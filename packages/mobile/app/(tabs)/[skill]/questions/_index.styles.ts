@@ -34,9 +34,6 @@ export const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  scrollContent: {
-    paddingBottom: Theme.spacing['4xl'],
-  },
   
   // Assessment Card
   assessmentCard: {
@@ -140,6 +137,41 @@ export const styles = StyleSheet.create({
     backgroundColor: Theme.colors.background.secondary,
     padding: Theme.spacing["2xl"],
   },
+  
+  // Test Buttons
+  testButtonsContainer: {
+    gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.xl,
+    paddingBottom: Theme.spacing.xl,
+    borderBottomWidth: Theme.borderWidth.thin,
+    borderBottomColor: Theme.colors.primary.medium,
+  },
+  testButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.primary.light,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: Theme.borderWidth.medium,
+    borderColor: Theme.colors.primary.border,
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.md,
+  },
+  testButtonSingle: {
+    borderColor: Theme.colors.success.main,
+    backgroundColor: Theme.colors.success.light,
+  },
+  testButtonMultiple: {
+    borderColor: Theme.colors.accent.teal,
+    backgroundColor: Theme.colors.accent.tealLight,
+  },
+  testButtonText: {
+    ...createTextStyle('base', 'bold', 'primary'),
+  },
+  testButtonSubtext: {
+    ...createTextStyle('xs', 'regular', 'secondary'),
+    marginTop: Theme.spacing.xs / 2,
+  },
+  
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -252,5 +284,3 @@ export const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
-
-

@@ -1,71 +1,49 @@
 import { Theme } from "@/theme/Theme";
-import {
-  spacing,
-  createButtonStyle,
-  flex,
-  createBadgeStyle,
-  createTextStyle,
-} from "@/theme/ThemeUtils";
+import { spacing, flex, createBadgeStyle } from "@/theme/ThemeUtils";
 import { MaterialIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  StatusBar,
-} from "react-native";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { styles } from "./_index.styles";
 import SkillOverviewScreen from "@/components/skill-overview/SkillOverview";
 import AIAssessment from "@/components/ai-assessment/AIAssessment";
-
-interface QuestionHistoryItem {
-  id: string;
-  question: string;
-  isCorrect: boolean;
-  timestamp: string;
-}
+import { MCQItem } from "@/types/Quiz";
+import { useRouteParams } from "@/navigation/navigation";
 
 const ReviewHistoryScreen = () => {
   const [selectedSegment, setSelectedSegment] = useState<"overview" | "review">(
     "overview",
   );
-
-  const historyData: QuestionHistoryItem[] = [
+  const mcqAnswers: MCQItem[] = [
     {
-      id: "1",
       question: "How do you define a decorator?",
+      id: 1,
       isCorrect: true,
-      timestamp: "2 hours ago",
+      timestamp: "2 days ago",
     },
     {
-      id: "2",
       question: "Time complexity of Dict lookups?",
+      id: 2,
       isCorrect: false,
-      timestamp: "Yesterday",
+      timestamp: "3 days ago",
     },
     {
-      id: "3",
       question: "Difference between __str__ & __repr__",
+      id: 3,
       isCorrect: true,
-      timestamp: "Oct 20, 2023",
+      timestamp: "5 days ago",
     },
     {
-      id: "4",
       question: "List comprehensions vs Generators",
-      isCorrect: true,
-      timestamp: "Oct 18, 2023",
+      id: 4,
+      isCorrect: false,
+      timestamp: "1 week ago",
     },
   ];
 
+
+  // Otherwise show the normal review history screen
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
-    >
+    <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       {/* Segmented Control */}
       <View style={[spacing.containerPadding, styles.segmentedContainer]}>
         <View style={styles.segmentedControl}>
@@ -81,7 +59,7 @@ const ReviewHistoryScreen = () => {
               style={[
                 styles.segmentButtonText,
                 selectedSegment === "overview" &&
-                styles.segmentButtonTextActive,
+                  styles.segmentButtonTextActive,
               ]}
             >
               Overview
@@ -113,12 +91,12 @@ const ReviewHistoryScreen = () => {
       ) : (
         <View style={styles.historyList}>
           <AIAssessment />
-          {historyData.map((item, index) => (
+          {mcqAnswers.map((item, index) => (
             <TouchableOpacity
               key={item.id}
               style={[
                 styles.historyItem,
-                index !== historyData.length - 1 && styles.historyItemBorder,
+                index !== mcqAnswers.length - 1 && styles.historyItemBorder,
               ]}
               activeOpacity={0.7}
             >

@@ -13,6 +13,7 @@ import { styles } from "./SkillsOverview.styles";
 import StatCard from "../stat-card/StatCard";
 import CircularProgress from "../circular-progress/CircularProgress";
 import { navigateTo, useRouteParams } from "@/navigation/navigation";
+import { SINGLE_QUESTION_TEST } from "@/data/QuizData";
 
 const SkillOverviewScreen = () => {
   const currentLevel = 0;
@@ -97,7 +98,7 @@ const SkillOverviewScreen = () => {
         style={styles.bottomCTA}
         pointerEvents="box-none"
       >
-        <TouchableOpacity onPress={() => navigateTo('assessment', {skill: skill})} style={styles.ctaButton} activeOpacity={0.95}>
+        <TouchableOpacity onPress={() => navigateTo('quiz', {skill: skill, data: SINGLE_QUESTION_TEST})} style={styles.ctaButton} activeOpacity={0.95}>
           <Text style={styles.ctaButtonText}>NEXT QUESTION</Text>
         </TouchableOpacity>
       </LinearGradient>

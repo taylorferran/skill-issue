@@ -1,7 +1,8 @@
 // lib/navigation.ts
-import { router, useLocalSearchParams } from 'expo-router';
-import z from 'zod';
-import { Href } from 'expo-router';
+import { router, useLocalSearchParams } from "expo-router";
+import z from "zod";
+import { Href } from "expo-router";
+import { QuizStateSchema } from "@/types/Quiz";
 
 const pages = {
   dashboard: {
@@ -31,13 +32,14 @@ const pages = {
       skill: z.string(),
     }),
   },
-   assessment: {
-    path: "/[skill]/questions/assessment" as const,
+  quiz: {
+    path: "/[skill]/questions/quiz" as const,
     params: z.object({
       skill: z.string(),
+      data: QuizStateSchema,
     }),
   },
- 
+
   profile: {
     path: "/profile" as const,
     params: z.object({}),
@@ -77,34 +79,46 @@ const routes = { ...pages } as const;
 
 export function navigateTo<K extends keyof typeof routes>(
   route: K,
-  ...args: z.infer<(typeof routes)[K]['params']> extends Record<string, never>
+  ...args: z.infer<(typeof routes)[K]["params"]> extends Record<string, never>
     ? []
-    : [params: z.infer<(typeof routes)[K]['params']>]
+    : [params: z.infer<(typeof routes)[K]["params"]>]
 ) {
   const [params] = args;
-  
-  // Build the path with params
   let pathname = routes[route].path;
-  
-  // Replace dynamic segments with actual values
+  const queryParams: Record<string, string> = {};
+
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
-      pathname = pathname.replace(`[${key}]`, String(value)) as any;
+      // Check if this key is a path parameter
+      if (pathname.includes(`[${key}]`)) {
+        pathname = pathname.replace(`[${key}]`, String(value)) as any;
+      } else {
+        // It's a query parameter - serialize it
+        if (typeof value === "object") {
+          queryParams[key] = JSON.stringify(value);
+        } else {
+          queryParams[key] = String(value);
+        }
+      }
     });
   }
-  
-  router.push(pathname as Href);
+
+  // Push with both pathname and params
+  router.push({
+    pathname: pathname as any,
+    params: queryParams,
+  } as Href);
 }
 
 export function dismissTo<K extends keyof typeof pages>(
   route: K,
-  ...args: z.infer<typeof pages[K]['params']> extends Record<string, never>
+  ...args: z.infer<(typeof pages)[K]["params"]> extends Record<string, never>
     ? []
-    : [params: z.infer<typeof pages[K]['params']>]
+    : [params: z.infer<(typeof pages)[K]["params"]>]
 ) {
   const [params] = args;
   let pathname = pages[route].path;
-  
+
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       pathname = pathname.replace(`[${key}]`, String(value)) as any;
@@ -116,8 +130,8 @@ export function dismissTo<K extends keyof typeof pages>(
 }
 
 export function useRouteParams<K extends keyof typeof pages>(
-  route: K
-): z.infer<typeof pages[K]['params']> {
+  route: K,
+): z.infer<(typeof pages)[K]["params"]> {
   const rawParams = useLocalSearchParams();
   const schema = pages[route].params;
 

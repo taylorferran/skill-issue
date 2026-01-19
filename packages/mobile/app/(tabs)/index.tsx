@@ -19,7 +19,6 @@ export default function SkillSelectScreen() {
   const handleLanguageSelect = (language: Language) => {
     navigateTo('questions', {
         skill: language.name,
-        topic: "test"
     })
   };
 

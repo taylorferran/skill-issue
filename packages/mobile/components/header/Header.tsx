@@ -1,7 +1,6 @@
 
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import { useUser } from "@clerk/clerk-expo";
+import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
@@ -9,14 +8,13 @@ import { Theme } from "@/theme/Theme";
 import { styles } from "./Header.styles";
 
 export function CustomHeader({ navigation, route, options }: BottomTabHeaderProps) {
-  const { user } = useUser();
   const router = useRouter();
 
   const backgroundColor = "rgba(252, 249, 243, 0.95)";
   const borderColor = "rgba(255, 139, 66, 0.1)";
 
   // Root routes that should not show a back button
-  const rootRoutes = ["index", "skills/index", "profile"];
+  const rootRoutes = ["index", "profile"];
   const isRootRoute = rootRoutes.includes(route.name);
   const canGoBack = navigation.canGoBack() && !isRootRoute;
 
@@ -39,7 +37,7 @@ export function CustomHeader({ navigation, route, options }: BottomTabHeaderProp
       <View style={styles.logoContainer}>
         {canGoBack && (
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
             style={({ pressed }) => [
               styles.backButton,
               { opacity: pressed ? 0.7 : 1 }

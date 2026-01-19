@@ -3,8 +3,11 @@ import { createButtonStyle } from "@/theme/ThemeUtils";
 import { MaterialIcons } from "@expo/vector-icons";
 import { View, Text, TouchableOpacity } from "react-native";
 import { styles } from "./AIAssessment.styles";
+import { navigateTo, useRouteParams } from "@/navigation/navigation";
+import { MULTIPLE_QUESTIONS_TEST } from "@/data/QuizData";
 
 const AIAssessment = () => {
+  const {skill} = useRouteParams('questions')
   return (
     <View style={styles.assessmentCardWrapper}>
       <View style={styles.assessmentCard}>
@@ -29,6 +32,7 @@ const AIAssessment = () => {
 
           <TouchableOpacity
             style={[createButtonStyle("primary"), styles.assessmentButton]}
+            onPress={() => navigateTo('quiz', {skill: skill, data: MULTIPLE_QUESTIONS_TEST})}
             activeOpacity={0.8}
           >
             <Text style={styles.assessmentButtonText}>Start Now</Text>
