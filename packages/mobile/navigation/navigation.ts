@@ -9,22 +9,35 @@ const pages = {
     params: z.object({}),
   },
   skillSelection: {
-    path: "/skills" as const,
+    path: "/" as const,
     params: z.object({}),
   },
   topicSelection: {
-    path: "/skills/[skill]" as const,
+    path: "/[skill]" as const,
     params: z.object({
       skill: z.string(),
     }),
   },
   learnTopic: {
-    path: "/skills/[skill]/[topic]" as const,
+    path: "/[skill]/[topic]" as const,
     params: z.object({
       skill: z.string(),
       topic: z.string(),
     }),
   },
+  questions: {
+    path: "/[skill]/questions" as const,
+    params: z.object({
+      skill: z.string(),
+    }),
+  },
+   assessment: {
+    path: "/[skill]/questions/assessment" as const,
+    params: z.object({
+      skill: z.string(),
+    }),
+  },
+ 
   profile: {
     path: "/profile" as const,
     params: z.object({}),

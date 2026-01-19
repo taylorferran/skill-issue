@@ -11,7 +11,7 @@ import { Theme } from "@/theme/Theme";
 import { Module } from "@/types/Module";
 import { flex } from "@/theme/ThemeUtils";
 import { ModuleCard } from "@/components/module-card/ModuleCard";
-import { useRouteParams } from "@/navigation/navigation";
+import { navigateTo, useRouteParams } from "@/navigation/navigation";
 import { styles } from "./_index.styles";
 
 // Icon component placeholder - replace with your actual icon component
@@ -108,7 +108,7 @@ export const LearnTopicScreen: React.FC = () => {
             key={module.id}
             module={module}
             isLast={index === modules.length - 1}
-            onPress={() => console.log(`Module ${module.id} pressed`)}
+            onPress={() => navigateTo('questions', {skill: skill, topic: module.title})}
           />
         ))}
       </View>

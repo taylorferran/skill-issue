@@ -14,20 +14,15 @@ type TabConfig = {
 };
 
 const TAB_CONFIGS: Record<string, TabConfig> = {
-  index: {
-    icon: "dashboard",
-    label: "DASHBOARD",
+ skills: {
     name: "index",
-  },
-  "skills/index": {
     icon: "military-tech",
     label: "SKILLS",
-    name: "skills/index",
   },
   profile: {
+    name: "(profile)",
     icon: "verified-user",
     label: "PROFILE",
-    name: "profile",
   },
 };
 
@@ -43,9 +38,11 @@ export function CustomTabBar({
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const cleanName = route.name.replace(/[()]/g, "");
-        const config = TAB_CONFIGS[cleanName];
-
-        // Skip routes without config (like profile/logout)
+        
+        // Map root/index routes to 'skills'
+        const configKey = cleanName === "index" || cleanName === "" ? "skills" : cleanName;
+        const config = TAB_CONFIGS[configKey];
+        
         if (!config) return null;
 
         const onPress = () => {

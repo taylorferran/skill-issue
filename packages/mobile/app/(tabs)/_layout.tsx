@@ -41,17 +41,17 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
+          title: "Skills",
           href: "/",
         }}
       />
-      <Tabs.Screen
-        name="skills/index"
-        options={{
-          title: "Skills",
-          href: "/skills",
-        }}
-      />
+      {/* <Tabs.Screen */}
+      {/*   name="skills/index" */}
+      {/*   options={{ */}
+      {/*     title: "Skills", */}
+      {/*     href: "/skills", */}
+      {/*   }} */}
+      {/* /> */}
       <Tabs.Screen
         name="profile"
         options={{

@@ -34,6 +34,13 @@ export const Theme = {
       light: 'rgba(160, 217, 177, 0.2)',
     },
     
+    // Error/Warning Colors (Added for incorrect answers)
+    error: {
+      main: '#FF8B42',
+      light: 'rgba(255, 139, 66, 0.1)',
+      medium: 'rgba(255, 139, 66, 0.3)',
+    },
+    
     // Shadow Colors
     shadow: {
       default: '#000',
@@ -45,8 +52,14 @@ export const Theme = {
       teal: '#22c3c3',
       tealDark: '#18a4a4',
       tealLight: 'rgba(107, 199, 184, 0.2)',
-      orange: '#FF6F00',
-      orangeLight: 'rgba(255, 111, 0, 0.1)',
+      orange: '#ED7733',
+      orangeLight: 'rgba(237, 119, 51, 0.1)',
+    },
+    
+    // Surface Colors (for cards, code blocks, etc.)
+    surface: {
+      light: '#F5F4F2',
+      dark: '#242830',
     },
     
     // Pastel Colors (for category backgrounds)

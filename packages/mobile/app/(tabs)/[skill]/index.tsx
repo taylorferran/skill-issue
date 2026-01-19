@@ -33,7 +33,7 @@ export const TopicSelectScreen: React.FC = () => {
   }, [navigation, skill]);
 
   const handleAssess = (topic: string) => {
-    navigateTo('learnTopic', { skill: skill, topic: topic });
+    navigateTo('questions', { skill: skill});
     // Handle navigation or modal opening
   };
 
