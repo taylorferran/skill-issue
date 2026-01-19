@@ -20,31 +20,13 @@ export const QuizTimer: React.FC<QuizTimerProps> = ({
 
   return (
     <View style={styles.timerContainer}>
-      <View style={styles.timerHeader}>
-        <MaterialIcons
-          name="timer"
-          size={20}
-          color={
-            isTimeUp
-              ? Theme.colors.primary.main
-              : isWarning
-              ? "#F59E0B"
-              : Theme.colors.text.secondary
-          }
-        />
-        <Text
-          style={[
-            styles.timerText,
-            isTimeUp && styles.timerTextTimeUp,
-            isWarning && styles.timerTextWarning,
-          ]}
-        >
-          {isTimeUp ? "Time's Up!" : `${timeLeft}s remaining`}
-        </Text>
-      </View>
-
-      <View style={styles.progressBar}>
-        <View
+      {/* Circular Progress Ring */}
+      <View style={styles.circularTimer}>
+        {/* Background Circle */}
+        <View style={styles.backgroundCircle} />
+        
+        {/* Progress Circle */}
+        <View 
           style={[
             styles.progressFill,
             {
