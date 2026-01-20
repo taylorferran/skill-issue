@@ -26,14 +26,14 @@ export function CustomHeader({
   // Show back button for any non-root route
   const canGoBack = !isRootRoute;
 
-  const isQuizRoute = pathname?.includes("/quiz");
+  const isQuizRoute = pathname?.includes("quiz");
 
   let displayTitle = "Skill Issue";
-  if (isQuizRoute && quizState) {
-    if (!quizState.isSingleQuestion) {
+  if (quizState) {
+    if (!quizState.isSingleQuestion && isQuizRoute) {
       displayTitle = `Question ${quizState.currentQuestion} of ${quizState.totalQuestions}`;
     } else {
-      displayTitle = "Quiz";
+      displayTitle = "";
     }
   } else if (isProfileRoute) {
     displayTitle = "Profile";
@@ -42,7 +42,6 @@ export function CustomHeader({
   } else {
     displayTitle = options.title ?? "Skill Issue";
   }
-  displayTitle = options.title ?? "Skill Issue";
 
   const handleBackPress = () => {
     if (router.canGoBack()) {

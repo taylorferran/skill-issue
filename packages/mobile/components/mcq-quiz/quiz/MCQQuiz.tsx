@@ -199,7 +199,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
 
         {/* SINGLE QUESTION MODE */}
         {isSingleQuestion && quizSession.hasAnswered && (
-          <>
+          <View style={styles.buttonContainer}>
             <QuizResult 
               isCorrect={quizSession.isCorrect} 
               explanation={currentQuestion.explanation} 
@@ -210,10 +210,10 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
             />
             {quizSession.rating !== null && (
               <View style={styles.buttonContainer}>
-                <FinishButton onPress={onFinish} isLastQuestion={true} />
+                <FinishButton onPress={onFinish} text={'Finish'} />
               </View>
             )}
-          </>
+          </View>
         )}
 
         {/* MULTIPLE QUESTION MODE */}
@@ -224,7 +224,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
               explanation={currentQuestion.explanation} 
             />
             <View style={styles.buttonContainer}>
-              <FinishButton onPress={handleNext} isLastQuestion={isLastQuestion} />
+              <FinishButton  onPress={handleNext} text={isLastQuestion ? 'Finish' : quizSession.hasAnswered ? 'Next': 'Confirm'} />
             </View>
           </>
         )}

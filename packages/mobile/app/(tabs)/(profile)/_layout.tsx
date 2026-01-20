@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 export default function ProfileStack() {
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerShown: false,
       }}

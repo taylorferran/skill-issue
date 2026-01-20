@@ -4,6 +4,7 @@ import { Stack } from "expo-router";
 export default function SkillsStack() {
   return (
     <Stack
+      initialRouteName="index"
       screenOptions={{
         headerShown: false, // Tab header handles it
       }}

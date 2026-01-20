@@ -6,35 +6,41 @@ import { CustomHeader } from "@/components/header/Header";
 import { HapticTab } from "@/components/heptic-tab/HepticTab";
 import { CustomTabBar } from "@/components/custom-tab/CustomTab";
 
+// app/(tabs)/_layout.tsx - temporary debug version
 export default function TabLayout() {
   const { isSignedIn, isLoaded } = useAuth();
-
+  
   if (!isLoaded) return null;
   if (!isSignedIn) return <Redirect href="/sign-in" />;
 
   return (
-    // app/(tabs)/_layout.tsx
     <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
+      initialRouteName="(skills)"
+      screenListeners={{
+        state: (e) => {
+          console.log('Tab state changed:', e.data);
+        },
+      }}
+      tabBar={(props) => {
+        console.log('Tab render - index:', props.state.index, 'route:', props.state.routes[props.state.index].name);
+        return <CustomTabBar {...props} />;
+      }}
       screenOptions={{
         header: (props) => <CustomHeader {...props} />,
-        headerShown: true, // This enables header for all tab screens
+        headerShown: true,
         tabBarButton: HapticTab,
       }}
     >
       <Tabs.Screen
-        name="(skills)" // ← Points to the whole stack
+        name="(skills)"
         options={{
           title: "Skills",
-          href: "/",
         }}
       />
-
       <Tabs.Screen
         name="(profile)"
         options={{
           title: "Profile",
-          href: "/profile",
         }}
       />
     </Tabs>

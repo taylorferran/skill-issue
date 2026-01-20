@@ -93,14 +93,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
   return (
     <View style={styles.questionCard}>
-      <View style={styles.questionHeader}>
-        <Text>
-          Question {questionNumber} of {totalQuestions}
-        </Text>
-      </View>
-
       <Text style={styles.questionText}>{question.question}</Text>
-
       <View style={styles.answersContainer}>
         {question.answers.map((answer) => (
           <Pressable

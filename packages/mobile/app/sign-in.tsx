@@ -20,7 +20,7 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/(skills)/');
       }
     } catch (err: any) {
       console.error('OAuth error', err);
@@ -34,7 +34,7 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/(skills)/');
       }
     } catch (err: any) {
       console.error('OAuth error', err);

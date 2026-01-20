@@ -49,7 +49,8 @@ export const styles = StyleSheet.create({
 
   // Button Container
   buttonContainer: {
-    marginTop: Theme.spacing["3xl"],
+    marginTop: Theme.spacing["xl"],
+    marginBottom: Theme.spacing["2xl"]
   },
 
   // Footer with progress

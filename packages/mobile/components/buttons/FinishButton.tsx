@@ -4,12 +4,12 @@ import { styles } from "./FinishButton.styles";
 
 type FinishButtonProps = {
   onPress: () => void;
-  isLastQuestion: boolean;
+  text: string;
 };
 
 export const FinishButton: React.FC<FinishButtonProps> = ({
   onPress,
-  isLastQuestion,
+  text,
 }) => {
   return (
     <TouchableOpacity
@@ -18,7 +18,7 @@ export const FinishButton: React.FC<FinishButtonProps> = ({
       activeOpacity={0.98}
     >
       <Text style={styles.finishButtonText}>
-        Confirm Answer
+        {text}
       </Text>
     </TouchableOpacity>
   );
