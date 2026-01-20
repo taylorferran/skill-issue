@@ -18,7 +18,7 @@ export default function TabLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         header: (props) => <CustomHeader {...props} />,
-        headerShown: true,
+        headerShown: true, // This enables header for all tab screens
         tabBarButton: HapticTab,
       }}
     >

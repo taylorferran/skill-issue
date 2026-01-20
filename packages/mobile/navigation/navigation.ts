@@ -141,35 +141,4 @@ export function useRouteParams<K extends keyof typeof pages>(
   return parsed;
 }
 
-// lib/navigation.ts
-export function navigateBack() {
-  const pathname = router.pathname || '/';
-  const segments = pathname.split('/').filter(Boolean);
-  
-  // Already at root
-  if (segments.length === 0) return;
-  
-  // /profile stays
-  if (segments[0] === 'profile') return;
-  
-  // /[skill] -> go to /
-  if (segments.length === 1) {
-    router.push('/');
-    return;
-  }
-  
-  // /[skill]/questions -> go to /[skill]
-  if (segments.length === 2 && segments[1] === 'questions') {
-    router.push(`/${segments[0]}`);
-    return;
-  }
-  
-  // /[skill]/questions/quiz -> go to /[skill]/questions
-  if (segments.length === 3 && segments[1] === 'questions' && segments[2] === 'quiz') {
-    router.push(`/${segments[0]}/questions`);
-    return;
-  }
-  
-  // Fallback
-  router.push('/');
-}
+

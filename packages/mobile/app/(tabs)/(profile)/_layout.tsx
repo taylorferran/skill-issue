@@ -8,7 +8,7 @@ export default function ProfileStack() {
         headerShown: false,
       }}
     >
-      <Stack.Screen name="index" />  {/* ← Add this */}
+      <Stack.Screen name="index" />
     </Stack>
   );
 }
