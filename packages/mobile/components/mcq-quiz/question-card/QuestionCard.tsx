@@ -1,9 +1,9 @@
-import { Theme } from "@/theme/Theme";
-import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, Pressable } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import { styles } from "./QuestionCard.styles";
-import { MCQQuestion } from "@/types/Quiz";
+import { MCQQuestion, QuizState } from "@/types/Quiz";
+import { Theme } from "@/theme/Theme";
 
 type QuestionCardProps = {
   question: MCQQuestion;
@@ -25,94 +25,95 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   totalQuestions,
 }) => {
   const getAnswerStyle = (answerId: number) => {
+    if (!hasAnswered) {
+      // Before answering - highlight selected answer
+      return answerId === selectedAnswerId ? styles.answerOptionSelected : null;
+    }
+
+    // After answering - show correct/incorrect
     const isCorrect = answerId === question.correctAnswerId;
     const isSelected = answerId === selectedAnswerId;
 
-    if (!hasAnswered && !isTimeUp) {
-      return isSelected 
-        ? [styles.answerOption, styles.answerOptionSelected]
-        : styles.answerOption;
-    }
-
     if (isCorrect) {
-      return [styles.answerOption, styles.answerOptionCorrect];
+      return styles.answerOptionCorrect;
     }
     
     if (isSelected && !isCorrect) {
-      return [styles.answerOption, styles.answerOptionIncorrect];
+      return styles.answerOptionIncorrect;
     }
 
-    return styles.answerOption;
+    return null;
   };
 
-  const getAnswerIndicator = (answerId: number) => {
+  const getAnswerTextStyle = (answerId: number) => {
+    if (!hasAnswered) return null;
+
     const isCorrect = answerId === question.correctAnswerId;
     const isSelected = answerId === selectedAnswerId;
 
-    // Show checkmark for correct answer after answering
-    if ((hasAnswered || isTimeUp) && isCorrect) {
+    if (isCorrect) {
+      return styles.answerTextCorrect;
+    }
+    
+    if (isSelected && !isCorrect) {
+      return styles.answerTextIncorrect;
+    }
+
+    return null;
+  };
+
+  const getAnswerIcon = (answerId: number) => {
+    if (!hasAnswered) return null;
+
+    const isCorrect = answerId === question.correctAnswerId;
+    const isSelected = answerId === selectedAnswerId;
+
+    if (isCorrect) {
       return (
-        <View style={[styles.radioContainer, styles.radioSelected]}>
-          <Ionicons
-            name="checkmark"
-            size={16}
-            color={Theme.colors.text.inverse}
-          />
-        </View>
+        <MaterialIcons
+          name="check-circle"
+          size={24}
+          color={Theme.colors.success.main}
+        />
       );
     }
 
-    // Show radio button for selection state
-    if (isSelected) {
+    if (isSelected && !isCorrect) {
       return (
-        <View style={[styles.radioContainer, styles.radioSelected]}>
-          {!hasAnswered && !isTimeUp && <View style={styles.radioInner} />}
-          {(hasAnswered || isTimeUp) && !isCorrect && (
-            <Ionicons
-              name="checkmark"
-              size={16}
-              color={Theme.colors.text.inverse}
-            />
-          )}
-        </View>
+        <MaterialIcons
+          name="cancel"
+          size={24}
+          color={Theme.colors.primary.main}
+        />
       );
     }
 
-    // Default radio button
-    return <View style={styles.radioContainer} />;
+    return null;
   };
 
   return (
     <View style={styles.questionCard}>
-      {/* Question Text (large, prominent iOS style) */}
+      <View style={styles.questionHeader}>
+        <Text>
+          Question {questionNumber} of {totalQuestions}
+        </Text>
+      </View>
+
       <Text style={styles.questionText}>{question.question}</Text>
 
-      {/* Answer Options */}
       <View style={styles.answersContainer}>
-        {question.answers.map((answer: any) => (
-          <TouchableOpacity
+        {question.answers.map((answer) => (
+          <Pressable
             key={answer.id}
-            style={getAnswerStyle(answer.id)}
+            style={[styles.answerOption, getAnswerStyle(answer.id)]}
             onPress={() => onAnswerSelect(answer.id)}
             disabled={hasAnswered || isTimeUp}
-            activeOpacity={0.98}
           >
-            <Text
-              style={[
-                styles.answerText,
-                (hasAnswered || isTimeUp) &&
-                  answer.id === question.correctAnswerId &&
-                  styles.answerTextCorrect,
-                (hasAnswered || isTimeUp) &&
-                  answer.id === selectedAnswerId &&
-                  answer.id !== question.correctAnswerId &&
-                  styles.answerTextIncorrect,
-              ]}
-            >
+            <Text style={[styles.answerText, getAnswerTextStyle(answer.id)]}>
               {answer.text}
             </Text>
-            {getAnswerIndicator(answer.id)}
-          </TouchableOpacity>
+            {getAnswerIcon(answer.id)}
+          </Pressable>
         ))}
       </View>
     </View>

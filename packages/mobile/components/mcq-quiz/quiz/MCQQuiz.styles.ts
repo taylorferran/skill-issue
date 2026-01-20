@@ -6,18 +6,18 @@ export const styles = StyleSheet.create({
   // Container (iOS-style background)
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f7', // iOS background
+    backgroundColor: "#f5f5f7", // iOS background
     maxWidth: 430,
-    alignSelf: 'center',
-    width: '100%',
+    alignSelf: "center",
+    width: "100%",
   },
-  
+
   // Header with close button and timer
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Theme.spacing['2xl'],
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: Theme.spacing["2xl"],
     paddingTop: Theme.spacing.lg,
     paddingBottom: Theme.spacing.lg,
   },
@@ -25,69 +25,79 @@ export const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: Theme.borderRadius.full,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-
+  confirmButton: {
+    backgroundColor: Theme.colors.primary.main,
+    borderRadius: Theme.borderRadius.lg,
+    padding: Theme.spacing.lg,
+    alignItems: "center",
+    ...Theme.shadows.card,
+  },
+  confirmButtonText: {
+    ...createTextStyle("base", "bold", "primary"),
+    color: "#FFFFFF",
+  },
   // Main Content Area
   mainContent: {
     flex: 1,
-    paddingHorizontal: Theme.spacing['2xl'],
-    marginTop: Theme.spacing['3xl'],
+    paddingHorizontal: Theme.spacing["2xl"],
+    marginTop: Theme.spacing["3xl"],
   },
 
   // Button Container
   buttonContainer: {
-    marginTop: Theme.spacing['3xl'],
+    marginTop: Theme.spacing["3xl"],
   },
 
   // Footer with progress
   footer: {
-    paddingHorizontal: Theme.spacing['2xl'],
-    paddingTop: Theme.spacing['3xl'],
+    paddingHorizontal: Theme.spacing["2xl"],
+    paddingTop: Theme.spacing["3xl"],
     paddingBottom: Theme.spacing.lg,
-    gap: Theme.spacing['3xl'],
+    gap: Theme.spacing["3xl"],
   },
   progressSection: {
-    width: '100%',
+    width: "100%",
   },
   progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
     marginBottom: Theme.spacing.sm,
   },
   progressLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
     letterSpacing: 1.5,
     color: Theme.colors.gray[500],
   },
   progressPercentage: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: "700",
     color: Theme.colors.primary.main,
   },
   progressTrack: {
     height: 6,
-    width: '100%',
+    width: "100%",
     backgroundColor: Theme.colors.gray[200],
     borderRadius: Theme.borderRadius.full,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   progressFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: Theme.colors.primary.main,
     borderRadius: Theme.borderRadius.full,
   },
   homeIndicator: {
     width: 128,
     height: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
     borderRadius: Theme.borderRadius.full,
-    alignSelf: 'center',
+    alignSelf: "center",
   },
 
   // Mode Indicator (Debug - remove in production)
@@ -134,7 +144,6 @@ export const styles = StyleSheet.create({
     borderRadius: Theme.borderRadius.full,
     overflow: "hidden",
   },
-
 
   // Question Card
   questionCard: {

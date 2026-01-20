@@ -4,46 +4,61 @@ import { View, Text, Pressable } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { usePathname, useRouter } from "expo-router";
 import { Theme } from "@/theme/Theme";
 import { styles } from "./CustomTab.style";
 
 type TabConfig = {
-  name: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   label: string;
+  path: string;
 };
 
 const TAB_CONFIGS: Record<string, TabConfig> = {
- skills: {
-    name: "index",
+  "(skills)": {
     icon: "military-tech",
     label: "SKILLS",
+    path: "/",
   },
-  profile: {
-    name: "(profile)",
+  "(profile)": {
     icon: "verified-user",
     label: "PROFILE",
+    path: "/profile",
   },
 };
 
-export function CustomTabBar({
-  state,
-  descriptors,
-  navigation,
-}: BottomTabBarProps) {
+// Helper: Check if a tab should be highlighted
+function isTabFocused(routeName: string, tabIndex: number, currentIndex: number, pathname: string): boolean {
+  // Direct tab focus
+  if (currentIndex === tabIndex) return true;
+
+  // Skills tab: highlight for all non-profile routes
+  if (routeName === "(skills)") {
+    return pathname === "/" || (!!pathname.match(/^\/[^/]+/) && !pathname.startsWith("/profile"));
+  }
+
+  // Profile tab: highlight for profile routes
+  if (routeName === "(profile)/index") {
+    return pathname.startsWith("/profile");
+  }
+
+  return false;
+}
+
+export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const router = useRouter();
+
+console.log("Tab routes:", state.routes.map(r => ({ name: r.name, key: r.key })));
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {state.routes.map((route, index) => {
-        const isFocused = state.index === index;
-        const cleanName = route.name.replace(/[()]/g, "");
-        
-        // Map root/index routes to 'skills'
-        const configKey = cleanName === "index" || cleanName === "" ? "skills" : cleanName;
-        const config = TAB_CONFIGS[configKey];
-        
+        const config = TAB_CONFIGS[route.name];
         if (!config) return null;
+
+        const isFocused = isTabFocused(route.name, index, state.index, pathname);
 
         const onPress = () => {
           const event = navigation.emit({
@@ -53,35 +68,22 @@ export function CustomTabBar({
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            router.push(config.path);
           }
         };
 
         return (
           <Pressable key={route.key} onPress={onPress} style={styles.tabButton}>
-            {/* Top indicator line */}
             {isFocused && <View style={styles.activeIndicator} />}
-
-            {/* Icon */}
             <MaterialIcons
               name={config.icon}
               size={Theme.iconSize.xl / 3.5}
-              color={
-                isFocused
-                  ? Theme.colors.primary.main
-                  : Theme.colors.text.secondary
-              }
+              color={isFocused ? Theme.colors.primary.main : Theme.colors.text.secondary}
             />
-
-            {/* Label */}
-            <Text
+            <Text 
               style={[
-                styles.label,
-                {
-                  color: isFocused
-                    ? Theme.colors.primary.main
-                    : Theme.colors.text.secondary,
-                },
+                styles.label, 
+                { color: isFocused ? Theme.colors.primary.main : Theme.colors.text.secondary }
               ]}
             >
               {config.label}

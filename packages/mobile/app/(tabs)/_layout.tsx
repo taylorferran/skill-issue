@@ -1,35 +1,19 @@
 // app/(tabs)/_layout.tsx
-import { Tabs, Redirect, useRouter } from "expo-router";
+import { Tabs, Redirect } from "expo-router";
 import React from "react";
 import { useAuth } from "@clerk/clerk-expo";
-import { Pressable } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
 import { CustomHeader } from "@/components/header/Header";
 import { HapticTab } from "@/components/heptic-tab/HepticTab";
 import { CustomTabBar } from "@/components/custom-tab/CustomTab";
 
 export default function TabLayout() {
-  const { isSignedIn, isLoaded, signOut } = useAuth();
-  const router = useRouter();
+  const { isSignedIn, isLoaded } = useAuth();
 
-  if (!isLoaded) {
-    return null;
-  }
-
-  if (!isSignedIn) {
-    return <Redirect href="/sign-in" />;
-  }
-
-  //  const handleSignOut = async () => {
-  //    try {
-  //      await signOut();
-  //     router.replace("/sign-in");
-  //  } catch (err) {
-  //   console.error("Sign out error:", err);
-  //  }
-  // };
+  if (!isLoaded) return null;
+  if (!isSignedIn) return <Redirect href="/sign-in" />;
 
   return (
+    // app/(tabs)/_layout.tsx
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
@@ -39,26 +23,20 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(skills)" // ← Points to the whole stack
         options={{
           title: "Skills",
           href: "/",
         }}
       />
-      {/* <Tabs.Screen */}
-      {/*   name="skills/index" */}
-      {/*   options={{ */}
-      {/*     title: "Skills", */}
-      {/*     href: "/skills", */}
-      {/*   }} */}
-      {/* /> */}
+
       <Tabs.Screen
-        name="profile"
+        name="(profile)"
         options={{
           title: "Profile",
-          href: "/profile", // Hide from tab bar
+          href: "/profile",
         }}
-     />
+      />
     </Tabs>
   );
 }

@@ -2,27 +2,31 @@ import { Theme } from "@/theme/Theme";
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-  // Timer Container
+  // Circular Timer Container
   timerContainer: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   
-  // Linear Progress Bar Container
-  progressBarContainer: {
-    width: '100%',
-    height: 8,
-    backgroundColor: Theme.colors.gray[200],
-    borderRadius: 4,
-    overflow: 'hidden',
+  // Circular Timer Design
+  circularTimer: {
+    width: 48,
+    height: 48,
     position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
-  // Progress Fill
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
+  // SVG Container
+  svgContainer: {
+    position: 'absolute',
+  },
+  
+  // Time Text Container
+  timeTextContainer: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   
   // Time Text
@@ -31,7 +35,6 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: Theme.colors.text.primary,
     letterSpacing: -0.5,
-    marginTop: 6,
   },
   timeTextWarning: {
     color: '#F59E0B',

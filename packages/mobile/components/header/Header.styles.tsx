@@ -47,4 +47,8 @@ export const styles = StyleSheet.create({
   profileContainer: {
     padding: 0,
   },
+  // Timer container in header
+  timerContainer: {
+    flexShrink: 0,
+  },
 });

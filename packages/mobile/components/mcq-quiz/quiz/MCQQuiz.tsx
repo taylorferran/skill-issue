@@ -1,143 +1,214 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text } from "react-native";
+import { View, ScrollView, Text, Pressable } from "react-native";
 import { styles } from "./MCQQuiz.styles";
 import { QuestionCard } from "../question-card/QuestionCard";
 import { QuizResult } from "../quiz-result/QuizResult";
-import { QuizTimer } from "../timer/QuizTimer";
 import { FinishButton } from "@/components/buttons/FinishButton";
 import { QuizState } from "@/types/Quiz";
-import { spacing } from "@/theme/ThemeUtils";
 import { StarRating } from "@/components/star-rating/StarRating";
+import { useQuiz } from "@/contexts/QuizContext";
 
 type MCQQuizProps = {
   data: QuizState;
   onFinish: () => void;
-  timePerQuestion?: number; // in seconds
+  timePerQuestion?: number;
 };
+
+interface QuizSessionState {
+  currentQuestionIndex: number;
+  selectedAnswerId: number | null;
+  hasAnswered: boolean;
+  isCorrect: boolean;
+  timeLeft: number;
+  isTimeUp: boolean;
+  rating: number | null;
+}
 
 export const MCQQuiz: React.FC<MCQQuizProps> = ({
   data,
   onFinish,
   timePerQuestion = 30,
 }) => {
+  const { setQuizState } = useQuiz();
   const isSingleQuestion = !Array.isArray(data);
   const questions = isSingleQuestion ? [data] : data;
 
-  // Debug: Log quiz mode
-  React.useEffect(() => {
-    console.log("Quiz Mode:", isSingleQuestion ? "SINGLE" : "MULTIPLE");
-    console.log("Total Questions:", questions.length);
-  }, []);
+  // ✅ Consolidated state
+  const [quizSession, setQuizSession] = useState<QuizSessionState>({
+    currentQuestionIndex: 0,
+    selectedAnswerId: null,
+    hasAnswered: false,
+    isCorrect: false,
+    timeLeft: timePerQuestion,
+    isTimeUp: false,
+    rating: null,
+  });
 
+  const currentQuestion = questions[quizSession.currentQuestionIndex];
+  const isLastQuestion = quizSession.currentQuestionIndex === questions.length - 1;
+
+  // Update context with quiz state
   useEffect(() => {
-    setCurrentQuestionIndex(0);
-    setSelectedAnswerId(null);
-    setHasAnswered(false);
-    setIsCorrect(false);
-    setRating(null);
-    setTimeLeft(timePerQuestion);
-    setIsTimeUp(false);
-  }, [data, timePerQuestion]); // Reset when data or timePerQuestion changes
+    setQuizState({
+      currentQuestion: quizSession.currentQuestionIndex + 1,
+      totalQuestions: questions.length,
+      isSingleQuestion,
+      timeLeft: quizSession.timeLeft,
+      totalTime: timePerQuestion,
+      isTimeUp: quizSession.isTimeUp,
+    });
+  }, [
+    quizSession.currentQuestionIndex,
+    quizSession.timeLeft,
+    quizSession.isTimeUp,
+    questions.length,
+    isSingleQuestion,
+    timePerQuestion,
+    setQuizState,
+  ]);
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
-  const [hasAnswered, setHasAnswered] = useState(false);
-  const [isCorrect, setIsCorrect] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(timePerQuestion);
-  const [isTimeUp, setIsTimeUp] = useState(false);
-  const [rating, setRating] = useState<number | null>(null); // ✅ New state for rating
-  const currentQuestion = questions[currentQuestionIndex];
-  const isLastQuestion = currentQuestionIndex === questions.length - 1;
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      setQuizState(null);
+    };
+  }, [setQuizState]);
+
+  // Reset quiz session when data changes
+  useEffect(() => {
+    setQuizSession({
+      currentQuestionIndex: 0,
+      selectedAnswerId: null,
+      hasAnswered: false,
+      isCorrect: false,
+      timeLeft: timePerQuestion,
+      isTimeUp: false,
+      rating: null,
+    });
+  }, [data, timePerQuestion]);
 
   // Reset timer when question changes
   useEffect(() => {
-    setTimeLeft(timePerQuestion);
-    setIsTimeUp(false);
-  }, [currentQuestionIndex, timePerQuestion]);
+    setQuizSession((prev) => ({
+      ...prev,
+      timeLeft: timePerQuestion,
+      isTimeUp: false,
+    }));
+  }, [quizSession.currentQuestionIndex, timePerQuestion]);
 
-  // Timer countdown
+  // Timer countdown with auto-submit
   useEffect(() => {
-    if (hasAnswered || timeLeft === 0) return;
+    if (quizSession.hasAnswered || quizSession.timeLeft === 0) return;
 
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          setIsTimeUp(true);
-          return 0;
+      setQuizSession((prev) => {
+        if (prev.timeLeft <= 1) {
+          // Time's up!
+          if (prev.selectedAnswerId !== null) {
+            // Answer was selected but not confirmed - auto confirm it
+            const correct = prev.selectedAnswerId === currentQuestion.correctAnswerId;
+            return {
+              ...prev,
+              timeLeft: 0,
+              isTimeUp: true,
+              hasAnswered: true,
+              isCorrect: correct,
+            };
+          } else {
+            // No answer selected - mark as failed
+            return {
+              ...prev,
+              timeLeft: 0,
+              isTimeUp: true,
+              hasAnswered: true,
+              isCorrect: false,
+            };
+          }
         }
-        return prev - 1;
+        return {
+          ...prev,
+          timeLeft: prev.timeLeft - 1,
+        };
       });
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft, hasAnswered]);
+  }, [quizSession.hasAnswered, quizSession.timeLeft, quizSession.selectedAnswerId, currentQuestion.correctAnswerId]);
 
   const handleAnswerSelect = (answerId: number) => {
-    if (hasAnswered || isTimeUp) return;
+    if (quizSession.hasAnswered || quizSession.isTimeUp) return;
+    setQuizSession((prev) => ({ ...prev, selectedAnswerId: answerId }));
+  };
 
-    setSelectedAnswerId(answerId);
-    setHasAnswered(true);
-    const correct = answerId === currentQuestion.correctAnswerId;
-    setIsCorrect(correct);
+  const handleConfirmAnswer = () => {
+    if (quizSession.selectedAnswerId === null || quizSession.hasAnswered) return;
+
+    const correct = quizSession.selectedAnswerId === currentQuestion.correctAnswerId;
+    setQuizSession((prev) => ({
+      ...prev,
+      hasAnswered: true,
+      isCorrect: correct,
+    }));
   };
 
   const handleNext = () => {
     if (isLastQuestion) {
       onFinish();
     } else {
-      // Move to next question
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setSelectedAnswerId(null);
-      setHasAnswered(false);
-      setIsCorrect(false);
+      setQuizSession((prev) => ({
+        ...prev,
+        currentQuestionIndex: prev.currentQuestionIndex + 1,
+        selectedAnswerId: null,
+        hasAnswered: false,
+        isCorrect: false,
+        rating: null,
+        timeLeft: timePerQuestion,
+        isTimeUp: false,
+      }));
     }
   };
 
   const handleRatingSelect = (selectedRating: number) => {
-    setRating(selectedRating);
-    // TODO: Save rating to backend/analytics here
-    console.log(
-      `User rated question ${currentQuestion.id} with ${selectedRating} stars`,
-    );
+    setQuizSession((prev) => ({ ...prev, rating: selectedRating }));
+    console.log(`User rated question ${currentQuestion.id} with ${selectedRating} stars`);
   };
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header with Close and Timer */}
-      <View style={styles.header}>
-        <QuizTimer
-          timeLeft={timeLeft}
-          totalTime={timePerQuestion}
-          isTimeUp={isTimeUp}
-        />
-      </View>
-
-      {/* Main Content */}
       <View style={styles.mainContent}>
         <QuestionCard
           question={currentQuestion}
-          selectedAnswerId={selectedAnswerId}
+          selectedAnswerId={quizSession.selectedAnswerId}
           onAnswerSelect={handleAnswerSelect}
-          hasAnswered={hasAnswered}
-          isTimeUp={isTimeUp}
-          questionNumber={currentQuestionIndex + 1}
+          hasAnswered={quizSession.hasAnswered}
+          isTimeUp={quizSession.isTimeUp}
+          questionNumber={quizSession.currentQuestionIndex + 1}
           totalQuestions={questions.length}
         />
 
+        {/* Confirm Answer Button */}
+        {quizSession.selectedAnswerId !== null && 
+         !quizSession.hasAnswered && 
+         !quizSession.isTimeUp && (
+          <View style={styles.buttonContainer}>
+            <Pressable style={styles.confirmButton} onPress={handleConfirmAnswer}>
+              <Text style={styles.confirmButtonText}>Confirm Answer</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* SINGLE QUESTION MODE */}
-        {isSingleQuestion && hasAnswered && (
+        {isSingleQuestion && quizSession.hasAnswered && (
           <>
-            {/* Show explanation without continue button */}
-            <QuizResult
-              isCorrect={isCorrect}
-              explanation={currentQuestion.explanation}
+            <QuizResult 
+              isCorrect={quizSession.isCorrect} 
+              explanation={currentQuestion.explanation} 
             />
-
-            {/* Show star rating */}
-            <StarRating rating={rating} onRatingSelect={handleRatingSelect} />
-
-            {/* Only show continue button after rating is given */}
-            {rating !== null && (
+            <StarRating 
+              rating={quizSession.rating} 
+              onRatingSelect={handleRatingSelect} 
+            />
+            {quizSession.rating !== null && (
               <View style={styles.buttonContainer}>
                 <FinishButton onPress={onFinish} isLastQuestion={true} />
               </View>
@@ -145,11 +216,17 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
           </>
         )}
 
-        {/* MULTIPLE QUESTION MODE: Show next/finish button */}
-        {!isSingleQuestion && hasAnswered && (
-          <View style={styles.buttonContainer}>
-            <FinishButton onPress={handleNext} isLastQuestion={isLastQuestion} />
-          </View>
+        {/* MULTIPLE QUESTION MODE */}
+        {!isSingleQuestion && quizSession.hasAnswered && (
+          <>
+            <QuizResult 
+              isCorrect={quizSession.isCorrect} 
+              explanation={currentQuestion.explanation} 
+            />
+            <View style={styles.buttonContainer}>
+              <FinishButton onPress={handleNext} isLastQuestion={isLastQuestion} />
+            </View>
+          </>
         )}
       </View>
     </ScrollView>

@@ -27,14 +27,18 @@ export const styles = StyleSheet.create({
   answersContainer: {
     gap: Theme.spacing.lg,
   },
-  
+
+  answerOptionSelected: {
+  backgroundColor: Theme.colors.primary.light,
+  borderColor: Theme.colors.primary.main,
+  borderWidth: Theme.borderWidth.medium,
+},
   // Answer Option (card-style)
   answerOption: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: Theme.colors.background.secondary,
-    borderRadius: Theme.borderRadius.xl,
     borderWidth: 1,
     borderColor: Theme.colors.gray[200],
     padding: Theme.spacing.xl,
@@ -42,14 +46,7 @@ export const styles = StyleSheet.create({
     ...Theme.shadows.subtle,
   },
   
-  // Selected Answer Option
-  answerOptionSelected: {
-    borderWidth: 2,
-    borderColor: Theme.colors.primary.main,
-    ...Theme.shadows.skillCard,
-  },
-  
-  // Correct Answer Option
+    // Correct Answer Option
   answerOptionCorrect: {
     borderWidth: 2,
     borderColor: Theme.colors.primary.main,
