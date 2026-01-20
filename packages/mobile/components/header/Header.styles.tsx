@@ -23,7 +23,7 @@ export const styles = StyleSheet.create({
   logoBox: {
     width: 32,
     height: 32,
-    backgroundColor: "#ff8b42",
+    backgroundColor: "white",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",

@@ -1,6 +1,6 @@
 import { useQuiz } from "@/contexts/QuizContext";
 import { Theme } from "@/theme/Theme";
-import { MaterialIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
 import { useRouter, usePathname } from "expo-router";
 import { View, Pressable, Text } from "react-native";
@@ -18,10 +18,12 @@ export function CustomHeader({
   const backgroundColor = "white";
 
   // Check if we're at a root tab route by pathname
-  const rootPaths = ["/", "/profile"];
-  const isRootRoute = rootPaths.includes(pathname);
+  const isProfileRoute =
+    pathname === "/profile" || pathname.startsWith("/profile/");
+  const isSkillsRoute = pathname === "/";
+  const isRootRoute = isSkillsRoute || isProfileRoute;
 
-  // Show back button for any non-root route (don't check navigation.canGoBack())
+  // Show back button for any non-root route
   const canGoBack = !isRootRoute;
 
   const isQuizRoute = pathname?.includes("/quiz");
@@ -33,13 +35,14 @@ export function CustomHeader({
     } else {
       displayTitle = "Quiz";
     }
-  } else if (pathname === "/") {
-    displayTitle = "Skills";
-  } else if (pathname === "/profile") {
+  } else if (isProfileRoute) {
     displayTitle = "Profile";
-  } else if (!isRootRoute) {
+  } else if (isSkillsRoute) {
+    displayTitle = "Skills";
+  } else {
     displayTitle = options.title ?? "Skill Issue";
   }
+  displayTitle = options.title ?? "Skill Issue";
 
   const handleBackPress = () => {
     if (router.canGoBack()) {
@@ -72,10 +75,10 @@ export function CustomHeader({
         )}
         {!isQuizRoute && (
           <View style={styles.logoBox}>
-            <MaterialIcons
-              name="bolt"
-              color={"white"}
-              size={Theme.iconSize.md}
+            <Ionicons
+              name="diamond"
+              size={28}
+              color={Theme.colors.primary.main}
             />
           </View>
         )}
