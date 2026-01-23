@@ -1,17 +1,11 @@
 import React, { useLayoutEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-} from "react-native";
+import { View, Text, ScrollView } from "react-native";
 import { useNavigation } from "expo-router";
 import { Theme } from "@/theme/Theme";
 import { Module } from "@/types/Module";
 import { flex } from "@/theme/ThemeUtils";
 import { ModuleCard } from "@/components/module-card/ModuleCard";
-import { useRouteParams } from "@/navigation/navigation";
+import { navigateTo, useRouteParams } from "@/navigation/navigation";
 import { styles } from "./_index.styles";
 
 // Icon component placeholder - replace with your actual icon component
@@ -28,7 +22,7 @@ const Icon = ({
 }) => <View style={{ width: size, height: size }} />;
 
 export const LearnTopicScreen: React.FC = () => {
-  const { skill, topic } = useRouteParams('learnTopic');
+  const { skill, topic } = useRouteParams("learnTopic");
   const navigation = useNavigation();
 
   useLayoutEffect(() => {
@@ -108,7 +102,9 @@ export const LearnTopicScreen: React.FC = () => {
             key={module.id}
             module={module}
             isLast={index === modules.length - 1}
-            onPress={() => console.log(`Module ${module.id} pressed`)}
+            onPress={() =>
+              navigateTo("questions", { skill: skill })
+            }
           />
         ))}
       </View>

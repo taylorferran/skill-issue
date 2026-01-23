@@ -4,30 +4,24 @@ import { View, Text, Pressable } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { usePathname, useRouter } from "expo-router";
 import { Theme } from "@/theme/Theme";
 import { styles } from "./CustomTab.style";
 
 type TabConfig = {
-  name: string;
   icon: keyof typeof MaterialIcons.glyphMap;
   label: string;
+  path: string;
 };
 
-const TAB_CONFIGS: Record<string, TabConfig> = {
-  index: {
-    icon: "dashboard",
-    label: "DASHBOARD",
-    name: "index",
-  },
-  "skills/index": {
+const TAB_CONFIGS: Record<string, Omit<TabConfig, "path">> = {
+  "(skills)": {
     icon: "military-tech",
     label: "SKILLS",
-    name: "skills/index",
   },
-  profile: {
+  "(profile)": {
     icon: "verified-user",
     label: "PROFILE",
-    name: "profile",
   },
 };
 
@@ -41,12 +35,11 @@ export function CustomTabBar({
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       {state.routes.map((route, index) => {
-        const isFocused = state.index === index;
-        const cleanName = route.name.replace(/[()]/g, "");
-        const config = TAB_CONFIGS[cleanName];
-
-        // Skip routes without config (like profile/logout)
+        const config = TAB_CONFIGS[route.name];
         if (!config) return null;
+
+        // Simple focus check - just use the navigation state
+        const isFocused = state.index === index;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -56,16 +49,16 @@ export function CustomTabBar({
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            // Reset to root of the tab to clear navigation history
+            navigation.reset({
+              index: 0,
+              routes: [{ name: route.name }],
+            });
           }
         };
-
         return (
           <Pressable key={route.key} onPress={onPress} style={styles.tabButton}>
-            {/* Top indicator line */}
             {isFocused && <View style={styles.activeIndicator} />}
-
-            {/* Icon */}
             <MaterialIcons
               name={config.icon}
               size={Theme.iconSize.xl / 3.5}
@@ -75,8 +68,6 @@ export function CustomTabBar({
                   : Theme.colors.text.secondary
               }
             />
-
-            {/* Label */}
             <Text
               style={[
                 styles.label,
