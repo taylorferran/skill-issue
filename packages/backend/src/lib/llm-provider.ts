@@ -79,17 +79,20 @@ Generate the challenge now:`;
   }
 
   private getDifficultyDescription(difficulty: number): string {
-    if (difficulty <= 2) {
-      return 'Basic recall, fundamental concepts, beginner-level knowledge';
-    } else if (difficulty <= 4) {
-      return 'Application of basic concepts, straightforward problem-solving';
-    } else if (difficulty <= 6) {
-      return 'Analysis and synthesis, combining multiple concepts, recognizing nuances';
-    } else if (difficulty <= 8) {
-      return 'Complex reasoning, advanced applications, subtle distinctions';
-    } else {
-      return 'Expert-level, rare edge cases, deep theoretical understanding';
-    }
+    const descriptions: Record<number, string> = {
+      1: 'Complete Beginner: Generate a question requiring no prior knowledge; assume the respondent is encountering this subject for the very first time.',
+      2: 'Novice: Generate a question about basic terminology or fundamental concepts that someone with minimal exposure to the subject could answer.',
+      3: 'Basic Understanding: Generate a question that tests foundational knowledge, requiring the respondent to recall core principles or definitions.',
+      4: 'Developing Competence: Generate a question that requires applying basic concepts to straightforward scenarios or making simple connections between ideas.',
+      5: 'Intermediate: Generate a question that assumes solid foundational knowledge and tests the ability to analyze, compare, or apply concepts in moderately complex situations.',
+      6: 'Proficient: Generate a question requiring integration of multiple concepts, awareness of common exceptions, or application to real-world contexts with some nuance.',
+      7: 'Advanced: Generate a question that tests deep understanding, including edge cases, limitations of standard approaches, or the ability to evaluate competing methods.',
+      8: 'Expert: Generate a question requiring specialized knowledge, critical evaluation of complex scenarios, or synthesis across multiple advanced topics.',
+      9: 'Specialist: Generate a question that assumes mastery of the field, testing nuanced judgment, obscure details, or the ability to navigate ambiguous or contested areas.',
+      10: 'Subject Matter Expert: Generate a question at the frontier of the domain, requiring knowledge of cutting-edge developments, unresolved debates, or the ability to identify novel insights.'
+    };
+
+    return descriptions[difficulty] || descriptions[5];
   }
 
   private parseChallengeResponse(response: string, targetDifficulty: number): GeneratedChallenge {
