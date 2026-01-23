@@ -21,7 +21,7 @@ const SkillOverviewScreen = () => {
   const hotStreak = 0;
   const questionsAnswered = 0;
 
-  const {skill } = useRouteParams('questions')
+  const {skill, progress } = useRouteParams('questions')
   return (
     <View style={styles.container}>
       <ScrollView
@@ -59,14 +59,8 @@ const SkillOverviewScreen = () => {
         <View style={styles.progressCard}>
           <Text style={styles.progressHeader}>OVERALL SKILL PROGRESS</Text>
 
-          <CircularProgress current={currentLevel} total={maxLevel} />
-
-          <Text style={styles.gaugeLabel}>LEVEL</Text>
-
-          <Text style={styles.progressDescription}>
-            Complete your first lesson to see your progress bloom.
-          </Text>
-        </View>
+          <CircularProgress current={progress} total={100} />
+       </View>
 
         {/* Pro Tip Card */}
         <View style={styles.proTipCard}>

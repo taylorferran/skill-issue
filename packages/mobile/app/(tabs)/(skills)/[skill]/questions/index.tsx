@@ -7,7 +7,6 @@ import { styles } from "./_index.styles";
 import SkillOverviewScreen from "@/components/skill-overview/SkillOverview";
 import AIAssessment from "@/components/ai-assessment/AIAssessment";
 import { MCQItem } from "@/types/Quiz";
-import { useRouteParams } from "@/navigation/navigation";
 
 const ReviewHistoryScreen = () => {
   const [selectedSegment, setSelectedSegment] = useState<"overview" | "review">(

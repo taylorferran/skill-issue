@@ -43,6 +43,7 @@ export const styles = StyleSheet.create({
     lineHeight: 14,
   },
   iconContainer: {
+    backgroundColor: Theme.colors.primary.main,
     width: 64,
     height: 64,
     borderRadius: Theme.borderRadius.lg,

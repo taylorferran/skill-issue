@@ -55,6 +55,7 @@ export const styles = StyleSheet.create({
 
   progressHeader: {
     ...createTextStyle("xs", "bold", "secondary"),
+    paddingBottom: Theme.spacing['xl'],
     letterSpacing: 1.6,
     marginBottom: Theme.spacing["3xl"],
   },

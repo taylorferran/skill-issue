@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Skill, getSkillIconColor } from '@/types/Skill';
+import { Skill } from '@/types/Skill';
 import { Theme } from '@/theme/Theme';
 import { ProgressBar } from '@/components/progress-bar/ProgressBar';
 import { styles } from './SkillCard.styles';
@@ -12,7 +12,6 @@ interface SkillCardProps {
 }
 
 export function SkillCard({ skill, onSelect }: SkillCardProps) {
-  const iconColor = getSkillIconColor(skill);
   
   return (
     <TouchableOpacity 
@@ -29,7 +28,7 @@ export function SkillCard({ skill, onSelect }: SkillCardProps) {
         </View>
         
         {/* Skill Icon */}
-        <View style={[styles.iconContainer, { backgroundColor: iconColor }]}>
+        <View style={[styles.iconContainer]}>
           <Ionicons 
             name={skill.icon} 
             size={28} 

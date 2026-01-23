@@ -3,10 +3,23 @@ import { createTextStyle } from "@/theme/ThemeUtils";
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
-
   container: {
     flex: 1,
     backgroundColor: Theme.colors.background.primary,
+  },
+
+  // Add this to your styles object
+  svgContainer: {
+    position: "relative",
+    width: 180,
+    height: 180,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gaugeInner: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   scrollView: {
@@ -179,5 +192,4 @@ export const styles = StyleSheet.create({
     fontWeight: Theme.typography.fontWeight.bold,
     color: Theme.colors.text.inverse,
   },
-}) 
-
+});

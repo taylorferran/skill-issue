@@ -30,6 +30,7 @@ const pages = {
     path: "/[skill]/questions" as const,
     params: z.object({
       skill: z.string(),
+      progress: z.number(),
     }),
   },
   quiz: {
