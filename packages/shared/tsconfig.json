@@ -1,12 +1,13 @@
 {
-  "extends": "../../tsconfig.json", 
+  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "composite": true,
-    "outDir": "./dist", 
-    "rootDir": "./src", 
-    "allowImportingTsExtensions": true, 
-    "moduleResolution": "bundler"
-  }, 
-  "include": ["src"], 
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+    "noEmit": true
+  },
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }

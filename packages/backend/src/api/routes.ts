@@ -1,11 +1,17 @@
 import express, { Request, Response } from 'express';
-import { z } from 'zod';
 import { getSupabase } from '@/lib/supabase';
 import { skillStateAgent } from '@/agents/agent3-skill-state';
 import { schedulerService } from '@/services/scheduler.service';
 import { opikService } from '@/lib/opik';
 import { apiKeyAuth } from '@/middleware/auth';
 import type { Database } from '@/types/database';
+import {
+  AnswerChallengeSchema,
+  CreateUserSchema,
+  UpdateUserSchema,
+  EnrollSkillSchema,
+  UpdateUserSkillSchema,
+} from '@learning-platform/shared/schemas';
 
 const router = express.Router();
 
@@ -42,15 +48,6 @@ type UserSkillStateUpdate = Database['public']['Tables']['user_skill_state']['Up
  * POST /api/answer
  * Submit an answer to a challenge
  */
-const AnswerChallengeSchema = z.object({
-  challengeId: z.string().uuid(),
-  userId: z.string().uuid(),
-  selectedOption: z.number().min(0).max(3),
-  responseTime: z.number().positive().optional(),
-  confidence: z.number().min(1).max(5).optional(),
-  userFeedback: z.string().optional(),
-});
-
 router.post('/answer', async (req: Request, res: Response) => {
   try {
     const validation = AnswerChallengeSchema.safeParse(req.body);
@@ -322,14 +319,6 @@ router.get('/skills', async (_req: Request, res: Response) => {
  * POST /api/users
  * Create a new user
  */
-const CreateUserSchema = z.object({
-  id: z.string().uuid().optional(),
-  timezone: z.string().default('UTC'),
-  quietHoursStart: z.number().min(0).max(23).optional(),
-  quietHoursEnd: z.number().min(0).max(23).optional(),
-  maxChallengesPerDay: z.number().min(1).max(100).default(5),
-});
-
 router.post('/users', async (req: Request, res: Response) => {
   console.log('[POST /users] Route handler called');
   console.log('[POST /users] Request body:', JSON.stringify(req.body));
@@ -417,13 +406,6 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
  * PUT /api/users/:userId
  * Update user settings
  */
-const UpdateUserSchema = z.object({
-  timezone: z.string().optional(),
-  quietHoursStart: z.number().min(0).max(23).optional(),
-  quietHoursEnd: z.number().min(0).max(23).optional(),
-  maxChallengesPerDay: z.number().min(1).max(100).optional(),
-});
-
 router.put('/users/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -489,11 +471,6 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
  * POST /api/users/:userId/skills
  * Enroll user in a skill (create user_skill_state)
  */
-const EnrollSkillSchema = z.object({
-  skillId: z.string().uuid(),
-  difficultyTarget: z.number().min(1).max(10).default(2),
-});
-
 router.post('/users/:userId/skills', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -592,10 +569,6 @@ router.post('/users/:userId/skills', async (req: Request, res: Response) => {
  * PUT /api/users/:userId/skills/:skillId
  * Update user skill state (e.g, manually adjust difficulty target)
  */
-const UpdateUserSkillSchema = z.object({
-  difficultyTarget: z.number().min(1).max(10).optional(),
-});
-
 router.put('/users/:userId/skills/:skillId', async (req: Request, res: Response) => {
   try {
     const { userId, skillId } = req.params;
@@ -729,5 +702,8 @@ router.post('/scheduler/tick', async (_req: Request, res: Response) => {
     });
   }
 });
+
+console.log('[Routes] All routes defined, exporting router');
+console.log(`[Routes] Router stack length: ${router.stack?.length}`);
 
 export default router;
