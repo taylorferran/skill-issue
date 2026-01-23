@@ -13,8 +13,8 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build TypeScript
-RUN npm run build
+# Build TypeScript using standalone config (no monorepo dependencies)
+RUN npx tsc -p tsconfig.docker.json
 
 # Stage 2: Production
 FROM node:18-alpine
