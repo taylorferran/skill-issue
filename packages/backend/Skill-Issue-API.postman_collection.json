@@ -1,0 +1,600 @@
+{
+	"info": {
+		"_postman_id": "skill-issue-api-collection",
+		"name": "Skill Issue API",
+		"description": "Complete API collection for testing the Skill Issue backend. Test the full flow: create users, enroll in skills, generate challenges, submit answers.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health & Info",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/health",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Check if the server is running. This endpoint never requires authentication."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Skills",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/skills",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"skills"
+							]
+						},
+						"description": "Get all active skills available in the system. Works for any skill type: languages, programming, math, history, etc."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Create User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    pm.collectionVariables.set(\"userId\", jsonData.id);",
+									"    console.log(\"User ID saved: \" + jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"timezone\": \"America/New_York\",\n  \"quietHoursStart\": 22,\n  \"quietHoursEnd\": 8,\n  \"maxChallengesPerDay\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users"
+							]
+						},
+						"description": "Create a new user with timezone and quiet hours settings. The user ID will be automatically saved to collection variables."
+					},
+					"response": []
+				},
+				{
+					"name": "Get User",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}"
+							]
+						},
+						"description": "Get user details including timezone, quiet hours, and max challenges per day."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Settings",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maxChallengesPerDay\": 10,\n  \"quietHoursStart\": 23,\n  \"quietHoursEnd\": 7\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}"
+							]
+						},
+						"description": "Update user settings. All fields are optional."
+					},
+					"response": []
+				},
+				{
+					"name": "Get User's Skills",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/skills",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"skills"
+							]
+						},
+						"description": "Get all skills the user is enrolled in, with their progress stats and difficulty levels."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "User Skills",
+			"item": [
+				{
+					"name": "Enroll User in Skill",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 201) {",
+									"    const jsonData = pm.response.json();",
+									"    console.log(\"User enrolled in skill: \" + jsonData.skillName);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"skillId\": \"{{skillId}}\",\n  \"difficultyTarget\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/skills",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"skills"
+							]
+						},
+						"description": "Enroll a user in a skill with an initial difficulty target (1-10). Make sure to set {{skillId}} variable first by copying from 'Get All Skills' response."
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Skill Difficulty",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"difficultyTarget\": 5\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/skills/{{skillId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"skills",
+								"{{skillId}}"
+							]
+						},
+						"description": "Manually adjust the difficulty target for a user's skill."
+					},
+					"response": []
+				},
+				{
+					"name": "Unenroll from Skill",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/skills/{{skillId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"skills",
+								"{{skillId}}"
+							]
+						},
+						"description": "Remove a skill from the user's enrolled skills."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Challenges",
+			"item": [
+				{
+					"name": "Trigger Scheduler (Create Challenge)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"console.log(\"Scheduler tick completed. Check server logs for challenge ID.\");",
+									"console.log(\"Then run 'Get User Challenge History' to see the generated challenge.\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/scheduler/tick",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"scheduler",
+								"tick"
+							]
+						},
+						"description": "Manually trigger the scheduler to create challenges. Agent 1 will evaluate all users and Agent 2 will generate challenges via LLM for qualified users."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Challenge by ID",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/challenges/{{challengeId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"challenges",
+								"{{challengeId}}"
+							]
+						},
+						"description": "Get a specific challenge. The correct answer is NOT included (hidden until answered)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Challenge History",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const jsonData = pm.response.json();",
+									"    if (jsonData.length > 0) {",
+									"        pm.collectionVariables.set(\"challengeId\", jsonData[0].challengeId);",
+									"        console.log(\"Challenge ID saved: \" + jsonData[0].challengeId);",
+									"        console.log(\"Question: \" + jsonData[0].question);",
+									"    }",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/users/{{userId}}/challenges/history?limit=10",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"users",
+								"{{userId}}",
+								"challenges",
+								"history"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get user's challenge history including both answered and unanswered challenges. The latest challenge ID will be automatically saved."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Answers",
+			"item": [
+				{
+					"name": "Submit Answer (Correct)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"userId\": \"{{userId}}\",\n  \"selectedOption\": 0,\n  \"responseTime\": 5000,\n  \"confidence\": 4\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/answer",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"answer"
+							]
+						},
+						"description": "Submit an answer to a challenge. Change 'selectedOption' (0-3) based on the correct answer from the challenge. Agent 3 will update the user's skill state."
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Answer (Wrong)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{apiKey}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"challengeId\": \"{{challengeId}}\",\n  \"userId\": \"{{userId}}\",\n  \"selectedOption\": 1,\n  \"responseTime\": 8000,\n  \"confidence\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/answer",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"answer"
+							]
+						},
+						"description": "Submit a wrong answer to test difficulty adjustment. Agent 3 will decrease difficulty or keep it the same."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000/api",
+			"type": "string"
+		},
+		{
+			"key": "apiKey",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "skillId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "challengeId",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
