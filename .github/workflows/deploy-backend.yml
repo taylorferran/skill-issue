@@ -1,10 +1,13 @@
 name: Deploy Backend to Railway (via Registry)
 
 on:
-  workflow_run:
-    workflows: ["Build and Push Docker Image"]
-    types:
-      - completed
+  # This workflow is OPTIONAL - Railway can auto-deploy when you configure it to watch GHCR
+  # Only enable this if you want to trigger Railway deployments from GitHub Actions
+  # Uncomment the trigger below to enable:
+  # workflow_run:
+  #   workflows: ["Build and Push Docker Image"]
+  #   types:
+  #     - completed
   workflow_dispatch:
 
 env:
@@ -14,22 +17,44 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
 
     steps:
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
+      - name: Trigger Railway Redeploy
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway service --name backend || railway service create backend
-          railway variables set IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          railway up --detach
+          # Trigger deployment via Railway API
+          # Requires: RAILWAY_TOKEN and RAILWAY_SERVICE_ID in GitHub secrets
+
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "RAILWAY_TOKEN not set. Skipping deployment."
+            exit 0
+          fi
+
+          if [ -z "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
+            echo "RAILWAY_SERVICE_ID not set. Skipping deployment."
+            exit 0
+          fi
+
+          echo "Triggering Railway redeploy..."
+          RESPONSE=$(curl -s -X POST "https://backboard.railway.app/graphql/v2" \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"mutation serviceInstanceRedeploy(\$serviceId: String!) { serviceInstanceRedeploy(serviceId: \$serviceId) }\",
+              \"variables\": {
+                \"serviceId\": \"${{ secrets.RAILWAY_SERVICE_ID }}\"
+              }
+            }")
+
+          echo "Response: $RESPONSE"
+          echo "Deployment triggered!"
 
       - name: Deployment Summary
         run: |
-          echo "✅ Backend deployed to Railway from container registry"
+          echo "Backend deployment process completed"
           echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "Triggered by: ${{ github.event_name }}"
+          echo ""
+          echo "Note: This workflow is optional."
+          echo "Railway can automatically detect and deploy new GHCR images"
+          echo "when configured with image source: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
