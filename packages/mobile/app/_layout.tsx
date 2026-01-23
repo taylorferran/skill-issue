@@ -1,10 +1,11 @@
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { ClerkProvider, ClerkLoaded } from '@clerk/clerk-expo';
-import * as SecureStore from 'expo-secure-store';
-import 'react-native-reanimated';
-import { use } from 'react';
-import { AuthContext} from '@/contexts/AuthContext';
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
+import * as SecureStore from "expo-secure-store";
+import "react-native-reanimated";
+import { use } from "react";
+import { AuthContext } from "@/contexts/AuthContext";
+import { QuizProvider } from "@/contexts/QuizContext";
 
 const tokenCache = {
   async getToken(key: string) {
@@ -24,21 +25,24 @@ const tokenCache = {
 };
 
 export default function RootLayout() {
-  const {isAuthenticated} = use(AuthContext)
+  const { isAuthenticated } = use(AuthContext);
   return (
     <ClerkProvider
-      publishableKey={""}
+      publishableKey={
+        ""
+      }
       tokenCache={tokenCache}
     >
-
       <ClerkLoaded>
+        <QuizProvider>
           <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Protected guard={!isAuthenticated}>
-            <Stack.Screen  name="sign-in" />
-          </Stack.Protected>
+            <Stack.Protected guard={!isAuthenticated}>
+              <Stack.Screen name="sign-in" />
+            </Stack.Protected>
             <Stack.Screen name="(tabs)" />
           </Stack>
           <StatusBar style="auto" />
+        </QuizProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );

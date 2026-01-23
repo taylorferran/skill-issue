@@ -14,13 +14,6 @@ export const styles = StyleSheet.create({
   progressSection: {
     padding: Theme.spacing['2xl'],
   },
-  progressLabel: {
-    fontSize: Theme.typography.fontSize.xs,
-    fontWeight: Theme.typography.fontWeight.bold,
-    color: Theme.colors.text.secondary,
-    letterSpacing: Theme.typography.letterSpacing.wide,
-    marginBottom: Theme.spacing.xs,
-  },
   progressTitle: {
     fontSize: Theme.typography.fontSize['2xl'],
     fontWeight: Theme.typography.fontWeight.bold,
