@@ -29,7 +29,7 @@ export default function RootLayout() {
   return (
     <ClerkProvider
       publishableKey={
-        "pk_test_YW1hemVkLW1hcm1vc2V0LTcwLmNsZXJrLmFjY291bnRzLmRldiQ"
+        ""
       }
       tokenCache={tokenCache}
     >
