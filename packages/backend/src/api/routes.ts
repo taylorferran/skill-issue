@@ -9,6 +9,12 @@ import type { Database } from '@/types/database';
 
 const router = express.Router();
 
+// Log all incoming requests for debugging
+router.use((req, _res, next) => {
+  console.log(`[API] ${req.method} ${req.path}`);
+  next();
+});
+
 /**
  * GET /api/health
  * Health check endpoint (no auth required)

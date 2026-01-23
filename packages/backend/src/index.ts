@@ -19,12 +19,26 @@ app.use(express.urlencoded({ extended: true }));
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
   next();
+});
+
+// Handle OPTIONS preflight requests
+app.options('*', (_req, res) => {
+  res.status(200).end();
 });
 
 // API Routes
 app.use('/api', apiRoutes);
+
+// Log registered routes
+console.log('\n[Server] Registered API routes:');
+apiRoutes.stack.forEach((r: any) => {
+  if (r.route) {
+    const methods = Object.keys(r.route.methods).join(', ').toUpperCase();
+    console.log(`  ${methods} /api${r.route.path}`);
+  }
+});
 
 // Root endpoint
 app.get('/', (_req, res) => {
@@ -37,6 +51,23 @@ app.get('/', (_req, res) => {
       2: 'Challenge Design',
       3: 'Skill State',
     },
+  });
+});
+
+// 404 handler for debugging
+app.use((req, res) => {
+  console.log(`[404] ${req.method} ${req.path} - Route not found`);
+  console.log(`[404] Headers:`, req.headers);
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Cannot ${req.method} ${req.path}`,
+    availableRoutes: [
+      'GET /api/health',
+      'POST /api/users',
+      'GET /api/users/:userId',
+      'GET /api/skills',
+      'POST /api/answer',
+    ],
   });
 });
 
