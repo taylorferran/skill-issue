@@ -19,6 +19,7 @@ export const AnswerChallengeSchema = z.object({
  */
 export const CreateUserSchema = z.object({
   id: z.string().uuid().optional(),
+  deviceId: z.string().optional(),
   timezone: z.string().default('UTC'),
   quietHoursStart: z.number().min(0).max(23).optional(),
   quietHoursEnd: z.number().min(0).max(23).optional(),
@@ -30,6 +31,7 @@ export const CreateUserSchema = z.object({
  * PUT /api/users/:userId
  */
 export const UpdateUserSchema = z.object({
+  deviceId: z.string().optional(),
   timezone: z.string().optional(),
   quietHoursStart: z.number().min(0).max(23).optional(),
   quietHoursEnd: z.number().min(0).max(23).optional(),

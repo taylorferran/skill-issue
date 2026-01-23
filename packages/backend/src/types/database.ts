@@ -9,6 +9,7 @@ export interface Database {
       users: {
         Row: {
           id: string;
+          device_id: string | null;
           timezone: string;
           quiet_hours_start: number | null;
           quiet_hours_end: number | null;
@@ -17,6 +18,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
+          device_id?: string | null;
           timezone?: string;
           quiet_hours_start?: number | null;
           quiet_hours_end?: number | null;
@@ -25,6 +27,7 @@ export interface Database {
         };
         Update: {
           id?: string;
+          device_id?: string | null;
           timezone?: string;
           quiet_hours_start?: number | null;
           quiet_hours_end?: number | null;

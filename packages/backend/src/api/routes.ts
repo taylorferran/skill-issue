@@ -336,6 +336,7 @@ router.post('/users', async (req: Request, res: Response) => {
 
     const userData: UserInsert = {
       id: body.id,
+      device_id: body.deviceId,
       timezone: body.timezone,
       quiet_hours_start: body.quietHoursStart,
       quiet_hours_end: body.quietHoursEnd,
@@ -356,6 +357,7 @@ router.post('/users', async (req: Request, res: Response) => {
 
     res.status(201).json({
       id: (user as any).id,
+      deviceId: (user as any).device_id,
       timezone: (user as any).timezone,
       quietHoursStart: (user as any).quiet_hours_start,
       quietHoursEnd: (user as any).quiet_hours_end,
@@ -390,6 +392,7 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
     const userData = user as any;
     res.json({
       id: userData.id,
+      deviceId: userData.device_id,
       timezone: userData.timezone,
       quietHoursStart: userData.quiet_hours_start,
       quietHoursEnd: userData.quiet_hours_end,
@@ -433,6 +436,7 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
     }
 
     const updateData: UserUpdate = {
+      device_id: body.deviceId,
       timezone: body.timezone,
       quiet_hours_start: body.quietHoursStart,
       quiet_hours_end: body.quietHoursEnd,
@@ -455,6 +459,7 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
     const userData = user as any;
     res.json({
       id: userData.id,
+      deviceId: userData.device_id,
       timezone: userData.timezone,
       quietHoursStart: userData.quiet_hours_start,
       quietHoursEnd: userData.quiet_hours_end,
