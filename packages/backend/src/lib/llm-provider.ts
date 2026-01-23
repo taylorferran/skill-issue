@@ -4,6 +4,7 @@ import type {
   LLMProvider,
   ChallengeDesignRequest,
   GeneratedChallenge,
+  GeneratedChallengeWithUsage,
 } from '@/types';
 
 dotenv.config();
@@ -20,13 +21,13 @@ export class AnthropicProvider implements LLMProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallenge> {
+  async generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallengeWithUsage> {
     const { skillId, difficulty, skillName, skillDescription } = request;
 
     const prompt = this.buildChallengePrompt(skillId, skillName, skillDescription, difficulty);
 
     const message = await this.client.messages.create({
-      model: 'claude-haiku-4-5-20251001', // Todo: This model is a little dumb honestly, will need to experiment 
+      model: 'claude-haiku-4-5-20251001', // Todo: This model is a little dumb honestly, will need to experiment
       max_tokens: 1500,
       temperature: 0.7,
       messages: [
@@ -41,7 +42,17 @@ export class AnthropicProvider implements LLMProvider {
       ? message.content[0].text
       : '';
 
-    return this.parseChallengeResponse(responseText, difficulty);
+    const challenge = this.parseChallengeResponse(responseText, difficulty);
+
+    return {
+      challenge,
+      usage: {
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+      },
+      prompt,        // The actual prompt sent to the LLM
+      rawResponse: responseText,  // The raw LLM response
+    };
   }
 
   private buildChallengePrompt(

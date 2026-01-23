@@ -1,35 +1,347 @@
-import type { OpikTraceParams } from '@/types';
+import type { OpikTrace, OpikSpan, OpikPrompt, SpanType } from '@/types';
 
 /**
- * Opik integration for observability and metrics
- * Tracks all agent decisions and LLM calls
+ * Opik integration for observability, tracing, and prompt optimization
  *
- * Currently uses console logging as placeholder.
- * TODO: Integrate actual Opik SDK when needed and rework to ensure we're using Opik correctly.
+ * Features:
+ * - Hierarchical tracing (traces contain spans)
+ * - LLM call tracking with token usage and cost estimation
+ * - Prompt versioning for A/B testing
+ * - Feedback scores for evaluation
  */
 
-// Note: Opik SDK types may need adjustment based on actual SDK
-interface OpikClient {
-  trace(params: OpikTraceParams): Promise<void>;
-  flush(): Promise<void>;
+const OPIK_BASE_URL = 'https://www.comet.com/opik/api';
+const API_VERSION = 'v1/private';
+
+/**
+ * Generate a UUIDv7 (time-based UUID required by Opik)
+ */
+function generateUUIDv7(): string {
+  const timestamp = Date.now();
+
+  // UUIDv7 format: tttttttt-tttt-7xxx-yxxx-xxxxxxxxxxxx
+  // t = timestamp, 7 = version, y = variant (8, 9, a, or b), x = random
+  const timestampHex = timestamp.toString(16).padStart(12, '0');
+
+  const randomBytes = new Uint8Array(10);
+  crypto.getRandomValues(randomBytes);
+
+  // Convert to hex
+  const randomHex = Array.from(randomBytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  // Construct UUIDv7
+  const uuid = [
+    timestampHex.slice(0, 8),                          // First 8 chars of timestamp
+    timestampHex.slice(8, 12),                         // Next 4 chars of timestamp
+    '7' + randomHex.slice(0, 3),                       // Version 7 + 3 random chars
+    ((parseInt(randomHex.slice(3, 5), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0') + randomHex.slice(5, 7), // Variant + random
+    randomHex.slice(7, 19),                            // Remaining random
+  ].join('-');
+
+  return uuid;
 }
 
+// Anthropic pricing (per 1M tokens) - Claude Haiku
+const ANTHROPIC_PRICING = {
+  'claude-haiku-4-5-20251001': {
+    input: 1.00,   // $1.00 per 1M input tokens
+    output: 5.00,  // $5.00 per 1M output tokens
+  },
+  'claude-3-5-sonnet-20241022': {
+    input: 3.00,
+    output: 15.00,
+  },
+  'claude-3-opus-20240229': {
+    input: 15.00,
+    output: 75.00,
+  },
+  // Default fallback
+  default: {
+    input: 1.00,
+    output: 5.00,
+  },
+};
+
+interface TraceContext {
+  traceId: string;
+  projectName: string;
+  startTime: Date;
+}
+
+// Active trace contexts (for nested span support)
+const activeTraces = new Map<string, TraceContext>();
+
 class OpikService {
-  private client: OpikClient | null = null;
+  private apiKey: string | null = null;
+  private workspace: string | null = null;
+  private projectName: string = 'skill-issue';
   private isEnabled: boolean = false;
+  private pendingRequests: Promise<void>[] = [];
 
   initialize(apiKey?: string, workspaceName?: string): void {
-    this.isEnabled = !!apiKey && !!workspaceName;
+    this.apiKey = apiKey || process.env.OPIK_API_KEY || null;
+    this.workspace = workspaceName || process.env.OPIK_WORKSPACE || null;
+    this.isEnabled = !!this.apiKey;
 
     if (!this.isEnabled) {
       console.log('[Opik] Not configured - using console logging for metrics');
+      console.log('[Opik] Set OPIK_API_KEY to enable tracing');
       return;
     }
 
-    // TODO: Initialize actual Opik client when SDK is available
-    console.log(`[Opik] Initialized for workspace: ${workspaceName}`);
+    console.log(`[Opik] Initialized for project: ${this.projectName}`);
   }
 
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Authorization: this.apiKey!,
+      'Content-Type': 'application/json',
+    };
+    if (this.workspace) {
+      headers['Comet-Workspace'] = this.workspace;
+    }
+    return headers;
+  }
+
+  private async request(
+    method: string,
+    endpoint: string,
+    body?: unknown
+  ): Promise<globalThis.Response | null> {
+    if (!this.isEnabled) {
+      return null;
+    }
+
+    const url = `${OPIK_BASE_URL}/${API_VERSION}${endpoint}`;
+
+    try {
+      const response: globalThis.Response = await fetch(url, {
+        method,
+        headers: this.getHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Opik] API error ${response.status}: ${errorText}`);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('[Opik] Request failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Calculate estimated cost for LLM usage
+   */
+  private calculateCost(
+    model: string,
+    inputTokens: number,
+    outputTokens: number
+  ): number {
+    const pricing =
+      ANTHROPIC_PRICING[model as keyof typeof ANTHROPIC_PRICING] ||
+      ANTHROPIC_PRICING.default;
+
+    const inputCost = (inputTokens / 1_000_000) * pricing.input;
+    const outputCost = (outputTokens / 1_000_000) * pricing.output;
+
+    return inputCost + outputCost;
+  }
+
+  // ============= Trace Management =============
+
+  /**
+   * Start a new trace for an operation (e.g., agent execution)
+   * Returns a trace ID that can be used to create child spans
+   */
+  async startTrace(params: {
+    name: string;
+    input?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    tags?: string[];
+  }): Promise<string> {
+    const traceId = generateUUIDv7();
+    const startTime = new Date();
+
+    const context: TraceContext = {
+      traceId,
+      projectName: this.projectName,
+      startTime,
+    };
+    activeTraces.set(traceId, context);
+
+    const traceData: Partial<OpikTrace> = {
+      id: traceId,
+      project_name: this.projectName,
+      name: params.name,
+      start_time: startTime.toISOString(),
+      input: params.input,
+      metadata: {
+        ...params.metadata,
+        environment: process.env.NODE_ENV || 'development',
+      },
+      tags: params.tags,
+    };
+
+    if (!this.isEnabled) {
+      console.log(`[Opik] Trace started: ${params.name} (${traceId})`);
+      return traceId;
+    }
+
+    // Use batch endpoint as required by Opik API
+    const promise = this.request('POST', '/traces/batch', { traces: [traceData] }).then(() => {});
+    this.pendingRequests.push(promise);
+
+    return traceId;
+  }
+
+  /**
+   * End a trace and record final output
+   */
+  async endTrace(params: {
+    traceId: string;
+    output?: Record<string, unknown>;
+    error?: Error;
+  }): Promise<void> {
+    const context = activeTraces.get(params.traceId);
+    if (!context) {
+      console.warn(`[Opik] No active trace found: ${params.traceId}`);
+      return;
+    }
+
+    const endTime = new Date();
+    const durationMs = endTime.getTime() - context.startTime.getTime();
+
+    const updateData: Partial<OpikTrace> = {
+      end_time: endTime.toISOString(),
+      output: params.output,
+      metadata: {
+        duration_ms: durationMs,
+        success: !params.error,
+      },
+    };
+
+    if (params.error) {
+      updateData.error_info = {
+        exception_type: params.error.name,
+        message: params.error.message,
+        traceback: params.error.stack || '',
+      };
+    }
+
+    activeTraces.delete(params.traceId);
+
+    if (!this.isEnabled) {
+      console.log(`[Opik] Trace ended: ${params.traceId} (${durationMs}ms)`);
+      return;
+    }
+
+    // Use batch endpoint as required by Opik API
+    const promise = this.request('PATCH', '/traces/batch', {
+      ids: [params.traceId],
+      update: updateData,
+    }).then(() => {});
+    this.pendingRequests.push(promise);
+  }
+
+  // ============= Span Management =============
+
+  /**
+   * Create a span within a trace (e.g., LLM call, DB query)
+   */
+  async createSpan(params: {
+    traceId: string;
+    name: string;
+    type: SpanType;
+    input?: Record<string, unknown>;
+    output?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+    model?: string;
+    provider?: string;
+    promptTokens?: number;
+    completionTokens?: number;
+    durationMs?: number;
+    error?: Error;
+    parentSpanId?: string;
+  }): Promise<string> {
+    const spanId = generateUUIDv7();
+    const startTime = new Date();
+    const endTime = params.durationMs
+      ? new Date(startTime.getTime() + params.durationMs)
+      : startTime;
+
+    // Calculate cost if we have token data
+    let estimatedCost: number | undefined;
+    if (params.model && params.promptTokens && params.completionTokens) {
+      estimatedCost = this.calculateCost(
+        params.model,
+        params.promptTokens,
+        params.completionTokens
+      );
+    }
+
+    const spanData: Partial<OpikSpan> = {
+      id: spanId,
+      trace_id: params.traceId,
+      parent_span_id: params.parentSpanId,
+      // Don't send project_name for spans - inherited from trace
+      name: params.name,
+      type: params.type,
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+      input: params.input,
+      output: params.output,
+      metadata: {
+        ...params.metadata,
+        estimated_cost_usd: estimatedCost,
+      },
+      model: params.model,
+      provider: params.provider,
+      usage:
+        params.promptTokens || params.completionTokens
+          ? {
+              prompt_tokens: params.promptTokens,
+              completion_tokens: params.completionTokens,
+              total_tokens:
+                (params.promptTokens || 0) + (params.completionTokens || 0),
+            }
+          : undefined,
+      total_estimated_cost: estimatedCost,
+    };
+
+    if (params.error) {
+      spanData.error_info = {
+        exception_type: params.error.name,
+        message: params.error.message,
+        traceback: params.error.stack || '',
+      };
+    }
+
+    if (!this.isEnabled) {
+      const costStr = estimatedCost ? ` ($${estimatedCost.toFixed(6)})` : '';
+      console.log(
+        `[Opik] Span: ${params.name} (${params.type}) - ${params.durationMs}ms${costStr}`
+      );
+      return spanId;
+    }
+
+    // Use batch endpoint as required by Opik API
+    const promise = this.request('POST', '/spans/batch', { spans: [spanData] }).then(() => {});
+    this.pendingRequests.push(promise);
+
+    return spanId;
+  }
+
+  // ============= High-Level Tracking Methods =============
+
+  /**
+   * Track a complete agent execution with optional nested LLM spans
+   */
   async trackAgentExecution(params: {
     agentName: string;
     input: Record<string, unknown>;
@@ -37,54 +349,96 @@ class OpikService {
     metadata?: Record<string, unknown>;
     durationMs: number;
     success: boolean;
+    llmCalls?: Array<{
+      model: string;
+      prompt: string;
+      response: string;
+      promptTokens?: number;
+      completionTokens?: number;
+      durationMs: number;
+    }>;
   }): Promise<void> {
-    const traceParams: OpikTraceParams = {
+    // Create the trace for the agent execution
+    const traceId = await this.startTrace({
       name: `agent_${params.agentName}`,
       input: params.input,
-      output: params.output,
       metadata: {
         ...params.metadata,
-        durationMs: params.durationMs,
-        success: params.success,
-        timestamp: new Date().toISOString(),
+        agent: params.agentName,
       },
-      tags: ['agent', params.agentName],
-    };
+      tags: ['agent', params.agentName, params.success ? 'success' : 'failure'],
+    });
 
-    await this.trace(traceParams);
+    // Create spans for each LLM call
+    if (params.llmCalls) {
+      for (const llmCall of params.llmCalls) {
+        await this.createSpan({
+          traceId,
+          name: `llm_${llmCall.model}`,
+          type: 'llm',
+          model: llmCall.model,
+          provider: this.getProviderFromModel(llmCall.model),
+          input: { prompt: llmCall.prompt },
+          output: { response: llmCall.response },
+          promptTokens: llmCall.promptTokens,
+          completionTokens: llmCall.completionTokens,
+          durationMs: llmCall.durationMs,
+        });
+      }
+    }
+
+    // End the trace
+    await this.endTrace({
+      traceId,
+      output: params.output,
+      error: params.success ? undefined : new Error('Agent execution failed'),
+    });
   }
 
+  /**
+   * Track a standalone LLM call (when not part of an agent trace)
+   */
   async trackLLMCall(params: {
     model: string;
     prompt: string;
     response: string;
-    tokenCount?: number;
+    promptTokens?: number;
+    completionTokens?: number;
     durationMs: number;
     success: boolean;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    const traceParams: OpikTraceParams = {
+    const traceId = await this.startTrace({
       name: 'llm_call',
-      input: {
-        model: params.model,
-        prompt: params.prompt,
-      },
-      output: {
-        response: params.response,
-      },
-      metadata: {
-        ...params.metadata,
-        tokenCount: params.tokenCount,
-        durationMs: params.durationMs,
-        success: params.success,
-        timestamp: new Date().toISOString(),
-      },
+      input: { prompt: params.prompt },
+      metadata: params.metadata,
       tags: ['llm', params.model],
-    };
+    });
 
-    await this.trace(traceParams);
+    await this.createSpan({
+      traceId,
+      name: params.model,
+      type: 'llm',
+      model: params.model,
+      provider: this.getProviderFromModel(params.model),
+      input: { prompt: params.prompt },
+      output: { response: params.response },
+      promptTokens: params.promptTokens,
+      completionTokens: params.completionTokens,
+      durationMs: params.durationMs,
+      error: params.success ? undefined : new Error('LLM call failed'),
+    });
+
+    await this.endTrace({
+      traceId,
+      output: { response: params.response },
+      error: params.success ? undefined : new Error('LLM call failed'),
+    });
   }
 
+  /**
+   * Track challenge outcome metrics
+   */
   async trackChallengeMetrics(params: {
     challengeId: string;
     userId: string;
@@ -94,7 +448,7 @@ class OpikService {
     responseTimeMs: number;
     userConfidence?: number;
   }): Promise<void> {
-    const traceParams: OpikTraceParams = {
+    const traceId = await this.startTrace({
       name: 'challenge_outcome',
       input: {
         challengeId: params.challengeId,
@@ -102,20 +456,35 @@ class OpikService {
         skillId: params.skillId,
         difficulty: params.difficulty,
       },
+      metadata: {
+        userConfidence: params.userConfidence,
+      },
+      tags: ['challenge', params.isCorrect ? 'correct' : 'incorrect'],
+    });
+
+    await this.endTrace({
+      traceId,
       output: {
         isCorrect: params.isCorrect,
         responseTimeMs: params.responseTimeMs,
       },
-      metadata: {
-        userConfidence: params.userConfidence,
-        timestamp: new Date().toISOString(),
-      },
-      tags: ['challenge', params.isCorrect ? 'correct' : 'incorrect'],
-    };
+    });
 
-    await this.trace(traceParams);
+    // Add feedback score for the outcome
+    await this.addFeedbackScore({
+      traceId,
+      name: 'correctness',
+      value: params.isCorrect ? 1 : 0,
+      source: 'automated',
+      reason: params.isCorrect
+        ? 'User answered correctly'
+        : 'User answered incorrectly',
+    });
   }
 
+  /**
+   * Track scheduling decision
+   */
   async trackSchedulingDecision(params: {
     userId: string;
     skillId: string;
@@ -123,53 +492,150 @@ class OpikService {
     reason: string;
     difficultyTarget: number;
   }): Promise<void> {
-    const traceParams: OpikTraceParams = {
+    const traceId = await this.startTrace({
       name: 'scheduling_decision',
       input: {
         userId: params.userId,
         skillId: params.skillId,
       },
+      tags: ['scheduling', params.shouldChallenge ? 'challenged' : 'skipped'],
+    });
+
+    await this.endTrace({
+      traceId,
       output: {
         decision: params.shouldChallenge,
         reason: params.reason,
         difficultyTarget: params.difficultyTarget,
       },
-      metadata: {
-        timestamp: new Date().toISOString(),
-      },
-      tags: ['scheduling', params.shouldChallenge ? 'challenged' : 'skipped'],
+    });
+  }
+
+  // ============= Prompt Management =============
+
+  /**
+   * Create or update a prompt in Opik for versioning
+   */
+  async createPrompt(params: {
+    name: string;
+    template: string;
+    metadata?: Record<string, unknown>;
+    tags?: string[];
+  }): Promise<string | null> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Prompt created (local): ${params.name}`);
+      return null;
+    }
+
+    const promptData: Partial<OpikPrompt> = {
+      name: params.name,
+      template: params.template,
+      metadata: params.metadata,
+      tags: params.tags,
     };
 
-    await this.trace(traceParams);
+    const response = await this.request('POST', '/prompts', promptData);
+    if (response?.ok) {
+      console.log(`[Opik] Prompt created: ${params.name}`);
+    }
+    return params.name;
   }
 
-  private async trace(params: OpikTraceParams): Promise<void> {
-    try {
-      if (!this.isEnabled) {
-        // Log to console when Opik is not configured
-        console.log(`[Opik] ${params.name}:`, {
-          tags: params.tags,
-          success: params.metadata?.success,
-          duration: params.metadata?.durationMs,
-        });
-        return;
-      }
-
-      // TODO: Replace with actual Opik SDK call
-      // if (this.client) {
-      //   await this.client.trace(params);
-      // }
-      console.log(`[Opik] Trace sent: ${params.name}`);
-    } catch (error) {
-      console.error('[Opik] Failed to send trace:', error);
-      // Don't throw - observability failures shouldn't break the app
+  /**
+   * Get a prompt by name (for using versioned prompts)
+   */
+  async getPrompt(name: string): Promise<OpikPrompt | null> {
+    if (!this.isEnabled) {
+      return null;
     }
+
+    const response = await this.request(
+      'GET',
+      `/prompts?name=${encodeURIComponent(name)}`
+    );
+    if (response?.ok) {
+      const data = (await response.json()) as { content?: OpikPrompt[] };
+      return data.content?.[0] || null;
+    }
+    return null;
   }
 
-  async flush(): Promise<void> {
-    if (this.client) {
-      await this.client.flush();
+  // ============= Feedback & Evaluation =============
+
+  /**
+   * Add a feedback score to a trace
+   */
+  async addFeedbackScore(params: {
+    traceId: string;
+    name: string;
+    value: number; // 0-1
+    source: 'human' | 'automated' | 'llm_judge';
+    reason?: string;
+  }): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(
+        `[Opik] Feedback: ${params.name}=${params.value} for trace ${params.traceId}`
+      );
+      return;
     }
+
+    const feedbackData = {
+      name: params.name,
+      value: params.value,
+      source: params.source,
+      reason: params.reason,
+    };
+
+    const promise = this.request(
+      'POST',
+      `/traces/${params.traceId}/feedback-scores`,
+      feedbackData
+    ).then(() => {});
+    this.pendingRequests.push(promise);
+  }
+
+  // ============= Utilities =============
+
+  private getProviderFromModel(model: string): string {
+    if (model.includes('claude') || model.includes('anthropic')) {
+      return 'anthropic';
+    }
+    if (model.includes('gpt') || model.includes('openai')) {
+      return 'openai';
+    }
+    if (model.includes('gemini') || model.includes('google')) {
+      return 'google';
+    }
+    return 'unknown';
+  }
+
+  /**
+   * Flush all pending requests (call before shutdown)
+   */
+  async flush(timeoutMs: number = 5000): Promise<void> {
+    if (this.pendingRequests.length === 0) {
+      return;
+    }
+
+    console.log(
+      `[Opik] Flushing ${this.pendingRequests.length} pending requests...`
+    );
+
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(resolve, timeoutMs)
+    );
+
+    await Promise.race([Promise.all(this.pendingRequests), timeout]);
+
+    this.pendingRequests = [];
+    console.log('[Opik] Flush complete');
+  }
+
+  /**
+   * Check if Opik is enabled and configured
+   */
+  isConfigured(): boolean {
+    return this.isEnabled;
   }
 }
 
@@ -182,3 +648,6 @@ export function initOpik(): void {
 
   opikService.initialize(apiKey, workspace);
 }
+
+// Export for advanced usage
+export { OpikService };

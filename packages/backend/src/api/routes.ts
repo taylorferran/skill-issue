@@ -6,6 +6,10 @@ import { schedulerService } from '@/services/scheduler.service';
 import { opikService } from '@/lib/opik';
 import { apiKeyAuth } from '@/middleware/auth';
 import type { Database } from '@/types/database';
+import dotenv from 'dotenv';
+
+
+dotenv.config();
 
 const router = express.Router();
 

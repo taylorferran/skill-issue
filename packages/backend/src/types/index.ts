@@ -103,8 +103,20 @@ export interface SkillUpdateRequest {
 }
 
 // ============= LLM Types =============
+export interface LLMUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface GeneratedChallengeWithUsage {
+  challenge: GeneratedChallenge;
+  usage: LLMUsage;
+  prompt: string;      // The actual prompt sent to the LLM
+  rawResponse: string; // The raw LLM response before parsing
+}
+
 export interface LLMProvider {
-  generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallenge>;
+  generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallengeWithUsage>;
 }
 
 export interface GeneratedChallenge {
@@ -124,10 +136,88 @@ export interface PushNotification {
 }
 
 // ============= Opik Types =============
+export interface OpikConfig {
+  apiKey?: string;
+  workspace?: string;
+  projectName?: string;
+}
+
+export type SpanType = 'general' | 'tool' | 'llm' | 'guardrail';
+
+export interface OpikErrorInfo {
+  exception_type: string;
+  message?: string;
+  traceback: string;
+}
+
+export interface OpikTrace {
+  id: string;
+  project_name: string;
+  name: string;
+  start_time: string;
+  end_time?: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  tags?: string[];
+  error_info?: OpikErrorInfo;
+  thread_id?: string;
+}
+
+export interface OpikSpan {
+  id: string;
+  trace_id: string;
+  parent_span_id?: string;
+  project_name: string;
+  name: string;
+  type: SpanType;
+  start_time: string;
+  end_time?: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  model?: string;
+  provider?: string;
+  tags?: string[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+  error_info?: OpikErrorInfo;
+  total_estimated_cost?: number;
+}
+
+export interface OpikPrompt {
+  id?: string;
+  name: string;
+  template: string;
+  metadata?: Record<string, unknown>;
+  tags?: string[];
+}
+
+export interface OpikFeedbackScore {
+  name: string;
+  value: number;
+  source: 'human' | 'automated' | 'llm_judge';
+  category_name?: string;
+  reason?: string;
+}
+
+// Legacy type for backwards compatibility
 export interface OpikTraceParams {
   name: string;
   input: Record<string, unknown>;
   output: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   tags?: string[];
+}
+
+// LLM response with usage info
+export interface LLMResponse<T> {
+  data: T;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+  };
 }
