@@ -1,0 +1,35 @@
+name: Deploy Backend to Railway (via Registry)
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway service --name backend || railway service create backend
+          railway variables set IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          railway up --detach
+
+      - name: Deployment Summary
+        run: |
+          echo "✅ Backend deployed to Railway from container registry"
+          echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "Triggered by: ${{ github.event_name }}"
