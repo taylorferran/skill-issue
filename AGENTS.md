@@ -52,4 +52,6 @@ For detailed guidelines, see:
 - Type safety first - avoid `any`, use strict TypeScript
 - Component-driven development with clear separation of concerns
 - Service based file structure pathing for web / mobile. pages => top level page => sub pages => components
+- For Css, where possible for styling ensure common properties get set as var(--) wherever possible
+- For React, anything thats reused, should get set into its own component, any tsx files should stay within the web folder, ensure for common components the use of var(--) is used and where possible create ts union types to be able to select styles
 - Authentication is critical - prioritize security patterns
