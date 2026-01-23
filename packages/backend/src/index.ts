@@ -11,9 +11,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Log all requests for debugging
+app.use((req, _res, next) => {
+  console.log(`[Request] ${req.method} ${req.url}`);
+  console.log(`[Request] Headers:`, JSON.stringify(req.headers, null, 2));
+  next();
+});
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Remove trailing slashes
+app.use((req, _res, next) => {
+  if (req.path !== '/' && req.path.endsWith('/')) {
+    const newPath = req.path.slice(0, -1);
+    console.log(`[Redirect] ${req.path} -> ${newPath}`);
+    return _res.redirect(301, newPath + (req.url.slice(req.path.length) || ''));
+  }
+  next();
+});
 
 // CORS middleware
 app.use((_req, res, next) => {
@@ -31,14 +48,25 @@ app.options('*', (_req, res) => {
 // API Routes
 app.use('/api', apiRoutes);
 
-// Log registered routes
-console.log('\n[Server] Registered API routes:');
-apiRoutes.stack.forEach((r: any) => {
-  if (r.route) {
-    const methods = Object.keys(r.route.methods).join(', ').toUpperCase();
-    console.log(`  ${methods} /api${r.route.path}`);
-  }
-});
+// Log registered routes for debugging
+console.log('\n[Server] Route registration details:');
+console.log(`  apiRoutes type: ${typeof apiRoutes}`);
+console.log(`  apiRoutes.stack length: ${apiRoutes.stack?.length || 'undefined'}`);
+if (apiRoutes.stack) {
+  console.log('\n[Server] Registered API routes:');
+  apiRoutes.stack.forEach((r: any) => {
+    if (r.route) {
+      const methods = Object.keys(r.route.methods).join(', ').toUpperCase();
+      console.log(`  ${methods} /api${r.route.path}`);
+    } else if (r.name === 'router') {
+      console.log(`  [Middleware: ${r.name}]`);
+    } else if (r.handle?.name) {
+      console.log(`  [Middleware: ${r.handle.name}]`);
+    }
+  });
+} else {
+  console.error('[Server] ERROR: apiRoutes.stack is undefined - routes may not be registered!');
+}
 
 // Root endpoint
 app.get('/', (_req, res) => {

@@ -331,6 +331,8 @@ const CreateUserSchema = z.object({
 });
 
 router.post('/users', async (req: Request, res: Response) => {
+  console.log('[POST /users] Route handler called');
+  console.log('[POST /users] Request body:', JSON.stringify(req.body));
   try {
     const validation = CreateUserSchema.safeParse(req.body);
     if (!validation.success) {
