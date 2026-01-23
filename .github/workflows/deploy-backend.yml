@@ -1,13 +1,10 @@
 name: Deploy Backend to Railway (via Registry)
 
 on:
-  # This workflow is OPTIONAL - Railway can auto-deploy when you configure it to watch GHCR
-  # Only enable this if you want to trigger Railway deployments from GitHub Actions
-  # Uncomment the trigger below to enable:
-  # workflow_run:
-  #   workflows: ["Build and Push Docker Image"]
-  #   types:
-  #     - completed
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types:
+      - completed
   workflow_dispatch:
 
 env:
