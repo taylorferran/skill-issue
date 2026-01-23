@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install ALL dependencies (including devDependencies for build)
-RUN npm ci
+# Use npm install since there's no package-lock.json (monorepo uses pnpm)
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -23,8 +24,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies (use --omit=dev instead of deprecated --only=production)
-RUN npm ci --omit=dev
+# Install only production dependencies
+RUN npm install --production
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
