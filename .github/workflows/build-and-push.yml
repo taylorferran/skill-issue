@@ -70,17 +70,12 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "⚠️  RAILWAY_TOKEN not set. Skipping automatic deployment."
-            exit 0
-          fi
-
-          if [ -z "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
-            echo "RAILWAY_SERVICE_ID not set. Skipping automatic deployment."
+            echo "RAILWAY_TOKEN not set. Skipping automatic deployment. - This needs to be the project token"
             exit 0
           fi
 
           echo "Triggering Railway deployment via CLI..."
-          railway redeploy --service=${{ secrets.RAILWAY_SERVICE_ID }} --yes
+          railway redeploy --service=skill-issue --yes
 
           if [ $? -eq 0 ]; then
             echo "Railway deployment triggered successfully!"
