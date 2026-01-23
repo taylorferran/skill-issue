@@ -58,6 +58,37 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Install Railway CLI
+        if: success()
+        run: |
+          # Install Railway CLI
+          npm install -g @railway/cli
+
+      - name: Trigger Railway Deployment
+        if: success()
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "⚠️  RAILWAY_TOKEN not set. Skipping automatic deployment."
+            exit 0
+          fi
+
+          if [ -z "${{ secrets.RAILWAY_SERVICE_ID }}" ]; then
+            echo "RAILWAY_SERVICE_ID not set. Skipping automatic deployment."
+            exit 0
+          fi
+
+          echo "Triggering Railway deployment via CLI..."
+          railway redeploy --service=${{ secrets.RAILWAY_SERVICE_ID }} --yes
+
+          if [ $? -eq 0 ]; then
+            echo "Railway deployment triggered successfully!"
+          else
+            echo "Railway deployment failed."
+            exit 1
+          fi
+
       - name: Image Summary
         run: |
           echo "Docker image built and pushed successfully"
