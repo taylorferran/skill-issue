@@ -14,7 +14,8 @@ RUN npm install
 COPY . .
 
 # Build TypeScript using standalone config (no monorepo dependencies)
-RUN npx tsc -p tsconfig.docker.json
+# Then resolve path aliases with tsc-alias
+RUN npx tsc -p tsconfig.docker.json && npx tsc-alias -p tsconfig.docker.json
 
 # Stage 2: Production
 FROM node:18-alpine
