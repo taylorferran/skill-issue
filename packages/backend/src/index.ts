@@ -54,16 +54,21 @@ console.log(`  apiRoutes type: ${typeof apiRoutes}`);
 console.log(`  apiRoutes.stack length: ${apiRoutes.stack?.length || 'undefined'}`);
 if (apiRoutes.stack) {
   console.log('\n[Server] Registered API routes:');
-  apiRoutes.stack.forEach((r: any) => {
+  let routeCount = 0;
+  apiRoutes.stack.forEach((r: any, index: number) => {
     if (r.route) {
       const methods = Object.keys(r.route.methods).join(', ').toUpperCase();
-      console.log(`  ${methods} /api${r.route.path}`);
+      console.log(`  [${index}] ${methods} /api${r.route.path}`);
+      routeCount++;
     } else if (r.name === 'router') {
-      console.log(`  [Middleware: ${r.name}]`);
+      console.log(`  [${index}] [Middleware: ${r.name}]`);
     } else if (r.handle?.name) {
-      console.log(`  [Middleware: ${r.handle.name}]`);
+      console.log(`  [${index}] [Middleware: ${r.handle.name}]`);
+    } else {
+      console.log(`  [${index}] [Unknown: ${r.name || 'anonymous'}]`);
     }
   });
+  console.log(`\n[Server] Total routes registered: ${routeCount}`);
 } else {
   console.error('[Server] ERROR: apiRoutes.stack is undefined - routes may not be registered!');
 }
