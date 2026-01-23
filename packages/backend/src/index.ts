@@ -1,9 +1,15 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { initSupabase } from '@/lib/supabase';
 import { initOpik } from '@/lib/opik';
 import { schedulerService } from '@/services/scheduler.service';
 import apiRoutes from '@/api/routes';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +50,10 @@ app.use((_req, res, next) => {
 app.options('*', (_req, res) => {
   res.status(200).end();
 });
+
+// Serve static files (admin dashboard)
+const publicPath = path.join(__dirname, '..', 'public');
+app.use('/admin', express.static(publicPath));
 
 // API Routes
 app.use('/api', apiRoutes);

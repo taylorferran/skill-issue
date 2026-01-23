@@ -33,6 +33,9 @@ RUN echo '{"type":"module","name":"skill-issue-backend","version":"0.1.0"}' > pa
 # Copy built bundle (includes all code from shared package)
 COPY --from=builder /monorepo/packages/backend/dist ./dist
 
+# Copy static files (admin dashboard)
+COPY --from=builder /monorepo/packages/backend/public ./public
+
 # Copy other necessary files
 COPY --from=builder /monorepo/packages/backend/supabase-schema.sql ./
 COPY --from=builder /monorepo/packages/backend/example-skills.sql ./
