@@ -1,38 +1,52 @@
 # Stage 1: Build
 FROM node:18-alpine AS builder
 
-WORKDIR /app
+# Install pnpm (lockfile version 6.0 requires pnpm 8.x)
+RUN npm install -g pnpm@8.15.9
 
-# Copy package files
-COPY package*.json ./
+WORKDIR /monorepo
 
-# Install ALL dependencies (including devDependencies for build)
-# Use npm install since there's no package-lock.json (monorepo uses pnpm)
-RUN npm install
+# Copy monorepo root package files
+COPY pnpm-workspace.yaml pnpm-lock.yaml* package.json ./
 
-# Copy source code
-COPY . .
+# Copy shared package
+COPY packages/shared ./packages/shared
 
-# Build with tsup (bundles and resolves path aliases automatically)
-RUN npm run build
+# Copy backend package
+COPY packages/backend ./packages/backend
+
+# Install dependencies using pnpm
+RUN pnpm install --frozen-lockfile
+
+# Build backend (tsup bundles shared package inline)
+WORKDIR /monorepo/packages/backend
+RUN pnpm run build
 
 # Stage 2: Production
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Create minimal package.json to mark as ESM
+RUN echo '{"type":"module","name":"skill-issue-backend","version":"0.1.0"}' > package.json
 
-# Install only production dependencies
-RUN npm install --production
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
+# Copy built bundle (includes all code from shared package)
+COPY --from=builder /monorepo/packages/backend/dist ./dist
 
 # Copy other necessary files
-COPY supabase-schema.sql ./
-COPY example-skills.sql ./
+COPY --from=builder /monorepo/packages/backend/supabase-schema.sql ./
+COPY --from=builder /monorepo/packages/backend/example-skills.sql ./
+
+# Install only runtime dependencies (those marked as external in tsup.config.ts)
+# The shared package code is already bundled in dist/index.js
+RUN npm install --omit=dev \
+  express@^4.18.2 \
+  dotenv@^16.3.1 \
+  @supabase/supabase-js@^2.39.0 \
+  @anthropic-ai/sdk@^0.30.1 \
+  node-cron@^3.0.3 \
+  expo-server-sdk@^3.7.0 \
+  zod@^3.22.4
 
 # Set environment to production
 ENV NODE_ENV=production
