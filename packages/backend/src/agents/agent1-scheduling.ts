@@ -227,6 +227,51 @@ export class SchedulingAgent {
       }
     }
 
+    // Check for unanswered challenges for this skill
+    // A challenge is unanswered if there's no corresponding record in the answers table
+    const supabase = getSupabase();
+
+    // Get all challenges for this user-skill combination
+    const { data: challenges, error: challengeError } = await supabase
+      .from('challenges')
+      .select('id, created_at')
+      .eq('user_id', userId)
+      .eq('skill_id', skillId)
+      .order('created_at', { ascending: false })
+      .limit(10); // Check recent challenges only
+
+    if (challengeError) {
+      console.error('[Agent 1] Error checking challenges:', challengeError);
+      // Continue anyway - don't block on this check
+    } else if (challenges && challenges.length > 0) {
+      // Check which challenges have been answered
+      const challengeIds = challenges.map((c: any) => c.id);
+      const { data: answers, error: answersError } = await supabase
+        .from('answers')
+        .select('challenge_id')
+        .in('challenge_id', challengeIds);
+
+      if (answersError) {
+        console.error('[Agent 1] Error checking answers:', answersError);
+        // Continue anyway
+      } else {
+        const answeredIds = new Set((answers as any[] || []).map((a: any) => a.challenge_id));
+        const unansweredChallenges = challenges.filter((c: any) => !answeredIds.has(c.id));
+
+        if (unansweredChallenges.length > 0) {
+          const oldestUnanswered = unansweredChallenges[0] as any;
+          const hoursSinceChallenge = (Date.now() - new Date(oldestUnanswered.created_at).getTime()) / (1000 * 60 * 60);
+          return {
+            shouldChallenge: false,
+            userId,
+            skillId,
+            difficultyTarget: userSkill.difficulty_target,
+            reason: `Unanswered challenge exists (${hoursSinceChallenge.toFixed(1)}h old)`,
+          };
+        }
+      }
+    }
+
     // Priority based on accuracy (lower accuracy = higher priority)
     // BUT only apply this threshold after sufficient attempts (minimum sample size)
     const accuracy = userSkill.attempts_total > 0
