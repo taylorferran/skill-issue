@@ -54,7 +54,7 @@ export class ChallengeDesignAgent {
 
       // Generate challenge via LLM
       const llmStartTime = Date.now();
-      const generatedChallenge = await this.llmProvider.generateChallenge({
+      const llmResult = await this.llmProvider.generateChallenge({
         skillId: decision.skillId,
         skillName: skill.name,
         skillDescription: skill.description,
@@ -62,17 +62,23 @@ export class ChallengeDesignAgent {
         userId: decision.userId,
       });
       const llmDuration = Date.now() - llmStartTime;
+      const { challenge: generatedChallenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
 
-      // Track LLM call - Todo: LLM config paramters to populate this Opik call.
+      // Track LLM call with actual prompt and raw response
       await opikService.trackLLMCall({
         model: 'claude-haiku-4-5-20251001',
-        prompt: `Skill: ${skill.name}, Difficulty: ${decision.difficultyTarget}`,
-        response: JSON.stringify(generatedChallenge),
+        prompt: actualPrompt,      // The actual prompt sent to the LLM
+        response: rawResponse,      // The raw LLM response
+        promptTokens: usage.inputTokens,
+        completionTokens: usage.outputTokens,
         durationMs: llmDuration,
         success: true,
         metadata: {
           skillId: decision.skillId,
           userId: decision.userId,
+          skillName: skill.name,
+          difficulty: decision.difficultyTarget,
+          parsedChallenge: generatedChallenge,  // Include the parsed result in metadata
         },
       });
 
@@ -140,16 +146,33 @@ export class ChallengeDesignAgent {
         .eq('user_id', decision.userId)
         .eq('skill_id', decision.skillId);
 
-      // Track successful execution
+      // Track successful execution with full LLM output
       await opikService.trackAgentExecution({
         agentName: 'challenge_design',
-        input: { decision, skill },
-        output: { challengeId: challenge.id },
+        input: {
+          decision,
+          skill,
+          prompt: actualPrompt,  // The full prompt sent to the LLM
+        },
+        output: {
+          challengeId: challenge.id,
+          llmResponse: rawResponse,  // Raw LLM output
+          generatedChallenge: {
+            question: generatedChallenge.question,
+            options: generatedChallenge.options,
+            correctAnswerIndex: generatedChallenge.correctAnswerIndex,
+            explanation: generatedChallenge.explanation,
+          },
+        },
         durationMs: Date.now() - startTime,
         success: true,
         metadata: {
           actualDifficulty: generatedChallenge.actualDifficulty,
           targetDifficulty: decision.difficultyTarget,
+          tokenUsage: {
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+          },
         },
       });
 

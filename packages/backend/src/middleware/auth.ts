@@ -1,3 +1,4 @@
+import { Console } from 'console';
 import { Request, Response, NextFunction } from 'express';
 
 /**
@@ -15,7 +16,6 @@ export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
     // Auth disabled, allow all requests
     return next();
   }
-
   // Get the API key from env
   const validApiKey = process.env.API_KEY;
 
