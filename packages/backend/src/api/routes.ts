@@ -438,6 +438,41 @@ router.post('/users', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/users
+ * Get all users
+ */
+router.get('/users', async (_req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get users error:', error);
+      return res.status(500).json({ error: 'Failed to load users' });
+    }
+
+    const formattedUsers = (users || []).map((user: any) => ({
+      id: user.id,
+      deviceId: user.device_id,
+      timezone: user.timezone,
+      quietHoursStart: user.quiet_hours_start,
+      quietHoursEnd: user.quiet_hours_end,
+      maxChallengesPerDay: user.max_challenges_per_day,
+      createdAt: user.created_at,
+    }));
+
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/users/:userId
  * Get user details
  */

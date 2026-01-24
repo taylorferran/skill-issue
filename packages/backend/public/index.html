@@ -269,6 +269,16 @@
         <div class="response" id="skills-response"></div>
       </div>
 
+      <!-- Get All Users -->
+      <div class="card">
+        <h2>All Users</h2>
+        <div class="info">
+          View all users in the system.
+        </div>
+        <button onclick="getAllUsers()">Get All Users</button>
+        <div class="response" id="all-users-response"></div>
+      </div>
+
       <!-- Get User -->
       <div class="card">
         <h2>Get User</h2>
@@ -467,6 +477,18 @@
         showResponse('skills-response', data, !response.ok);
       } catch (error) {
         showResponse('skills-response', { error: error.message }, true);
+      }
+    }
+
+    async function getAllUsers() {
+      try {
+        const response = await fetch(`${API_BASE}/api/users`, {
+          headers: getHeaders()
+        });
+        const data = await response.json();
+        showResponse('all-users-response', data, !response.ok);
+      } catch (error) {
+        showResponse('all-users-response', { error: error.message }, true);
       }
     }
 
