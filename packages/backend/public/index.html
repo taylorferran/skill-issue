@@ -216,7 +216,10 @@
         <input type="text" id="apiKey" placeholder="Enter API key if API_AUTH_ENABLED=true">
       </div>
       <div class="api-key-info">
-        Leave blank if API authentication is disabled. Set the X-API-Key header if enabled.
+        <strong>Authentication Options:</strong><br>
+        • Leave blank if <code>API_AUTH_ENABLED=false</code><br>
+        • Enter your API key if authentication is enabled (set via <code>API_KEY</code> env variable)<br>
+        • The key will be sent as <code>Authorization: Bearer &lt;key&gt;</code> header
       </div>
     </div>
 
@@ -388,7 +391,7 @@
       };
       const apiKey = document.getElementById('apiKey').value;
       if (apiKey) {
-        headers['X-API-Key'] = apiKey;
+        headers['Authorization'] = `Bearer ${apiKey}`;
       }
       return headers;
     }
