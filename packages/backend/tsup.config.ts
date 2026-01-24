@@ -12,6 +12,7 @@ export default defineConfig({
   bundle: true,
   splitting: false,
   treeshake: true,
+  noExternal: ['@learning-platform/shared'],
   external: [
     'express',
     'dotenv',

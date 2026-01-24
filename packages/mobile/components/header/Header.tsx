@@ -1,98 +1,123 @@
-
-import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import { useUser } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
-import { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
+import { useQuiz } from "@/contexts/QuizContext";
 import { Theme } from "@/theme/Theme";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
+import { useRouter, usePathname } from "expo-router";
+import { View, Pressable, Text } from "react-native";
+import { QuizTimer } from "../mcq-quiz/timer/QuizTimer";
 import { styles } from "./Header.styles";
 
-export function CustomHeader({ navigation, route, options }: BottomTabHeaderProps) {
-  const { user } = useUser();
+export function CustomHeader({
+  navigation,
+  route,
+  options,
+}: BottomTabHeaderProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const { quizState } = useQuiz();
+  const backgroundColor = "white";
 
-  const backgroundColor = "rgba(252, 249, 243, 0.95)";
-  const borderColor = "rgba(255, 139, 66, 0.1)";
+  // Check if we're at a root tab route by pathname
+  const isProfileRoute =
+    pathname === "/profile" || pathname.startsWith("/profile/");
+  const isSkillsRoute = pathname === "/";
+  const isRootRoute = isSkillsRoute || isProfileRoute;
 
-  // Root routes that should not show a back button
-  const rootRoutes = ["index", "skills/index", "profile"];
-  const isRootRoute = rootRoutes.includes(route.name);
-  const canGoBack = navigation.canGoBack() && !isRootRoute;
+  // Show back button for any non-root route
+  const canGoBack = !isRootRoute;
 
-  // The user wants "Skills" for the skills root, but "Skill Issue" for others
+  const isQuizRoute = pathname?.includes("quiz");
+
   let displayTitle = "Skill Issue";
-  if (route.name === "skills/index") {
+  if (quizState) {
+    if (!quizState.isSingleQuestion && isQuizRoute) {
+      displayTitle = `Question ${quizState.currentQuestion} of ${quizState.totalQuestions}`;
+    } else {
+      displayTitle = "";
+    }
+  } else if (isProfileRoute) {
+    displayTitle = "Profile";
+  } else if (isSkillsRoute) {
     displayTitle = "Skills";
-  } else if (!isRootRoute) {
+  } else {
     displayTitle = options.title ?? "Skill Issue";
   }
+
+  const handleBackPress = () => {
+    if (router.canGoBack()) {
+      router.back();
+    }
+  };
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor, borderBottomColor: borderColor },
+        { backgroundColor, borderBottomColor: "white" },
       ]}
     >
-      {/* Logo Section */}
       <View style={styles.logoContainer}>
         {canGoBack && (
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={handleBackPress}
             style={({ pressed }) => [
               styles.backButton,
-              { opacity: pressed ? 0.7 : 1 }
+              { opacity: pressed ? 0.7 : 1 },
             ]}
           >
             <MaterialIcons
-              name="arrow-back"
+              name={isQuizRoute ? "close" : "arrow-back"}
               size={Theme.iconSize.md}
               color={Theme.colors.primary.main}
             />
           </Pressable>
         )}
-        <View style={styles.logoBox}>
-          <MaterialIcons
-            name="bolt"
-            color={"white"}
-            size={Theme.iconSize.md}
-          />
-        </View>
-        <Text 
+        {!isQuizRoute && (
+          <View style={styles.logoBox}>
+            <Ionicons
+              name="diamond"
+              size={28}
+              color={Theme.colors.primary.main}
+            />
+          </View>
+        )}
+        <Text
           style={[styles.title, { color: Theme.colors.text.primary }]}
           numberOfLines={1}
         >
           {displayTitle}
         </Text>
       </View>
-
       {/* Right Actions */}
       <View style={styles.actionsContainer}>
-        {/* Notifications Button */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.notificationButton,
-            {
-              backgroundColor: pressed
-                ? "rgba(255, 139, 66, 0.1)"
-                : "transparent",
-            },
-          ]}
-          onPress={() => {
-            // Handle notifications
-            console.log("Notifications pressed");
-          }}
-        >
-          <MaterialIcons
-            name="notifications"
-            color={Theme.colors.primary.main}
-            size={Theme.iconSize.lg}
+        {isQuizRoute && quizState ? (
+          <QuizTimer
+            timeLeft={quizState.timeLeft}
+            totalTime={quizState.totalTime}
+            isTimeUp={quizState.isTimeUp}
           />
-        </Pressable>
+        ) : !isQuizRoute ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.notificationButton,
+              {
+                backgroundColor: pressed
+                  ? Theme.colors.background.primary
+                  : "transparent",
+              },
+            ]}
+            onPress={() => {
+              console.log("Notifications pressed");
+            }}
+          >
+            <MaterialIcons
+              name="notifications"
+              color={Theme.colors.primary.main}
+              size={Theme.iconSize.lg}
+            />
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
 }
-
-

@@ -23,7 +23,7 @@ export const styles = StyleSheet.create({
   logoBox: {
     width: 32,
     height: 32,
-    backgroundColor: "#ff8b42",
+    backgroundColor: "white",
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
@@ -47,25 +47,8 @@ export const styles = StyleSheet.create({
   profileContainer: {
     padding: 0,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "rgba(255, 139, 66, 0.2)",
-  },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: "rgba(255, 139, 66, 0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
+  // Timer container in header
+  timerContainer: {
+    flexShrink: 0,
   },
 });

@@ -1,17 +1,25 @@
 import express, { Request, Response } from 'express';
-import { z } from 'zod';
 import { getSupabase } from '@/lib/supabase';
 import { skillStateAgent } from '@/agents/agent3-skill-state';
 import { schedulerService } from '@/services/scheduler.service';
 import { opikService } from '@/lib/opik';
 import { apiKeyAuth } from '@/middleware/auth';
 import type { Database } from '@/types/database';
-import dotenv from 'dotenv';
-
-
-dotenv.config();
+import {
+  AnswerChallengeSchema,
+  CreateUserSchema,
+  UpdateUserSchema,
+  EnrollSkillSchema,
+  UpdateUserSkillSchema,
+} from '@learning-platform/shared/schemas';
 
 const router = express.Router();
+
+// Log all incoming requests for debugging
+router.use((req, _res, next) => {
+  console.log(`[API] ${req.method} ${req.path}`);
+  next();
+});
 
 /**
  * GET /api/health
@@ -40,15 +48,6 @@ type UserSkillStateUpdate = Database['public']['Tables']['user_skill_state']['Up
  * POST /api/answer
  * Submit an answer to a challenge
  */
-const AnswerChallengeSchema = z.object({
-  challengeId: z.string().uuid(),
-  userId: z.string().uuid(),
-  selectedOption: z.number().min(0).max(3),
-  responseTime: z.number().positive().optional(),
-  confidence: z.number().min(1).max(5).optional(),
-  userFeedback: z.string().optional(),
-});
-
 router.post('/answer', async (req: Request, res: Response) => {
   try {
     const validation = AnswerChallengeSchema.safeParse(req.body);
@@ -291,6 +290,73 @@ router.get('/users/:userId/challenges/history', async (req: Request, res: Respon
 });
 
 /**
+ * GET /api/users/:userId/challenges/pending
+ * Get unanswered challenges for a user
+ */
+router.get('/users/:userId/challenges/pending', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const supabase = getSupabase();
+
+    // Get all challenges for this user
+    const { data: challenges, error: challengesError } = await supabase
+      .from('challenges')
+      .select(`
+        id,
+        skill_id,
+        difficulty,
+        question,
+        options_json,
+        created_at,
+        skills!inner(name)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (challengesError) {
+      console.error('Get challenges error:', challengesError);
+      return res.status(500).json({ error: 'Failed to load challenges' });
+    }
+
+    if (!challenges || challenges.length === 0) {
+      return res.json([]);
+    }
+
+    // Get all answers for these challenges
+    const challengeIds = challenges.map((c: any) => c.id);
+    const { data: answers, error: answersError } = await supabase
+      .from('answers')
+      .select('challenge_id')
+      .in('challenge_id', challengeIds);
+
+    if (answersError) {
+      console.error('Get answers error:', answersError);
+      return res.status(500).json({ error: 'Failed to load answers' });
+    }
+
+    // Filter out answered challenges
+    const answeredIds = new Set((answers || []).map((a: any) => a.challenge_id));
+    const unansweredChallenges = challenges.filter((c: any) => !answeredIds.has(c.id));
+
+    // Format response
+    const formatted = unansweredChallenges.map((challenge: any) => ({
+      challengeId: challenge.id,
+      skillId: challenge.skill_id,
+      skillName: challenge.skills.name,
+      difficulty: challenge.difficulty,
+      question: challenge.question,
+      options: challenge.options_json,
+      createdAt: challenge.created_at,
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Get pending challenges error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/skills
  * Get all available skills
  */
@@ -320,15 +386,9 @@ router.get('/skills', async (_req: Request, res: Response) => {
  * POST /api/users
  * Create a new user
  */
-const CreateUserSchema = z.object({
-  id: z.string().uuid().optional(),
-  timezone: z.string().default('UTC'),
-  quietHoursStart: z.number().min(0).max(23).optional(),
-  quietHoursEnd: z.number().min(0).max(23).optional(),
-  maxChallengesPerDay: z.number().min(1).max(100).default(5),
-});
-
 router.post('/users', async (req: Request, res: Response) => {
+  console.log('[POST /users] Route handler called');
+  console.log('[POST /users] Request body:', JSON.stringify(req.body));
   try {
     const validation = CreateUserSchema.safeParse(req.body);
     if (!validation.success) {
@@ -343,6 +403,7 @@ router.post('/users', async (req: Request, res: Response) => {
 
     const userData: UserInsert = {
       id: body.id,
+      device_id: body.deviceId,
       timezone: body.timezone,
       quiet_hours_start: body.quietHoursStart,
       quiet_hours_end: body.quietHoursEnd,
@@ -363,6 +424,7 @@ router.post('/users', async (req: Request, res: Response) => {
 
     res.status(201).json({
       id: (user as any).id,
+      deviceId: (user as any).device_id,
       timezone: (user as any).timezone,
       quietHoursStart: (user as any).quiet_hours_start,
       quietHoursEnd: (user as any).quiet_hours_end,
@@ -371,6 +433,41 @@ router.post('/users', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Create user error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/users
+ * Get all users
+ */
+router.get('/users', async (_req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Get users error:', error);
+      return res.status(500).json({ error: 'Failed to load users' });
+    }
+
+    const formattedUsers = (users || []).map((user: any) => ({
+      id: user.id,
+      deviceId: user.device_id,
+      timezone: user.timezone,
+      quietHoursStart: user.quiet_hours_start,
+      quietHoursEnd: user.quiet_hours_end,
+      maxChallengesPerDay: user.max_challenges_per_day,
+      createdAt: user.created_at,
+    }));
+
+    res.json(formattedUsers);
+  } catch (error) {
+    console.error('Get users error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -397,6 +494,7 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
     const userData = user as any;
     res.json({
       id: userData.id,
+      deviceId: userData.device_id,
       timezone: userData.timezone,
       quietHoursStart: userData.quiet_hours_start,
       quietHoursEnd: userData.quiet_hours_end,
@@ -413,13 +511,6 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
  * PUT /api/users/:userId
  * Update user settings
  */
-const UpdateUserSchema = z.object({
-  timezone: z.string().optional(),
-  quietHoursStart: z.number().min(0).max(23).optional(),
-  quietHoursEnd: z.number().min(0).max(23).optional(),
-  maxChallengesPerDay: z.number().min(1).max(100).optional(),
-});
-
 router.put('/users/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -447,6 +538,7 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
     }
 
     const updateData: UserUpdate = {
+      device_id: body.deviceId,
       timezone: body.timezone,
       quiet_hours_start: body.quietHoursStart,
       quiet_hours_end: body.quietHoursEnd,
@@ -469,6 +561,7 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
     const userData = user as any;
     res.json({
       id: userData.id,
+      deviceId: userData.device_id,
       timezone: userData.timezone,
       quietHoursStart: userData.quiet_hours_start,
       quietHoursEnd: userData.quiet_hours_end,
@@ -485,11 +578,6 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
  * POST /api/users/:userId/skills
  * Enroll user in a skill (create user_skill_state)
  */
-const EnrollSkillSchema = z.object({
-  skillId: z.string().uuid(),
-  difficultyTarget: z.number().min(1).max(10).default(2),
-});
-
 router.post('/users/:userId/skills', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -588,10 +676,6 @@ router.post('/users/:userId/skills', async (req: Request, res: Response) => {
  * PUT /api/users/:userId/skills/:skillId
  * Update user skill state (e.g, manually adjust difficulty target)
  */
-const UpdateUserSkillSchema = z.object({
-  difficultyTarget: z.number().min(1).max(10).optional(),
-});
-
 router.put('/users/:userId/skills/:skillId', async (req: Request, res: Response) => {
   try {
     const { userId, skillId } = req.params;
@@ -725,5 +809,8 @@ router.post('/scheduler/tick', async (_req: Request, res: Response) => {
     });
   }
 });
+
+console.log('[Routes] All routes defined, exporting router');
+console.log(`[Routes] Router stack length: ${router.stack?.length}`);
 
 export default router;

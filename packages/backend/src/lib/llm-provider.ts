@@ -73,6 +73,8 @@ RULES:
 - Difficulty ${difficulty} means: ${this.getDifficultyDescription(difficulty)}
 - Question must be answerable in under 30 seconds
 - 4 options, only 1 correct
+- Randomly shuffle the order of correct answer among the options
+- Don't repeat questions you've generated before - each challenge must be unique try to make it unique
 - Distractors should be plausible but clearly wrong to someone who knows the subject
 - Include a brief explanation of why the answer is correct
 - Tailor the question specifically to the skill described above
