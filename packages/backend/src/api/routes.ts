@@ -290,6 +290,73 @@ router.get('/users/:userId/challenges/history', async (req: Request, res: Respon
 });
 
 /**
+ * GET /api/users/:userId/challenges/pending
+ * Get unanswered challenges for a user
+ */
+router.get('/users/:userId/challenges/pending', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const supabase = getSupabase();
+
+    // Get all challenges for this user
+    const { data: challenges, error: challengesError } = await supabase
+      .from('challenges')
+      .select(`
+        id,
+        skill_id,
+        difficulty,
+        question,
+        options_json,
+        created_at,
+        skills!inner(name)
+      `)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (challengesError) {
+      console.error('Get challenges error:', challengesError);
+      return res.status(500).json({ error: 'Failed to load challenges' });
+    }
+
+    if (!challenges || challenges.length === 0) {
+      return res.json([]);
+    }
+
+    // Get all answers for these challenges
+    const challengeIds = challenges.map((c: any) => c.id);
+    const { data: answers, error: answersError } = await supabase
+      .from('answers')
+      .select('challenge_id')
+      .in('challenge_id', challengeIds);
+
+    if (answersError) {
+      console.error('Get answers error:', answersError);
+      return res.status(500).json({ error: 'Failed to load answers' });
+    }
+
+    // Filter out answered challenges
+    const answeredIds = new Set((answers || []).map((a: any) => a.challenge_id));
+    const unansweredChallenges = challenges.filter((c: any) => !answeredIds.has(c.id));
+
+    // Format response
+    const formatted = unansweredChallenges.map((challenge: any) => ({
+      challengeId: challenge.id,
+      skillId: challenge.skill_id,
+      skillName: challenge.skills.name,
+      difficulty: challenge.difficulty,
+      question: challenge.question,
+      options: challenge.options_json,
+      createdAt: challenge.created_at,
+    }));
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Get pending challenges error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/skills
  * Get all available skills
  */

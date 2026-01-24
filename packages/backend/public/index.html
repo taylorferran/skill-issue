@@ -320,6 +320,20 @@
         <div class="response" id="scheduler-response"></div>
       </div>
 
+      <!-- Get Pending Challenges -->
+      <div class="card">
+        <h2>Pending Challenges</h2>
+        <div class="info">
+          View all unanswered challenges for a user. These are challenges that have been created but not yet answered.
+        </div>
+        <div class="form-group">
+          <label for="pendingUserId">User ID</label>
+          <input type="text" id="pendingUserId" placeholder="Enter user UUID">
+        </div>
+        <button onclick="getPendingChallenges()">Get Pending Challenges</button>
+        <div class="response" id="pending-response"></div>
+      </div>
+
       <!-- Get Challenge History -->
       <div class="card">
         <h2>Challenge History</h2>
@@ -567,6 +581,25 @@
         showResponse('challenge-response', data, !response.ok);
       } catch (error) {
         showResponse('challenge-response', { error: error.message }, true);
+      }
+    }
+
+    async function getPendingChallenges() {
+      const userId = document.getElementById('pendingUserId').value;
+
+      if (!userId) {
+        showResponse('pending-response', { error: 'User ID is required' }, true);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/challenges/pending`, {
+          headers: getHeaders()
+        });
+        const data = await response.json();
+        showResponse('pending-response', data, !response.ok);
+      } catch (error) {
+        showResponse('pending-response', { error: error.message }, true);
       }
     }
 
