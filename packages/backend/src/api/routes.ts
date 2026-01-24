@@ -404,6 +404,7 @@ router.post('/users', async (req: Request, res: Response) => {
     const userData: UserInsert = {
       id: body.id,
       device_id: body.deviceId,
+      discord_user_id: body.discordUserId,
       timezone: body.timezone,
       quiet_hours_start: body.quietHoursStart,
       quiet_hours_end: body.quietHoursEnd,
@@ -425,6 +426,7 @@ router.post('/users', async (req: Request, res: Response) => {
     res.status(201).json({
       id: (user as any).id,
       deviceId: (user as any).device_id,
+      discordUserId: (user as any).discord_user_id,
       timezone: (user as any).timezone,
       quietHoursStart: (user as any).quiet_hours_start,
       quietHoursEnd: (user as any).quiet_hours_end,
@@ -440,15 +442,23 @@ router.post('/users', async (req: Request, res: Response) => {
 /**
  * GET /api/users
  * Get all users
+ * Query params: discordUserId - filter by Discord user ID
  */
-router.get('/users', async (_req: Request, res: Response) => {
+router.get('/users', async (req: Request, res: Response) => {
   try {
     const supabase = getSupabase();
+    const { discordUserId } = req.query;
 
-    const { data: users, error } = await supabase
+    let query = supabase
       .from('users')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
+
+    // Filter by Discord user ID if provided
+    if (discordUserId) {
+      query = query.eq('discord_user_id', discordUserId);
+    }
+
+    const { data: users, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       console.error('Get users error:', error);
@@ -458,6 +468,7 @@ router.get('/users', async (_req: Request, res: Response) => {
     const formattedUsers = (users || []).map((user: any) => ({
       id: user.id,
       deviceId: user.device_id,
+      discordUserId: user.discord_user_id,
       timezone: user.timezone,
       quietHoursStart: user.quiet_hours_start,
       quietHoursEnd: user.quiet_hours_end,
@@ -495,6 +506,7 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
     res.json({
       id: userData.id,
       deviceId: userData.device_id,
+      discordUserId: userData.discord_user_id,
       timezone: userData.timezone,
       quietHoursStart: userData.quiet_hours_start,
       quietHoursEnd: userData.quiet_hours_end,
@@ -562,6 +574,7 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
     res.json({
       id: userData.id,
       deviceId: userData.device_id,
+      discordUserId: userData.discord_user_id,
       timezone: userData.timezone,
       quietHoursStart: userData.quiet_hours_start,
       quietHoursEnd: userData.quiet_hours_end,

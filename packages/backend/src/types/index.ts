@@ -7,6 +7,7 @@ export interface User {
   quietHoursStart?: number; // 0-23
   quietHoursEnd?: number; // 0-23
   maxChallengesPerDay: number;
+  discordUserId?: string; // Discord user ID for bot integration
   createdAt: Date;
 }
 

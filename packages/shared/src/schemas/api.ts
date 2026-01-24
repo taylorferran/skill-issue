@@ -20,6 +20,7 @@ export const AnswerChallengeSchema = z.object({
 export const CreateUserSchema = z.object({
   id: z.string().uuid().optional(),
   deviceId: z.string().optional(),
+  discordUserId: z.string().optional(),
   timezone: z.string().default('UTC'),
   quietHoursStart: z.number().min(0).max(23).optional(),
   quietHoursEnd: z.number().min(0).max(23).optional(),
