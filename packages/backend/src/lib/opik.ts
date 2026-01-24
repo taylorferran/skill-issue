@@ -1,3 +1,4 @@
+import { randomBytes as cryptoRandomBytes } from 'crypto';
 import type { OpikTrace, OpikSpan, OpikPrompt, SpanType } from '@/types';
 
 /**
@@ -23,8 +24,7 @@ function generateUUIDv7(): string {
   // t = timestamp, 7 = version, y = variant (8, 9, a, or b), x = random
   const timestampHex = timestamp.toString(16).padStart(12, '0');
 
-  const randomBytes = new Uint8Array(10);
-  crypto.getRandomValues(randomBytes);
+  const randomBytes = cryptoRandomBytes(10);
 
   // Convert to hex
   const randomHex = Array.from(randomBytes)
