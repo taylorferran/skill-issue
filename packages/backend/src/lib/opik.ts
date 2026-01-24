@@ -68,6 +68,9 @@ interface TraceContext {
   traceId: string;
   projectName: string;
   startTime: Date;
+  input?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+  creationPromise?: Promise<void>;  // Wait for trace to be created before updating
 }
 
 // Active trace contexts (for nested span support)
@@ -168,10 +171,17 @@ class OpikService {
     const traceId = generateUUIDv7();
     const startTime = new Date();
 
+    const initialMetadata = {
+      ...params.metadata,
+      environment: process.env.NODE_ENV || 'development',
+    };
+
     const context: TraceContext = {
       traceId,
       projectName: this.projectName,
       startTime,
+      input: params.input,
+      metadata: initialMetadata,
     };
     activeTraces.set(traceId, context);
 
@@ -181,10 +191,7 @@ class OpikService {
       name: params.name,
       start_time: startTime.toISOString(),
       input: params.input,
-      metadata: {
-        ...params.metadata,
-        environment: process.env.NODE_ENV || 'development',
-      },
+      metadata: initialMetadata,
       tags: params.tags,
     };
 
@@ -194,8 +201,10 @@ class OpikService {
     }
 
     // Use batch endpoint as required by Opik API
-    const promise = this.request('POST', '/traces/batch', { traces: [traceData] }).then(() => {});
-    this.pendingRequests.push(promise);
+    // Store the promise so endTrace can wait for creation to complete
+    const creationPromise = this.request('POST', '/traces/batch', { traces: [traceData] }).then(() => {});
+    context.creationPromise = creationPromise;
+    this.pendingRequests.push(creationPromise);
 
     return traceId;
   }
@@ -218,9 +227,11 @@ class OpikService {
     const durationMs = endTime.getTime() - context.startTime.getTime();
 
     const updateData: Partial<OpikTrace> = {
+      project_name: context.projectName,  // Required to match the trace
       end_time: endTime.toISOString(),
       output: params.output,
       metadata: {
+        ...context.metadata,  // Preserve original metadata
         duration_ms: durationMs,
         success: !params.error,
       },
@@ -234,6 +245,8 @@ class OpikService {
       };
     }
 
+    // Store creation promise before deleting context
+    const creationPromise = context.creationPromise;
     activeTraces.delete(params.traceId);
 
     if (!this.isEnabled) {
@@ -241,11 +254,14 @@ class OpikService {
       return;
     }
 
-    // Use batch endpoint as required by Opik API
-    const promise = this.request('PATCH', '/traces/batch', {
-      ids: [params.traceId],
-      update: updateData,
-    }).then(() => {});
+    // Wait for trace creation to complete before updating
+    // This prevents 404 errors from race conditions
+    const promise = (async () => {
+      if (creationPromise) {
+        await creationPromise;
+      }
+      await this.request('PATCH', `/traces/${params.traceId}`, updateData);
+    })();
     this.pendingRequests.push(promise);
   }
 
@@ -289,7 +305,7 @@ class OpikService {
       id: spanId,
       trace_id: params.traceId,
       parent_span_id: params.parentSpanId,
-      // Don't send project_name for spans - inherited from trace
+      project_name: this.projectName,  // Required - spans don't inherit from trace
       name: params.name,
       type: params.type,
       start_time: startTime.toISOString(),
@@ -330,8 +346,17 @@ class OpikService {
       return spanId;
     }
 
-    // Use batch endpoint as required by Opik API
-    const promise = this.request('POST', '/spans/batch', { spans: [spanData] }).then(() => {});
+    // Get the trace context to wait for trace creation
+    const traceContext = activeTraces.get(params.traceId);
+    const creationPromise = traceContext?.creationPromise;
+
+    // Wait for trace creation before creating span
+    const promise = (async () => {
+      if (creationPromise) {
+        await creationPromise;
+      }
+      await this.request('POST', '/spans/batch', { spans: [spanData] });
+    })();
     this.pendingRequests.push(promise);
 
     return spanId;
@@ -475,7 +500,7 @@ class OpikService {
       traceId,
       name: 'correctness',
       value: params.isCorrect ? 1 : 0,
-      source: 'automated',
+      source: 'SDK',
       reason: params.isCorrect
         ? 'User answered correctly'
         : 'User answered incorrectly',
@@ -569,7 +594,7 @@ class OpikService {
     traceId: string;
     name: string;
     value: number; // 0-1
-    source: 'human' | 'automated' | 'llm_judge';
+    source: 'UI' | 'SDK' | 'ONLINE_SCORING';
     reason?: string;
   }): Promise<void> {
     if (!this.isEnabled) {
@@ -587,7 +612,7 @@ class OpikService {
     };
 
     const promise = this.request(
-      'POST',
+      'PUT',
       `/traces/${params.traceId}/feedback-scores`,
       feedbackData
     ).then(() => {});

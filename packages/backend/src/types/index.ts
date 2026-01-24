@@ -199,7 +199,7 @@ export interface OpikPrompt {
 export interface OpikFeedbackScore {
   name: string;
   value: number;
-  source: 'human' | 'automated' | 'llm_judge';
+  source: 'UI' | 'SDK' | 'ONLINE_SCORING';
   category_name?: string;
   reason?: string;
 }
