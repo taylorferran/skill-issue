@@ -1,73 +1,135 @@
-# React + TypeScript + Vite
+# Skill Issue
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**WORK IN PROGRESS** - This project is under active development and not yet ready for production use.
 
-Currently, two official plugins are available:
+## Overview
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Skill Issue is an agent-based system that builds and maintains real competence by periodically sending short challenges to users. Instead of tracking content consumption or study time, the system measures whether a skill is actually usable at the moment it is tested.
 
-## React Compiler
+The system adapts automatically: challenge difficulty, timing, and frequency change based on real user outcomes. LLMs are used as tools inside a broader autonomous system, not as a monolithic brain.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Core Product Principles
 
-## Expanding the ESLint configuration
+- **Competence over content** - Measure what you can do, not what you've read
+- **Measurement over teaching** - Test real ability in the moment
+- **Short interruptions, not study sessions** - Quick challenges that fit into your day
+- **Autonomous adaptation** - System learns from your performance automatically
+- **Strong observability and evaluation** - Every decision is logged and traceable
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## High-Level System Flow
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+1. The system decides it is an appropriate moment to challenge a user
+2. A challenge is designed at a target difficulty
+3. The challenge is sent via push notification
+4. The user answers the challenge and provides feedback
+5. The system updates its belief about the user's skill
+6. System behavior is evaluated and tuned automatically
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Technology Stack
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- **Package Manager**: PNPM with workspaces
+- **Language**: TypeScript
+- **Authentication**: Clerk for user management
+- **Database**: Supabase (PostgreSQL)
+- **AI**: Anthropic Claude SDK for challenge generation
+- **Observability**: Opik for LLM and agent monitoring
+
+## Monorepo Structure
+
+```
+/packages
+  /backend       - Express API server with scheduling and agent logic
+  /discord       - Discord bot integration (in development)
+  /mobile        - React Native mobile app (Expo)
+  /web           - React web application
+  /shared        - Common TypeScript code (types, schemas, API clients)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Package Descriptions
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+#### `@skill-issue/backend`
+Express-based API server that orchestrates the core system:
+- Autonomous scheduling agents that decide when to send challenges
+- Challenge generation using Claude SDK
+- User skill tracking and difficulty adaptation
+- Integration with Supabase for data persistence
+- Push notification delivery via Expo
+- Cron jobs for periodic challenge scheduling
+- All agent decisions and LLM calls logged to Opik
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+**Key Dependencies**: Express, Anthropic SDK, Supabase, node-cron, expo-server-sdk
+
+#### `@learning-platform/mobile`
+React Native mobile app built with Expo:
+- Cross-platform iOS/Android support
+- User authentication via Clerk
+- Challenge interface for answering questions
+- Feedback collection (confidence, difficulty ratings)
+- Push notification handling
+- Skill selection and difficulty settings
+
+**Key Dependencies**: Expo 54, React Native, Clerk, React Navigation
+
+#### `@learning-platform/web`
+React web application for desktop access:
+- User dashboard and skill management
+- Challenge history and performance analytics
+- Alternative interface to the mobile app
+- Built with Vite for fast development
+
+**Key Dependencies**: React, Vite, Clerk, React Router
+
+#### `@learning-platform/shared`
+Shared TypeScript package used across all platforms:
+- Common type definitions
+- Zod schemas for validation
+- API client utilities
+- Shared business logic
+- Ensures type safety across frontend and backend
+
+**Key Dependencies**: Zod, TypeScript
+
+#### `packages/discord` (In Development)
+Discord bot for delivering challenges via Discord:
+- Alternative delivery channel to mobile push notifications
+- Discord slash commands for skill management
+- Challenge delivery through Discord messages
+
+## Version 1 Flow
+
+1. **Authentication**: Login with Clerk → generate auth token → save to Supabase
+2. **User Setup**: Create user profile → store details in Supabase
+3. **Skill Selection**: Browse available skills → choose skill → set initial difficulty (1-10) → save to Supabase
+4. **Challenge Loop**:
+   - User waits for next challenge
+   - Scheduler agent decides when to send challenge (decision logged to Opik)
+   - Challenge agent generates MCQ based on skill/difficulty rubric (LLM call logged to Opik)
+   - Challenge sent to user via push notification
+   - User answers, records: answer, time taken, confidence (1-5), perceived difficulty (1-5)
+   - Answer evaluation agent processes response → updates difficulty target (±1) → saves to Supabase
+   - Challenge/answer pair logged to Opik for analysis
+   - Difficulty rubrics manually tuned using Opik data
+
+## Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run backend
+cd packages/backend
+pnpm dev
+
+# Run web app
+cd packages/web
+pnpm dev
+
+# Run mobile app
+cd packages/mobile
+pnpm start
 ```
+
+## Documentation
+
+- `AGENTS.md` - Detailed system architecture and development principles
+- `docs/API_REFERENCE.md` - API endpoints and usage
