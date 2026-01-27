@@ -30,7 +30,7 @@ export class SkillStateAgent {
   /**
    * Update user skill state after challenge answer
    */
-  async updateSkillState(request: SkillUpdateRequest): Promise<void> {
+  async updateSkillState(request: SkillUpdateRequest, traceId?: string): Promise<void> {
     const startTime = Date.now();
     const supabase = getSupabase();
 
@@ -94,6 +94,7 @@ export class SkillStateAgent {
         },
         durationMs: Date.now() - startTime,
         success: true,
+        traceId,
         metadata: {
           previousDifficulty: userSkillState.difficulty_target,
           newDifficulty: update.newDifficultyTarget,
@@ -110,6 +111,7 @@ export class SkillStateAgent {
         output: { error: String(error) },
         durationMs: Date.now() - startTime,
         success: false,
+        traceId,
       });
 
       throw error;

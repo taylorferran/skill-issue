@@ -47,7 +47,7 @@ export class SchedulingAgent {
    * Called on periodic ticks (e.g., every 30 minutes)
    * Returns multiple decisions based on maxUsersPerTick config
    */
-  async makeSchedulingDecisions(): Promise<SchedulingDecision[]> {
+  async makeSchedulingDecisions(traceId?: string): Promise<SchedulingDecision[]> {
     const startTime = Date.now();
     const supabase = getSupabase();
 
@@ -108,6 +108,7 @@ export class SchedulingAgent {
             shouldChallenge: true,
             reason: decision.reason,
             difficultyTarget: decision.difficultyTarget,
+            traceId,
           });
 
           decisions.push(decision);
@@ -150,6 +151,7 @@ export class SchedulingAgent {
         },
         durationMs: duration,
         success: true,
+        traceId,
       });
 
       return decisions;
@@ -163,6 +165,7 @@ export class SchedulingAgent {
         output: { error: String(error) },
         durationMs: duration,
         success: false,
+        traceId,
       });
 
       return [];

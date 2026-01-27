@@ -34,7 +34,7 @@ export class ChallengeDesignAgent {
   /**
    * Design and create a challenge based on scheduling decision
    */
-  async designChallenge(decision: SchedulingDecision): Promise<Challenge | null> {
+  async designChallenge(decision: SchedulingDecision, traceId?: string): Promise<Challenge | null> {
     const startTime = Date.now();
     const supabase = getSupabase();
 
@@ -64,26 +64,20 @@ export class ChallengeDesignAgent {
       const llmDuration = Date.now() - llmStartTime;
       const { challenge: generatedChallenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
 
-      // Track LLM call with actual prompt and raw response
-      await opikService.trackLLMCall({
-        model: 'claude-haiku-4-5-20251001',
-        prompt: actualPrompt,      // The actual prompt sent to the LLM
-        response: rawResponse,      // The raw LLM response
-        promptTokens: usage.inputTokens,
-        completionTokens: usage.outputTokens,
-        durationMs: llmDuration,
-        success: true,
-        metadata: {
-          skillId: decision.skillId,
-          userId: decision.userId,
-          skillName: skill.name,
-          difficulty: decision.difficultyTarget,
-          parsedChallenge: generatedChallenge,  // Include the parsed result in metadata
-        },
-      });
-
       // Validate challenge
       const validation = this.validateChallenge(generatedChallenge);
+
+      // Track validation step as a span
+      if (traceId) {
+        await opikService.createSpan({
+          traceId,
+          name: 'validate_challenge',
+          type: 'general',
+          input: { question: generatedChallenge.question, optionCount: generatedChallenge.options?.length },
+          output: { isValid: validation.isValid, errors: validation.errors },
+        });
+      }
+
       if (!validation.isValid) {
         console.error('[Agent 2] Invalid challenge generated:', validation.errors);
 
@@ -94,6 +88,7 @@ export class ChallengeDesignAgent {
           output: { error: 'Validation failed', errors: validation.errors },
           durationMs: Date.now() - startTime,
           success: false,
+          traceId,
         });
 
         return null;
@@ -146,17 +141,15 @@ export class ChallengeDesignAgent {
         .eq('user_id', decision.userId)
         .eq('skill_id', decision.skillId);
 
-      // Track successful execution with full LLM output
+      // Track successful execution with nested LLM span
       await opikService.trackAgentExecution({
         agentName: 'challenge_design',
         input: {
           decision,
           skill,
-          prompt: actualPrompt,  // The full prompt sent to the LLM
         },
         output: {
           challengeId: challenge.id,
-          llmResponse: rawResponse,  // Raw LLM output
           generatedChallenge: {
             question: generatedChallenge.question,
             options: generatedChallenge.options,
@@ -166,14 +159,19 @@ export class ChallengeDesignAgent {
         },
         durationMs: Date.now() - startTime,
         success: true,
+        traceId,
         metadata: {
           actualDifficulty: generatedChallenge.actualDifficulty,
           targetDifficulty: decision.difficultyTarget,
-          tokenUsage: {
-            inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-          },
         },
+        llmCalls: [{
+          model: 'claude-haiku-4-5-20251001',
+          prompt: actualPrompt,
+          response: rawResponse,
+          promptTokens: usage.inputTokens,
+          completionTokens: usage.outputTokens,
+          durationMs: llmDuration,
+        }],
       });
 
       // Convert database row to Challenge type
@@ -187,6 +185,7 @@ export class ChallengeDesignAgent {
         output: { error: String(error) },
         durationMs: Date.now() - startTime,
         success: false,
+        traceId,
       });
 
       return null;

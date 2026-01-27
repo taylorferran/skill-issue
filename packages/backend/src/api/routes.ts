@@ -49,6 +49,7 @@ type UserSkillStateUpdate = Database['public']['Tables']['user_skill_state']['Up
  * Submit an answer to a challenge
  */
 router.post('/answer', async (req: Request, res: Response) => {
+  let traceId: string | undefined;
   try {
     const validation = AnswerChallengeSchema.safeParse(req.body);
     if (!validation.success) {
@@ -61,7 +62,15 @@ router.post('/answer', async (req: Request, res: Response) => {
     const body = validation.data;
     const supabase = getSupabase();
 
+    // Create a single root trace for the entire answer submission flow
+    traceId = await opikService.startTrace({
+      name: 'answer_submission',
+      input: { challengeId: body.challengeId, userId: body.userId },
+      tags: ['answer'],
+    });
+
     // Load challenge to check correct answer
+    const lookupStart = Date.now();
     const { data: challenge, error: challengeError } = await supabase
       .from('challenges')
       .select('*')
@@ -69,6 +78,15 @@ router.post('/answer', async (req: Request, res: Response) => {
       .single<Challenge>();
 
     if (challengeError || !challenge) {
+      await opikService.createSpan({
+        traceId,
+        name: 'load_challenge',
+        type: 'general',
+        input: { challengeId: body.challengeId },
+        output: { found: false },
+        durationMs: Date.now() - lookupStart,
+      });
+      await opikService.endTrace({ traceId, error: new Error('Challenge not found') });
       return res.status(404).json({ error: 'Challenge not found' });
     }
 
@@ -80,7 +98,17 @@ router.post('/answer', async (req: Request, res: Response) => {
       .eq('user_id', body.userId)
       .single();
 
+    await opikService.createSpan({
+      traceId,
+      name: 'load_challenge',
+      type: 'general',
+      input: { challengeId: body.challengeId },
+      output: { found: true, alreadyAnswered: !!existingAnswer },
+      durationMs: Date.now() - lookupStart,
+    });
+
     if (existingAnswer) {
+      await opikService.endTrace({ traceId, error: new Error('Challenge already answered') });
       return res.status(400).json({ error: 'Challenge already answered' });
     }
 
@@ -88,6 +116,7 @@ router.post('/answer', async (req: Request, res: Response) => {
     const isCorrect = body.selectedOption === challenge.correct_option;
 
     // Store answer in answers table
+    const storeStartTime = Date.now();
     const answerData: AnswerInsert = {
       challenge_id: body.challengeId,
       user_id: body.userId,
@@ -105,10 +134,21 @@ router.post('/answer', async (req: Request, res: Response) => {
 
     if (insertError) {
       console.error('Failed to store answer:', insertError);
+      await opikService.endTrace({ traceId, error: new Error('Failed to store answer') });
       return res.status(500).json({ error: 'Failed to store answer' });
     }
 
-    // Track metrics with Opik - this is really a placeholder tbh, rework later
+    // Create span for the DB write
+    await opikService.createSpan({
+      traceId,
+      name: 'store_answer',
+      type: 'general',
+      input: { challengeId: body.challengeId },
+      output: { isCorrect },
+      durationMs: Date.now() - storeStartTime,
+    });
+
+    // Track metrics with Opik — creates a span under the root trace
     await opikService.trackChallengeMetrics({
       challengeId: challenge.id,
       userId: body.userId,
@@ -117,15 +157,22 @@ router.post('/answer', async (req: Request, res: Response) => {
       isCorrect,
       responseTimeMs: body.responseTime || 30000,
       userConfidence: body.confidence,
+      traceId,
     });
 
-    // Update user skill state via Agent 3
+    // Update user skill state via Agent 3 — creates a span under the root trace
     await skillStateAgent.updateSkillState({
       userId: body.userId,
       skillId: challenge.skill_id,
       isCorrect,
       responseTimeMs: body.responseTime || 30000,
       difficulty: challenge.difficulty,
+    }, traceId);
+
+    // End the root trace
+    await opikService.endTrace({
+      traceId,
+      output: { isCorrect, correctOption: challenge.correct_option },
     });
 
     // Return result
@@ -136,6 +183,9 @@ router.post('/answer', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Answer error:', error);
+    if (traceId) {
+      await opikService.endTrace({ traceId, error: error as Error });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });
