@@ -44,3 +44,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase configuration (contains sensitive API keys)
+google-services.json
+android/app/google-services.json

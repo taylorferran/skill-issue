@@ -1,6 +1,7 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-expo'; // Changed here
 import type { User } from '@learning-platform/shared/types';
+import { useNotificationStore } from '@/stores/notificationStore';
 
 interface AuthContextValue {
   user: User | null;
@@ -21,6 +22,7 @@ export const AuthContext = createContext<AuthContextValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { user: clerkUser, isLoaded } = useUser();
   const { signOut: clerkSignOut } = useClerkAuth();
+  const { reset: resetNotifications } = useNotificationStore();
 
   // Transform Clerk user to our User type
   const user: User | null = clerkUser ? {
@@ -34,6 +36,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } : null;
 
   const signOut = async () => {
+    // Clear notification data on sign out
+    resetNotifications();
     await clerkSignOut();
   };
 

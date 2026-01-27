@@ -1,28 +1,143 @@
 import { Theme } from "@/theme/Theme";
-import { createTextStyle } from "@/theme/ThemeUtils";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import React, { use } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   Image,
-  StyleSheet,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
 import { SettingItem } from "@/components/setting-item/SettingItem";
+import { SettingToggle } from "@/components/setting-toggle/SettingToggle";
+import { useNotificationStore } from "@/stores/notificationStore";
+import {
+  registerForPushNotificationsAsync,
+  openDeviceSettings,
+  areNotificationsEnabled,
+} from "@/utils/notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { styles } from "./index.styles";
 
 export default function ProfileScreen() {
   const { user: clerkUser } = useUser();
   const { signOut } = useAuth();
-  // Navigation handlers - implement with your router
-  const handleNotifications = () => {
-    console.log("Navigate to notifications");
-    // Example: router.push('/notifications');
+  
+  // Notification state management
+  const { permissionStatus, setPermissionStatus, setExpoPushToken } = useNotificationStore();
+  const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
+  const notificationsEnabled = permissionStatus === 'granted';
+
+  // Check current notification permission status on mount
+  useEffect(() => {
+    const checkPermissions = async () => {
+      const enabled = await areNotificationsEnabled();
+      setPermissionStatus(enabled ? 'granted' : 'denied');
+    };
+    checkPermissions();
+  }, [setPermissionStatus]);
+
+  // Handle notification toggle
+  const handleNotificationToggle = async (value: boolean) => {
+    if (value) {
+      // User wants to ENABLE notifications
+      if (permissionStatus === 'denied') {
+        // Permission was previously denied - guide to settings
+        Alert.alert(
+          'Notifications Disabled',
+          'To enable notifications, please allow them in your device settings.',
+          [
+            {
+              text: 'Open Settings',
+              onPress: openDeviceSettings,
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+        return;
+      }
+
+      // Request permission
+      setIsTogglingNotifications(true);
+      try {
+        console.log('[Profile] 🚀 Requesting push notification token...');
+        const token = await registerForPushNotificationsAsync();
+        
+        console.log('[Profile] 📋 Token result:', token ? 'RECEIVED' : 'NULL');
+        
+        if (token && token.trim() !== '') {
+          // ✅ CRITICAL: Save token to store
+          console.log('[Profile] 💾 Saving token to store...');
+          setExpoPushToken(token);
+          setPermissionStatus('granted');
+          console.log('[Profile] ✅ Push token saved successfully');
+          
+          Alert.alert('Success', 'Notifications enabled successfully!');
+        } else {
+          console.error('[Profile] ❌ Token is null/empty');
+          setPermissionStatus('denied');
+          
+          Alert.alert(
+            'Token Error',
+            'Unable to retrieve push notification token. This may be due to:\n\n• Network connectivity issues\n• Expo server problems\n• Device configuration\n\nPlease check your internet connection and try again.',
+            [
+              { text: 'Try Again', onPress: () => handleNotificationToggle(true) },
+              { text: 'Cancel', style: 'cancel' }
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('[Profile] ❌ Error enabling notifications:', error);
+        Alert.alert('Error', 'Failed to enable notifications. Please try again.');
+      } finally {
+        setIsTogglingNotifications(false);
+      }
+    } else {
+      // User wants to DISABLE notifications
+      Alert.alert(
+        'Disable Notifications?',
+        'Are you sure you want to disable notifications?',
+        [
+          {
+            text: 'Disable',
+            style: 'destructive',
+            onPress: () => {
+              Alert.alert(
+                'Action Required',
+                'To fully disable notifications, please turn them off in your device settings.',
+                [
+                  {
+                    text: 'Open Settings',
+                    onPress: () => {
+                      setPermissionStatus('denied');
+                      openDeviceSettings();
+                    },
+                  },
+                  {
+                    text: 'Not Now',
+                    onPress: () => {
+                      setPermissionStatus('denied');
+                    },
+                    style: 'cancel',
+                  },
+                ]
+              );
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+        ]
+      );
+    }
   };
 
   const handleAccountDetails = () => {
@@ -47,6 +162,39 @@ export default function ProfileScreen() {
     } catch (err) {
       console.error("Sign out error:", err);
     }
+  };
+
+  // Debug: Retry token fetch
+  const handleDebugRetryToken = async () => {
+    Alert.alert(
+      'Debug: Retry Token',
+      'This will attempt to fetch your push notification token again.',
+      [
+        {
+          text: 'Retry',
+          onPress: async () => {
+            setIsTogglingNotifications(true);
+            try {
+              const token = await registerForPushNotificationsAsync();
+
+              if (token && token.trim() !== '') {
+                setExpoPushToken(token);
+                setPermissionStatus('granted');
+                Alert.alert('Success!', `Token retrieved:\n\n${token.substring(0, 50)}...`);
+              } else {
+                Alert.alert('Failed', 'Token is still null.');
+              }
+            } catch (error) {
+              console.error('[DEBUG] Error during retry:', error);
+              Alert.alert('Error', error instanceof Error ? error.message : 'Unknown error');
+            } finally {
+              setIsTogglingNotifications(false);
+            }
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
   };
 
   return (
@@ -113,11 +261,13 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>PREFERENCES</Text>
         <View style={styles.settingsGroup}>
-          <SettingItem
+          <SettingToggle
             icon="notifications-outline"
             title="Notification Settings"
             subtitle="Manage alerts and news"
-            onPress={handleNotifications}
+            value={notificationsEnabled}
+            onValueChange={handleNotificationToggle}
+            loading={isTogglingNotifications}
             testID="setting-notifications"
           />
           <SettingItem
@@ -151,6 +301,93 @@ export default function ProfileScreen() {
           />
         </View>
       </View>
+
+      {/* Developer Tools (only visible in __DEV__ mode) */}
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔧 DEVELOPER TOOLS</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="refresh-outline"
+              title="Reset User Creation Flag"
+              subtitle="Clear user created state for testing"
+              onPress={async () => {
+                try {
+                  await AsyncStorage.removeItem('@skill_issue_user_created');
+                  Alert.alert(
+                    'Reset Complete',
+                    'User creation flag cleared.\n\nRestart the app to trigger user creation again.',
+                    [{ text: 'OK' }]
+                  );
+                } catch (error) {
+                  Alert.alert('Error', 'Failed to reset: ' + error);
+                }
+              }}
+              testID="dev-reset-user"
+            />
+            <SettingItem
+              icon="information-circle-outline"
+              title="Check Token State"
+              subtitle="View current notification token status"
+              onPress={() => {
+                const { expoPushToken, permissionStatus } = useNotificationStore.getState();
+                Alert.alert(
+                  'Token Debug Info',
+                  `Permission Status: ${permissionStatus}\n\nExpo Push Token:\n${expoPushToken || 'NULL'}\n\nToken Length: ${expoPushToken?.length || 0} chars`,
+                  [{ text: 'OK' }]
+                );
+              }}
+              testID="dev-check-token"
+            />
+            <SettingItem
+              icon="trash-outline"
+              title="Clear All App Data"
+              subtitle="Reset entire app state"
+              onPress={async () => {
+                Alert.alert(
+                  'Clear All Data?',
+                  'This will reset the entire app to fresh install state. You will need to sign in again.',
+                  [
+                    {
+                      text: 'Cancel',
+                      style: 'cancel'
+                    },
+                    {
+                      text: 'Clear All',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await AsyncStorage.clear();
+                          Alert.alert('Success', 'All app data cleared. Please restart the app.');
+                        } catch (error) {
+                          Alert.alert('Error', 'Failed to clear data: ' + error);
+                        }
+                      }
+                    }
+                  ]
+                );
+              }}
+              testID="dev-clear-all"
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Debug Section */}
+      {__DEV__ && (
+        <>
+          <Text style={styles.sectionTitle}>🐛 DEBUG TOOLS</Text>
+          <View style={styles.settingsGroup}>
+            <SettingItem
+              icon="refresh"
+              title="Retry Token Fetch"
+              subtitle="Manually retry push notification token"
+              onPress={handleDebugRetryToken}
+              variant="support"
+            />
+          </View>
+        </>
+      )}
 
       {/* Logout Button */}
       <TouchableOpacity

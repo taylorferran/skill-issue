@@ -80,11 +80,6 @@ export const styles = StyleSheet.create({
     position: "relative",
   },
 
-  gaugeInner: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
   gaugeNumber: {
     fontSize: 36,
     fontWeight: Theme.typography.fontWeight.bold,

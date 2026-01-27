@@ -7,43 +7,42 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  Skill,
-  skillsMock,
-  availableSkillsMock,
-} from "@/types/Skill";
+import { Skill, skillsMock, availableSkillsMock } from "@/types/Skill";
 import { SkillCard } from "@/components/skill-card/SkillCard";
 import { StatsCard } from "@/components/stats-card/StatsCard";
 import { navigateTo } from "@/navigation/navigation";
 import { styles } from "./_index.styles";
 import { spacing } from "@/theme/ThemeUtils";
 import { Theme } from "@/theme/Theme";
+import { isNotificationsEnabled } from "@/utils/getPushToken";
 
 export default function SkillSelectScreen() {
   const [selectedSegment, setSelectedSegment] = useState<
     "Current Skills" | "New Skills"
   >("Current Skills");
-  
+
   // Current skills that user is learning
   const [currentSkills, setCurrentSkills] = useState<Skill[]>(skillsMock);
-  
+
+  console.log(isNotificationsEnabled());
   // Available skills to add
-  const [availableSkills, setAvailableSkills] = useState<Skill[]>(availableSkillsMock);
+  const [availableSkills, setAvailableSkills] =
+    useState<Skill[]>(availableSkillsMock);
 
   const handleSkillSelect = (skill: Skill) => {
-    navigateTo("questions", {
+    navigateTo("assessment", {
       skill: skill.name,
-      progress: skill.progress
+      progress: skill.progress,
     });
   };
 
   const handleAddSkill = (skill: Skill) => {
     // Add skill to current skills
-    setCurrentSkills(prev => [...prev, skill]);
-    
+    setCurrentSkills((prev) => [...prev, skill]);
+
     // Remove from available skills
-    setAvailableSkills(prev => prev.filter(s => s.id !== skill.id));
-    
+    setAvailableSkills((prev) => prev.filter((s) => s.id !== skill.id));
+
     // Switch back to Current Skills tab
     setSelectedSegment("Current Skills");
   };
@@ -52,11 +51,7 @@ export default function SkillSelectScreen() {
   const renderNewSkillCard = (skill: Skill) => (
     <View key={skill.id} style={styles.newSkillCard}>
       <View>
-        <View
-          style={[
-            styles.newSkillIconContainer,
-          ]}
-        >
+        <View style={[styles.newSkillIconContainer]}>
           <Ionicons name={skill.icon} size={28} color="#ffffff" />
         </View>
         <Text style={styles.newSkillName}>{skill.name}</Text>
@@ -64,27 +59,23 @@ export default function SkillSelectScreen() {
           {skill.category}
         </Text>
       </View>
-      
+
       {/* Add Skill Button */}
       <TouchableOpacity
         style={styles.addSkillButton}
         onPress={() => handleAddSkill(skill)}
         activeOpacity={0.7}
       >
-        <Ionicons
-          name="add"
-          size={14}
-          color={Theme.colors.text.inverse}
-        />
+        <Ionicons name="add" size={14} color={Theme.colors.text.inverse} />
         <Text style={styles.addSkillButtonText}>Add Skill</Text>
       </TouchableOpacity>
     </View>
   );
 
   const calculateTotalSkills = () => currentSkills.length;
-  
+
   const getActivePath = () => {
-    const primarySkill = currentSkills.find(skill => skill.isPrimary);
+    const primarySkill = currentSkills.find((skill) => skill.isPrimary);
     return primarySkill ? primarySkill.name.split(" ")[0] : "None";
   };
 
@@ -103,7 +94,7 @@ export default function SkillSelectScreen() {
                 style={[
                   styles.segmentButton,
                   selectedSegment === "Current Skills" &&
-                    styles.segmentButtonActive,
+                  styles.segmentButtonActive,
                 ]}
                 onPress={() => setSelectedSegment("Current Skills")}
                 activeOpacity={0.7}
@@ -112,7 +103,7 @@ export default function SkillSelectScreen() {
                   style={[
                     styles.segmentButtonText,
                     selectedSegment === "Current Skills" &&
-                      styles.segmentButtonTextActive,
+                    styles.segmentButtonTextActive,
                   ]}
                 >
                   Current Skills
@@ -121,7 +112,8 @@ export default function SkillSelectScreen() {
               <TouchableOpacity
                 style={[
                   styles.segmentButton,
-                  selectedSegment === "New Skills" && styles.segmentButtonActive,
+                  selectedSegment === "New Skills" &&
+                  styles.segmentButtonActive,
                 ]}
                 onPress={() => setSelectedSegment("New Skills")}
                 activeOpacity={0.7}
@@ -130,7 +122,7 @@ export default function SkillSelectScreen() {
                   style={[
                     styles.segmentButtonText,
                     selectedSegment === "New Skills" &&
-                      styles.segmentButtonTextActive,
+                    styles.segmentButtonTextActive,
                   ]}
                 >
                   New Skills
@@ -149,10 +141,7 @@ export default function SkillSelectScreen() {
                     label="TOTAL SKILLS"
                     value={calculateTotalSkills()}
                   />
-                  <StatsCard
-                    label="ACTIVE PATH"
-                    value={getActivePath()}
-                  />
+                  <StatsCard label="ACTIVE PATH" value={getActivePath()} />
                 </View>
               </View>
 

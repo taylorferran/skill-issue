@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Skill Issue",
+    "slug": "skill-issue",
     "version": "1.0.0",
+    "owner": "jmurphy786s-organization",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
@@ -21,7 +22,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.mobile"
+      "googleServicesFile": "./google-services.json",
+      "package": "com.jmurphy.skillissue"
     },
     "web": {
       "output": "static",
@@ -40,11 +42,24 @@
             "backgroundColor": "#000000"
           }
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff",
+          "defaultChannel": "default",
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b302dea4-1c3f-42d5-bd5f-eca4acebea90"
+      }
     }
   }
 }
