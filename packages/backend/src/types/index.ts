@@ -199,7 +199,7 @@ export interface OpikPrompt {
 export interface OpikFeedbackScore {
   name: string;
   value: number;
-  source: 'UI' | 'SDK' | 'ONLINE_SCORING';
+  source: 'ui' | 'sdk' | 'online_scoring';
   category_name?: string;
   reason?: string;
 }

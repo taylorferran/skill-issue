@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { schedulingAgent } from '@/agents/agent1-scheduling';
 import { challengeDesignAgent } from '@/agents/agent2-challenge-design';
 import { getSupabase } from '@/lib/supabase';
+import { opikService } from '@/lib/opik';
 import type { SchedulingDecision } from '@/types';
 
 /**
@@ -49,12 +50,20 @@ class SchedulerService {
   async runSchedulingTick(): Promise<void> {
     console.log('[Scheduler] Tick started at', new Date().toISOString());
 
+    // Create a single root trace for the entire scheduling tick
+    const traceId = await opikService.startTrace({
+      name: 'scheduling_tick',
+      input: { timestamp: new Date().toISOString() },
+      tags: ['scheduler'],
+    });
+
     try {
       // Agent 1: Make scheduling decisions (may return multiple)
-      const decisions = await schedulingAgent.makeSchedulingDecisions();
+      const decisions = await schedulingAgent.makeSchedulingDecisions(traceId);
 
       if (decisions.length === 0) {
         console.log('[Scheduler] No challenges scheduled this tick');
+        await opikService.endTrace({ traceId, output: { decisionsCount: 0 } });
         return;
       }
 
@@ -62,24 +71,32 @@ class SchedulerService {
 
       // Process each decision
       for (const decision of decisions) {
-        await this.processChallenge(decision);
+        await this.processChallenge(decision, traceId);
       }
 
       console.log('[Scheduler] Tick completed successfully');
+      await opikService.endTrace({
+        traceId,
+        output: {
+          decisionsCount: decisions.length,
+          users: decisions.map(d => d.userId),
+        },
+      });
     } catch (error) {
       console.error('[Scheduler] Tick error:', error);
+      await opikService.endTrace({ traceId, error: error as Error });
     }
   }
 
   /**
    * Process a single challenge decision
    */
-  private async processChallenge(decision: SchedulingDecision): Promise<void> {
+  private async processChallenge(decision: SchedulingDecision, traceId: string): Promise<void> {
     try {
       console.log(`[Scheduler] Processing challenge for user ${decision.userId}, skill ${decision.skillId}`);
 
       // Agent 2: Design challenge
-      const challenge = await challengeDesignAgent.designChallenge(decision);
+      const challenge = await challengeDesignAgent.designChallenge(decision, traceId);
 
       if (!challenge) {
         console.error(`[Scheduler] Failed to design challenge for user ${decision.userId}`);

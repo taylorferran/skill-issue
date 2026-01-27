@@ -365,7 +365,9 @@ class OpikService {
   // ============= High-Level Tracking Methods =============
 
   /**
-   * Track a complete agent execution with optional nested LLM spans
+   * Track a complete agent execution with optional nested LLM spans.
+   * If traceId is provided, creates spans under the existing trace.
+   * If not, creates a new standalone trace.
    */
   async trackAgentExecution(params: {
     agentName: string;
@@ -374,6 +376,7 @@ class OpikService {
     metadata?: Record<string, unknown>;
     durationMs: number;
     success: boolean;
+    traceId?: string;
     llmCalls?: Array<{
       model: string;
       prompt: string;
@@ -383,7 +386,41 @@ class OpikService {
       durationMs: number;
     }>;
   }): Promise<void> {
-    // Create the trace for the agent execution
+    if (params.traceId) {
+      // Create a general span under the existing trace
+      const agentSpanId = await this.createSpan({
+        traceId: params.traceId,
+        name: `agent_${params.agentName}`,
+        type: 'general',
+        input: params.input,
+        output: params.output,
+        metadata: { ...params.metadata, agent: params.agentName, success: params.success },
+        durationMs: params.durationMs,
+        error: params.success ? undefined : new Error('Agent execution failed'),
+      });
+
+      // Nest LLM spans under the agent span
+      if (params.llmCalls) {
+        for (const llmCall of params.llmCalls) {
+          await this.createSpan({
+            traceId: params.traceId,
+            parentSpanId: agentSpanId,
+            name: `llm_${llmCall.model}`,
+            type: 'llm',
+            model: llmCall.model,
+            provider: this.getProviderFromModel(llmCall.model),
+            input: { prompt: llmCall.prompt },
+            output: { response: llmCall.response },
+            promptTokens: llmCall.promptTokens,
+            completionTokens: llmCall.completionTokens,
+            durationMs: llmCall.durationMs,
+          });
+        }
+      }
+      return;
+    }
+
+    // No parent trace — create a standalone trace
     const traceId = await this.startTrace({
       name: `agent_${params.agentName}`,
       input: params.input,
@@ -462,7 +499,9 @@ class OpikService {
   }
 
   /**
-   * Track challenge outcome metrics
+   * Track challenge outcome metrics.
+   * If traceId is provided, creates a span under the existing trace.
+   * If not, creates a new standalone trace.
    */
   async trackChallengeMetrics(params: {
     challengeId: string;
@@ -472,35 +511,54 @@ class OpikService {
     isCorrect: boolean;
     responseTimeMs: number;
     userConfidence?: number;
+    traceId?: string;
   }): Promise<void> {
-    const traceId = await this.startTrace({
-      name: 'challenge_outcome',
-      input: {
-        challengeId: params.challengeId,
-        userId: params.userId,
-        skillId: params.skillId,
-        difficulty: params.difficulty,
-      },
-      metadata: {
-        userConfidence: params.userConfidence,
-      },
-      tags: ['challenge', params.isCorrect ? 'correct' : 'incorrect'],
-    });
+    const metricsInput = {
+      challengeId: params.challengeId,
+      userId: params.userId,
+      skillId: params.skillId,
+      difficulty: params.difficulty,
+    };
+    const metricsOutput = {
+      isCorrect: params.isCorrect,
+      responseTimeMs: params.responseTimeMs,
+    };
 
-    await this.endTrace({
-      traceId,
-      output: {
-        isCorrect: params.isCorrect,
-        responseTimeMs: params.responseTimeMs,
-      },
-    });
+    // Determine the traceId to use for feedback scores
+    let feedbackTraceId: string;
+
+    if (params.traceId) {
+      // Create a span under the existing trace
+      await this.createSpan({
+        traceId: params.traceId,
+        name: 'challenge_metrics',
+        type: 'general',
+        input: metricsInput,
+        output: metricsOutput,
+        metadata: { userConfidence: params.userConfidence },
+      });
+      feedbackTraceId = params.traceId;
+    } else {
+      // Standalone trace
+      feedbackTraceId = await this.startTrace({
+        name: 'challenge_outcome',
+        input: metricsInput,
+        metadata: { userConfidence: params.userConfidence },
+        tags: ['challenge', params.isCorrect ? 'correct' : 'incorrect'],
+      });
+
+      await this.endTrace({
+        traceId: feedbackTraceId,
+        output: metricsOutput,
+      });
+    }
 
     // Add feedback score for the outcome
     await this.addFeedbackScore({
-      traceId,
+      traceId: feedbackTraceId,
       name: 'correctness',
       value: params.isCorrect ? 1 : 0,
-      source: 'SDK',
+      source: 'sdk',
       reason: params.isCorrect
         ? 'User answered correctly'
         : 'User answered incorrectly',
@@ -508,7 +566,9 @@ class OpikService {
   }
 
   /**
-   * Track scheduling decision
+   * Track scheduling decision.
+   * If traceId is provided, creates a span under the existing trace.
+   * If not, creates a new standalone trace.
    */
   async trackSchedulingDecision(params: {
     userId: string;
@@ -516,23 +576,40 @@ class OpikService {
     shouldChallenge: boolean;
     reason: string;
     difficultyTarget: number;
+    traceId?: string;
   }): Promise<void> {
+    const decisionInput = {
+      userId: params.userId,
+      skillId: params.skillId,
+    };
+    const decisionOutput = {
+      decision: params.shouldChallenge,
+      reason: params.reason,
+      difficultyTarget: params.difficultyTarget,
+    };
+
+    if (params.traceId) {
+      // Create a span under the existing trace
+      await this.createSpan({
+        traceId: params.traceId,
+        name: 'scheduling_decision',
+        type: 'general',
+        input: decisionInput,
+        output: decisionOutput,
+      });
+      return;
+    }
+
+    // Standalone trace
     const traceId = await this.startTrace({
       name: 'scheduling_decision',
-      input: {
-        userId: params.userId,
-        skillId: params.skillId,
-      },
+      input: decisionInput,
       tags: ['scheduling', params.shouldChallenge ? 'challenged' : 'skipped'],
     });
 
     await this.endTrace({
       traceId,
-      output: {
-        decision: params.shouldChallenge,
-        reason: params.reason,
-        difficultyTarget: params.difficultyTarget,
-      },
+      output: decisionOutput,
     });
   }
 
@@ -594,7 +671,7 @@ class OpikService {
     traceId: string;
     name: string;
     value: number; // 0-1
-    source: 'UI' | 'SDK' | 'ONLINE_SCORING';
+    source: 'ui' | 'sdk' | 'online_scoring';
     reason?: string;
   }): Promise<void> {
     if (!this.isEnabled) {

@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initSupabase } from '@/lib/supabase';
-import { initOpik } from '@/lib/opik';
+import { initOpik, opikService } from '@/lib/opik';
 import { schedulerService } from '@/services/scheduler.service';
 import apiRoutes from '@/api/routes';
 
@@ -151,15 +151,17 @@ async function start() {
 }
 
 // Handle graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('\nSIGTERM received, shutting down gracefully...');
   schedulerService.stop();
+  await opikService.flush();
   process.exit(0);
 });
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('\nSIGINT received, shutting down gracefully...');
   schedulerService.stop();
+  await opikService.flush();
   process.exit(0);
 });
 
