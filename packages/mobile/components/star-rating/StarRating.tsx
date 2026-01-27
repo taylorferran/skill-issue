@@ -7,10 +7,12 @@ import { styles } from "./StarRating.styles";
 
 type StarRatingProps = {
   rating: number | null;
+  text: string;
   onRatingSelect: (rating: number) => void;
 };
 
 export const StarRating: React.FC<StarRatingProps> = ({
+  text,
   rating,
   onRatingSelect,
 }) => {

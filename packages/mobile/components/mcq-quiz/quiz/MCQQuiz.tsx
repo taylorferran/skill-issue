@@ -21,7 +21,8 @@ interface QuizSessionState {
   isCorrect: boolean;
   timeLeft: number;
   isTimeUp: boolean;
-  rating: number | null;
+  difficultyRating: number | null;
+  usefulRating: number | null;
 }
 
 export const MCQQuiz: React.FC<MCQQuizProps> = ({
@@ -41,7 +42,8 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     isCorrect: false,
     timeLeft: timePerQuestion,
     isTimeUp: false,
-    rating: null,
+    difficultyRating: null,
+    usefulRating: null
   });
 
   const currentQuestion = questions[quizSession.currentQuestionIndex];
@@ -83,7 +85,8 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
       isCorrect: false,
       timeLeft: timePerQuestion,
       isTimeUp: false,
-      rating: null,
+      usefulRating: null,
+      difficultyRating: null
     });
   }, [data, timePerQuestion]);
 
@@ -205,10 +208,14 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
               explanation={currentQuestion.explanation} 
             />
             <StarRating 
-              rating={quizSession.rating} 
-              onRatingSelect={handleRatingSelect} 
-            />
-            {quizSession.rating !== null && (
+              text='How difficult was this question?'
+              rating={quizSession.difficultyRating} 
+              onRatingSelect={(rating) => setQuizSession((prev => ({...prev, difficultyRating: rating})))} />
+            <StarRating 
+              rating={quizSession.usefulRating} 
+              text='How useful was this question?'
+              onRatingSelect={(rating) => setQuizSession((prev => ({...prev, usefulRating: rating})))} />
+            {quizSession.usefulRating!== null && quizSession.difficultyRating && (
               <View style={styles.buttonContainer}>
                 <FinishButton onPress={onFinish} text={'Finish'} />
               </View>

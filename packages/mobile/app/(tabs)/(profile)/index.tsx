@@ -25,21 +25,26 @@ import * as Localization from "expo-localization";
 import { useCreateUser } from "@/api-routes/createUser";
 import type { CreateUserInput } from "@learning-platform/shared";
 import { styles } from "./index.styles";
+import { usePush } from "@/api-routes/usePush";
 
 export default function ProfileScreen() {
-  const { auth, setUser, updateUser, isUserCreated, markUserAsCreated } = useUser();
+  const { auth, setUser, updateUser, isUserCreated, markUserAsCreated } =
+    useUser();
   const { execute: createUserApi } = useCreateUser();
-  
+
+  const { getPushToken } = useNotificationStore.getState();
   // Notification state management
-  const { permissionStatus, setPermissionStatus, setExpoPushToken } = useNotificationStore();
+  const { permissionStatus, setPermissionStatus, setExpoPushToken } =
+    useNotificationStore();
   const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
-  const notificationsEnabled = permissionStatus === 'granted';
+  const notificationsEnabled = permissionStatus === "granted";
+  const { execute } = usePush();
 
   // Check current notification permission status on mount
   useEffect(() => {
     const checkPermissions = async () => {
       const enabled = await areNotificationsEnabled();
-      setPermissionStatus(enabled ? 'granted' : 'denied');
+      setPermissionStatus(enabled ? "granted" : "denied");
     };
     checkPermissions();
   }, [setPermissionStatus]);
@@ -48,21 +53,21 @@ export default function ProfileScreen() {
   const handleNotificationToggle = async (value: boolean) => {
     if (value) {
       // User wants to ENABLE notifications
-      if (permissionStatus === 'denied') {
+      if (permissionStatus === "denied") {
         // Permission was previously denied - guide to settings
         Alert.alert(
-          'Notifications Disabled',
-          'To enable notifications, please allow them in your device settings.',
+          "Notifications Disabled",
+          "To enable notifications, please allow them in your device settings.",
           [
             {
-              text: 'Open Settings',
+              text: "Open Settings",
               onPress: openDeviceSettings,
             },
             {
-              text: 'Cancel',
-              style: 'cancel',
+              text: "Cancel",
+              style: "cancel",
             },
-          ]
+          ],
         );
         return;
       }
@@ -70,134 +75,151 @@ export default function ProfileScreen() {
       // Request permission
       setIsTogglingNotifications(true);
       try {
-        console.log('[Profile] 🚀 Requesting push notification token...');
+        console.log("[Profile] 🚀 Requesting push notification token...");
         const token = await registerForPushNotificationsAsync();
-        
-        console.log('[Profile] 📋 Token result:', token ? 'RECEIVED' : 'NULL');
-        
-        if (token && token.trim() !== '') {
+
+        console.log("[Profile] 📋 Token result:", token ? "RECEIVED" : "NULL");
+
+        if (token && token.trim() !== "") {
           // Save token to notification store
-          console.log('[Profile] 💾 Saving token to notification store...');
+          console.log("[Profile] 💾 Saving token to notification store...");
           setExpoPushToken(token);
-          setPermissionStatus('granted');
-          console.log('[Profile] ✅ Push token saved to notification store');
-          
+          setPermissionStatus("granted");
+          console.log("[Profile] ✅ Push token saved to notification store");
+
           // Check if backend user exists
           if (!isUserCreated()) {
-            console.log('[Profile] 🆕 First time user - creating on backend...');
-            
+            console.log(
+              "[Profile] 🆕 First time user - creating on backend...",
+            );
+
             try {
               // Prepare user data
               const userData: CreateUserInput = {
-                timezone: Localization.getCalendars()[0]?.timeZone || 'UTC',
+                timezone: Localization.getCalendars()[0]?.timeZone || "UTC",
                 deviceId: token,
                 maxChallengesPerDay: 5,
               };
-              
-              console.log('[Profile] 🚀 Creating user with data:', {
+
+              console.log("[Profile] 🚀 Creating user with data:", {
                 timezone: userData.timezone,
-                deviceId: '[Push Token Set]',
-                maxChallengesPerDay: userData.maxChallengesPerDay
+                deviceId: "[Push Token Set]",
+                maxChallengesPerDay: userData.maxChallengesPerDay,
               });
-              
+
               // Create on backend
               await createUserApi(userData);
-              console.log('[Profile] ✅ User created on backend');
-              
+              console.log("[Profile] ✅ User created on backend");
+
               // Store locally
               await setUser(userData);
-              console.log('[Profile] 💾 User data saved locally');
-              
+              console.log("[Profile] 💾 User data saved locally");
+
               // Mark as created
               await markUserAsCreated();
-              console.log('[Profile] 🎉 User setup complete');
-              
-              Alert.alert('Success', 'Notifications enabled successfully!');
+              console.log("[Profile] 🎉 User setup complete");
+
+              Alert.alert("Success", "Notifications enabled successfully!");
             } catch (error) {
-              console.error('[Profile] ❌ Error during user creation:', error);
-              
+              console.error("[Profile] ❌ Error during user creation:", error);
+
               // Graceful degradation - still allow app usage
               Alert.alert(
-                'Setup Notice',
-                'Notifications are enabled, but we encountered an issue setting up your account. You can continue using the app.',
-                [{ text: 'OK', style: 'default' }]
+                "Setup Notice",
+                "Notifications are enabled, but we encountered an issue setting up your account. You can continue using the app.",
+                [{ text: "OK", style: "default" }],
               );
             }
           } else {
-            console.log('[Profile] ✅ User already exists, updating push token locally');
-            
+            console.log(
+              "[Profile] ✅ User already exists, updating push token locally",
+            );
+
             // User already exists, just update deviceId locally
             try {
               await updateUser({ deviceId: token });
-              console.log('[Profile] 💾 Push token updated locally');
+              console.log("[Profile] 💾 Push token updated locally");
             } catch (error) {
-              console.error('[Profile] ⚠️ Failed to update token locally:', error);
+              console.error(
+                "[Profile] ⚠️ Failed to update token locally:",
+                error,
+              );
             }
-            
-            Alert.alert('Success', 'Notifications enabled successfully!');
+
+            Alert.alert("Success", "Notifications enabled successfully!");
           }
         } else {
-          console.error('[Profile] ❌ Token is null/empty');
-          setPermissionStatus('denied');
-          
+          console.error("[Profile] ❌ Token is null/empty");
+          setPermissionStatus("denied");
+
           Alert.alert(
-            'Token Error',
-            'Unable to retrieve push notification token. This may be due to:\n\n• Network connectivity issues\n• Expo server problems\n• Device configuration\n\nPlease check your internet connection and try again.',
+            "Token Error",
+            "Unable to retrieve push notification token. This may be due to:\n\n• Network connectivity issues\n• Expo server problems\n• Device configuration\n\nPlease check your internet connection and try again.",
             [
-              { text: 'Try Again', onPress: () => handleNotificationToggle(true) },
-              { text: 'Cancel', style: 'cancel' }
-            ]
+              {
+                text: "Try Again",
+                onPress: () => handleNotificationToggle(true),
+              },
+              { text: "Cancel", style: "cancel" },
+            ],
           );
         }
       } catch (error) {
-        console.error('[Profile] ❌ Error enabling notifications:', error);
-        Alert.alert('Error', 'Failed to enable notifications. Please try again.');
+        console.error("[Profile] ❌ Error enabling notifications:", error);
+        Alert.alert(
+          "Error",
+          "Failed to enable notifications. Please try again.",
+        );
       } finally {
         setIsTogglingNotifications(false);
       }
     } else {
       // User wants to DISABLE notifications
       Alert.alert(
-        'Disable Notifications?',
-        'Are you sure you want to disable notifications?',
+        "Disable Notifications?",
+        "Are you sure you want to disable notifications?",
         [
           {
-            text: 'Disable',
-            style: 'destructive',
+            text: "Disable",
+            style: "destructive",
             onPress: () => {
               Alert.alert(
-                'Action Required',
-                'To fully disable notifications, please turn them off in your device settings.',
+                "Action Required",
+                "To fully disable notifications, please turn them off in your device settings.",
                 [
                   {
-                    text: 'Open Settings',
+                    text: "Open Settings",
                     onPress: () => {
-                      setPermissionStatus('denied');
+                      setPermissionStatus("denied");
                       openDeviceSettings();
                     },
                   },
                   {
-                    text: 'Not Now',
+                    text: "Not Now",
                     onPress: () => {
-                      setPermissionStatus('denied');
+                      setPermissionStatus("denied");
                     },
-                    style: 'cancel',
+                    style: "cancel",
                   },
-                ]
+                ],
               );
             },
           },
           {
-            text: 'Cancel',
-            style: 'cancel',
+            text: "Cancel",
+            style: "cancel",
           },
-        ]
+        ],
       );
     }
   };
 
   const handleAccountDetails = () => {
     console.log("Navigate to account details");
+    var token = getPushToken();
+    if (token !== null) {
+      execute({ pushToken: token });
+    }
     // Example: router.push('/account-details');
   };
 
@@ -223,33 +245,39 @@ export default function ProfileScreen() {
   // Debug: Retry token fetch
   const handleDebugRetryToken = async () => {
     Alert.alert(
-      'Debug: Retry Token',
-      'This will attempt to fetch your push notification token again.',
+      "Debug: Retry Token",
+      "This will attempt to fetch your push notification token again.",
       [
         {
-          text: 'Retry',
+          text: "Retry",
           onPress: async () => {
             setIsTogglingNotifications(true);
             try {
               const token = await registerForPushNotificationsAsync();
 
-              if (token && token.trim() !== '') {
+              if (token && token.trim() !== "") {
                 setExpoPushToken(token);
-                setPermissionStatus('granted');
-                Alert.alert('Success!', `Token retrieved:\n\n${token.substring(0, 50)}...`);
+                setPermissionStatus("granted");
+                Alert.alert(
+                  "Success!",
+                  `Token retrieved:\n\n${token.substring(0, 50)}...`,
+                );
               } else {
-                Alert.alert('Failed', 'Token is still null.');
+                Alert.alert("Failed", "Token is still null.");
               }
             } catch (error) {
-              console.error('[DEBUG] Error during retry:', error);
-              Alert.alert('Error', error instanceof Error ? error.message : 'Unknown error');
+              console.error("[DEBUG] Error during retry:", error);
+              Alert.alert(
+                "Error",
+                error instanceof Error ? error.message : "Unknown error",
+              );
             } finally {
               setIsTogglingNotifications(false);
             }
-          }
+          },
         },
-        { text: 'Cancel', style: 'cancel' }
-      ]
+        { text: "Cancel", style: "cancel" },
+      ],
     );
   };
 
@@ -264,7 +292,8 @@ export default function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <Image
             source={{
-              uri: auth.clerkUser?.imageUrl || "https://via.placeholder.com/128",
+              uri:
+                auth.clerkUser?.imageUrl || "https://via.placeholder.com/128",
             }}
             style={styles.avatar}
           />
@@ -369,14 +398,14 @@ export default function ProfileScreen() {
               subtitle="Clear user created state for testing"
               onPress={async () => {
                 try {
-                  await AsyncStorage.removeItem('@skill_issue_user_created');
+                  await AsyncStorage.removeItem("@skill_issue_user_created");
                   Alert.alert(
-                    'Reset Complete',
-                    'User creation flag cleared.\n\nRestart the app to trigger user creation again.',
-                    [{ text: 'OK' }]
+                    "Reset Complete",
+                    "User creation flag cleared.\n\nRestart the app to trigger user creation again.",
+                    [{ text: "OK" }],
                   );
                 } catch (error) {
-                  Alert.alert('Error', 'Failed to reset: ' + error);
+                  Alert.alert("Error", "Failed to reset: " + error);
                 }
               }}
               testID="dev-reset-user"
@@ -386,11 +415,12 @@ export default function ProfileScreen() {
               title="Check Token State"
               subtitle="View current notification token status"
               onPress={() => {
-                const { expoPushToken, permissionStatus } = useNotificationStore.getState();
+                const { expoPushToken, permissionStatus } =
+                  useNotificationStore.getState();
                 Alert.alert(
-                  'Token Debug Info',
-                  `Permission Status: ${permissionStatus}\n\nExpo Push Token:\n${expoPushToken || 'NULL'}\n\nToken Length: ${expoPushToken?.length || 0} chars`,
-                  [{ text: 'OK' }]
+                  "Token Debug Info",
+                  `Permission Status: ${permissionStatus}\n\nExpo Push Token:\n${expoPushToken || "NULL"}\n\nToken Length: ${expoPushToken?.length || 0} chars`,
+                  [{ text: "OK" }],
                 );
               }}
               testID="dev-check-token"
@@ -401,26 +431,32 @@ export default function ProfileScreen() {
               subtitle="Reset entire app state"
               onPress={async () => {
                 Alert.alert(
-                  'Clear All Data?',
-                  'This will reset the entire app to fresh install state. You will need to sign in again.',
+                  "Clear All Data?",
+                  "This will reset the entire app to fresh install state. You will need to sign in again.",
                   [
                     {
-                      text: 'Cancel',
-                      style: 'cancel'
+                      text: "Cancel",
+                      style: "cancel",
                     },
                     {
-                      text: 'Clear All',
-                      style: 'destructive',
+                      text: "Clear All",
+                      style: "destructive",
                       onPress: async () => {
                         try {
                           await AsyncStorage.clear();
-                          Alert.alert('Success', 'All app data cleared. Please restart the app.');
+                          Alert.alert(
+                            "Success",
+                            "All app data cleared. Please restart the app.",
+                          );
                         } catch (error) {
-                          Alert.alert('Error', 'Failed to clear data: ' + error);
+                          Alert.alert(
+                            "Error",
+                            "Failed to clear data: " + error,
+                          );
                         }
-                      }
-                    }
-                  ]
+                      },
+                    },
+                  ],
                 );
               }}
               testID="dev-clear-all"

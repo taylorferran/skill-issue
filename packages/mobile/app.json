@@ -23,7 +23,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",
-      "package": "com.jmurphy.skillissue"
+      "package": "com.jmurphy.skillissue.mobile"
     },
     "web": {
       "output": "static",
