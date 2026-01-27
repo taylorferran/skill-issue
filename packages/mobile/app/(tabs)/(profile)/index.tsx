@@ -1,5 +1,5 @@
 import { Theme } from "@/theme/Theme";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useUser } from "@/contexts/UserContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -21,11 +21,14 @@ import {
   areNotificationsEnabled,
 } from "@/utils/notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Localization from "expo-localization";
+import { useCreateUser } from "@/api-routes/createUser";
+import type { CreateUserInput } from "@learning-platform/shared";
 import { styles } from "./index.styles";
 
 export default function ProfileScreen() {
-  const { user: clerkUser } = useUser();
-  const { signOut } = useAuth();
+  const { auth, setUser, updateUser, isUserCreated, markUserAsCreated } = useUser();
+  const { execute: createUserApi } = useCreateUser();
   
   // Notification state management
   const { permissionStatus, setPermissionStatus, setExpoPushToken } = useNotificationStore();
@@ -73,13 +76,66 @@ export default function ProfileScreen() {
         console.log('[Profile] 📋 Token result:', token ? 'RECEIVED' : 'NULL');
         
         if (token && token.trim() !== '') {
-          // ✅ CRITICAL: Save token to store
-          console.log('[Profile] 💾 Saving token to store...');
+          // Save token to notification store
+          console.log('[Profile] 💾 Saving token to notification store...');
           setExpoPushToken(token);
           setPermissionStatus('granted');
-          console.log('[Profile] ✅ Push token saved successfully');
+          console.log('[Profile] ✅ Push token saved to notification store');
           
-          Alert.alert('Success', 'Notifications enabled successfully!');
+          // Check if backend user exists
+          if (!isUserCreated()) {
+            console.log('[Profile] 🆕 First time user - creating on backend...');
+            
+            try {
+              // Prepare user data
+              const userData: CreateUserInput = {
+                timezone: Localization.getCalendars()[0]?.timeZone || 'UTC',
+                deviceId: token,
+                maxChallengesPerDay: 5,
+              };
+              
+              console.log('[Profile] 🚀 Creating user with data:', {
+                timezone: userData.timezone,
+                deviceId: '[Push Token Set]',
+                maxChallengesPerDay: userData.maxChallengesPerDay
+              });
+              
+              // Create on backend
+              await createUserApi(userData);
+              console.log('[Profile] ✅ User created on backend');
+              
+              // Store locally
+              await setUser(userData);
+              console.log('[Profile] 💾 User data saved locally');
+              
+              // Mark as created
+              await markUserAsCreated();
+              console.log('[Profile] 🎉 User setup complete');
+              
+              Alert.alert('Success', 'Notifications enabled successfully!');
+            } catch (error) {
+              console.error('[Profile] ❌ Error during user creation:', error);
+              
+              // Graceful degradation - still allow app usage
+              Alert.alert(
+                'Setup Notice',
+                'Notifications are enabled, but we encountered an issue setting up your account. You can continue using the app.',
+                [{ text: 'OK', style: 'default' }]
+              );
+            }
+          } else {
+            console.log('[Profile] ✅ User already exists, updating push token locally');
+            
+            // User already exists, just update deviceId locally
+            try {
+              await updateUser({ deviceId: token });
+              console.log('[Profile] 💾 Push token updated locally');
+            } catch (error) {
+              console.error('[Profile] ⚠️ Failed to update token locally:', error);
+            }
+            
+            Alert.alert('Success', 'Notifications enabled successfully!');
+          }
         } else {
           console.error('[Profile] ❌ Token is null/empty');
           setPermissionStatus('denied');
@@ -157,7 +213,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     try {
-      await signOut();
+      await auth.signOut();
       router.replace("/sign-in");
     } catch (err) {
       console.error("Sign out error:", err);
@@ -208,7 +264,7 @@ export default function ProfileScreen() {
         <View style={styles.avatarContainer}>
           <Image
             source={{
-              uri: clerkUser?.imageUrl || "https://via.placeholder.com/128",
+              uri: auth.clerkUser?.imageUrl || "https://via.placeholder.com/128",
             }}
             style={styles.avatar}
           />
@@ -223,7 +279,7 @@ export default function ProfileScreen() {
 
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>
-            {clerkUser?.fullName || "Undefined"}
+            {auth.clerkUser?.fullName || "Undefined"}
           </Text>
           <View style={styles.badgesContainer}>
             <View style={styles.proBadge}>

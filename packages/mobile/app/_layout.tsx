@@ -1,10 +1,10 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
+import { ClerkProvider, ClerkLoaded, useAuth } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
 import "react-native-reanimated";
-import { use, useEffect, useMemo } from "react";
-import { AuthContext } from "@/contexts/AuthContext";
+import { useEffect, useMemo } from "react";
+import { UserProvider } from "@/contexts/UserContext";
 import { QuizProvider } from "@/contexts/QuizContext";
 import {
   configureNotificationHandler,
@@ -29,8 +29,8 @@ const tokenCache = {
   },
 };
 
-export default function RootLayout() {
-  const { isAuthenticated } = use(AuthContext);
+function RootLayoutContent() {
+  const { isSignedIn } = useAuth();
 
   // Initialize notification handler and listeners on app mount
   useEffect(() => {
@@ -44,6 +44,17 @@ export default function RootLayout() {
     return cleanup;
   }, []);
 
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={!isSignedIn}>
+        <Stack.Screen name="sign-in" />
+      </Stack.Protected>
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
   // Memoize service URLs to prevent unnecessary re-renders in ApiProvider
   // Uses environment variable with fallback for local development
   const serviceUrls = useMemo(() => ({
@@ -56,17 +67,14 @@ export default function RootLayout() {
       tokenCache={tokenCache}
     >
       <ClerkLoaded>
-        <ApiProvider serviceUrls={serviceUrls}>
-          <QuizProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Protected guard={!isAuthenticated}>
-                <Stack.Screen name="sign-in" />
-              </Stack.Protected>
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-            <StatusBar style="auto" />
-          </QuizProvider>
-        </ApiProvider>
+        <UserProvider>
+          <ApiProvider serviceUrls={serviceUrls}>
+            <QuizProvider>
+              <RootLayoutContent />
+              <StatusBar style="auto" />
+            </QuizProvider>
+          </ApiProvider>
+        </UserProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );
