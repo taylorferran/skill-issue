@@ -8,6 +8,7 @@ import { Request, Response, NextFunction } from 'express';
  * Checks for API key in Authorization header: "Bearer <your-api-key>"
  */
 
+// Clerk integration
 export function apiKeyAuth(req: Request, res: Response, next: NextFunction) {
   // Check if auth is enabled
   const authEnabled = process.env.API_AUTH_ENABLED !== 'false';

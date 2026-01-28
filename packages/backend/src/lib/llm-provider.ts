@@ -163,22 +163,32 @@ Generate the challenge now:`;
 
       const parsed = JSON.parse(jsonStr.trim());
 
+      // Handle both correctAnswerIndex and correctOption field names (LLM sometimes uses different names)
+      const correctIndex = parsed.correctAnswerIndex ?? parsed.correctOption;
+
       // Validate structure
       if (
         !parsed.question ||
         !Array.isArray(parsed.options) ||
         parsed.options.length !== 4 ||
-        typeof parsed.correctAnswerIndex !== 'number' ||
-        parsed.correctAnswerIndex < 0 ||
-        parsed.correctAnswerIndex > 3
+        typeof correctIndex !== 'number' ||
+        correctIndex < 0 ||
+        correctIndex > 3
       ) {
+        console.error('Validation failed:', {
+          hasQuestion: !!parsed.question,
+          isOptionsArray: Array.isArray(parsed.options),
+          optionsLength: parsed.options?.length,
+          correctIndex,
+          correctIndexType: typeof correctIndex
+        });
         throw new Error('Invalid challenge structure');
       }
 
       return {
         question: parsed.question,
         options: parsed.options,
-        correctAnswerIndex: parsed.correctAnswerIndex,
+        correctAnswerIndex: correctIndex,
         explanation: parsed.explanation || '',
         actualDifficulty: parsed.actualDifficulty || targetDifficulty,
       };

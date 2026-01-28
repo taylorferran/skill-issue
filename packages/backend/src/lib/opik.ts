@@ -127,8 +127,14 @@ class OpikService {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Opik] API error ${response.status}: ${errorText}`);
+        // Clone response before consuming body for error logging
+        const errorResponse = response.clone();
+        try {
+          const errorText = await errorResponse.text();
+          console.error(`[Opik] API error ${response.status}: ${errorText}`);
+        } catch (readError) {
+          console.error(`[Opik] API error ${response.status} (could not read body)`);
+        }
       }
 
       return response;
@@ -646,12 +652,20 @@ class OpikService {
       });
 
       if (response?.ok) {
-        const data = await response.json() as Record<string, unknown>;
-        const latestVersion = data?.latest_version as Record<string, unknown> | undefined;
-        const commit = latestVersion?.commit as string | undefined;
-        const tagsStr = params.tags ? `, tags: ${params.tags.join(', ')}` : '';
-        console.log(`[Opik] Prompt registered: ${params.name} (commit: ${commit || 'unknown'}${tagsStr})`);
-        return { name: params.name, commit };
+        try {
+          const data = await response.json() as Record<string, unknown>;
+          const latestVersion = data?.latest_version as Record<string, unknown> | undefined;
+          const commit = latestVersion?.commit as string | undefined;
+          const tagsStr = params.tags ? `, tags: ${params.tags.join(', ')}` : '';
+          console.log(`[Opik] Prompt registered: ${params.name} (commit: ${commit || 'unknown'}${tagsStr})`);
+          return { name: params.name, commit };
+        } catch (jsonError) {
+          console.error('[Opik] Failed to parse prompt registration response:', jsonError);
+          // Still return success with just the name if we got an OK status
+          return { name: params.name };
+        }
+      } else {
+        console.error(`[Opik] Prompt registration failed with status: ${response?.status}`);
       }
     } catch (error) {
       console.error('[Opik] Failed to register prompt:', error);
