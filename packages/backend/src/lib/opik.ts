@@ -643,6 +643,14 @@ class OpikService {
     }
 
     try {
+      // First check if prompt already exists to avoid 409 errors
+      const existingPrompt = await this.getPromptWithVersion(params.name);
+      if (existingPrompt) {
+        console.log(`[Opik] Using existing prompt: ${params.name} (commit: ${existingPrompt.commit || 'unknown'})`);
+        return { name: params.name, commit: existingPrompt.commit };
+      }
+
+      // Prompt doesn't exist, create it
       const response = await this.request('POST', '/prompts', {
         name: params.name,
         template: params.template,
@@ -672,6 +680,42 @@ class OpikService {
     }
 
     return { name: params.name };
+  }
+
+  /**
+   * Get a prompt by name with version info (uses the detail endpoint)
+   */
+  private async getPromptWithVersion(name: string): Promise<{ name: string; commit?: string } | null> {
+    if (!this.isEnabled) {
+      return null;
+    }
+
+    // First get the prompt ID from the list
+    const listResponse = await this.request(
+      'GET',
+      `/prompts?name=${encodeURIComponent(name)}`
+    );
+    if (!listResponse?.ok) {
+      return null;
+    }
+
+    const listData = await listResponse.json() as { content?: Array<{ id?: string; name?: string }> };
+    const promptInfo = listData.content?.find(p => p.name === name);
+    if (!promptInfo?.id) {
+      return null;
+    }
+
+    // Now get the full prompt details including latest_version
+    const detailResponse = await this.request('GET', `/prompts/${promptInfo.id}`);
+    if (!detailResponse?.ok) {
+      return { name };
+    }
+
+    const detailData = await detailResponse.json() as Record<string, unknown>;
+    const latestVersion = detailData?.latest_version as Record<string, unknown> | undefined;
+    const commit = latestVersion?.commit as string | undefined;
+
+    return { name, commit };
   }
 
   /**
