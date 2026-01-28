@@ -616,31 +616,41 @@ class OpikService {
   // ============= Prompt Management =============
 
   /**
-   * Create or update a prompt in Opik for versioning
+   * Register a prompt with Opik for versioning.
+   * Opik auto-creates a new version if the template content changed.
+   * If the same template is posted again, Opik returns the existing version.
+   * Returns the prompt name and commit hash for linking to traces.
    */
-  async createPrompt(params: {
+  async createOrGetPrompt(params: {
     name: string;
     template: string;
     metadata?: Record<string, unknown>;
-    tags?: string[];
-  }): Promise<string | null> {
+  }): Promise<{ name: string; commit?: string }> {
     if (!this.isEnabled) {
-      console.log(`[Opik] Prompt created (local): ${params.name}`);
-      return null;
+      console.log(`[Opik] Prompt registered (local): ${params.name}`);
+      return { name: params.name };
     }
 
-    const promptData: Partial<OpikPrompt> = {
-      name: params.name,
-      template: params.template,
-      metadata: params.metadata,
-      tags: params.tags,
-    };
+    try {
+      const response = await this.request('POST', '/prompts', {
+        name: params.name,
+        template: params.template,
+        metadata: params.metadata,
+        change_description: `Auto-registered at ${new Date().toISOString()}`,
+      });
 
-    const response = await this.request('POST', '/prompts', promptData);
-    if (response?.ok) {
-      console.log(`[Opik] Prompt created: ${params.name}`);
+      if (response?.ok) {
+        const data = await response.json() as Record<string, unknown>;
+        const latestVersion = data?.latest_version as Record<string, unknown> | undefined;
+        const commit = latestVersion?.commit as string | undefined;
+        console.log(`[Opik] Prompt registered: ${params.name} (commit: ${commit || 'unknown'})`);
+        return { name: params.name, commit };
+      }
+    } catch (error) {
+      console.error('[Opik] Failed to register prompt:', error);
     }
-    return params.name;
+
+    return { name: params.name };
   }
 
   /**

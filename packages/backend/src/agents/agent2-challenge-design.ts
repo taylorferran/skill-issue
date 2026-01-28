@@ -1,5 +1,5 @@
 import { getSupabase } from '@/lib/supabase';
-import { createLLMProvider } from '@/lib/llm-provider';
+import { createLLMProvider, AnthropicProvider } from '@/lib/llm-provider';
 import { opikService } from '@/lib/opik';
 import type { SchedulingDecision, Challenge, GeneratedChallenge } from '@/types';
 import type { Database } from '@/types/database';
@@ -64,6 +64,14 @@ export class ChallengeDesignAgent {
       const llmDuration = Date.now() - llmStartTime;
       const { challenge: generatedChallenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
 
+      // Register prompt TEMPLATE with Opik (not the interpolated version)
+      // Opik only creates a new version when the template structure changes
+      const promptVersion = await opikService.createOrGetPrompt({
+        name: 'challenge_generation',
+        template: AnthropicProvider.getChallengePromptTemplate(),
+        metadata: { model: 'claude-haiku-4-5-20251001' },
+      });
+
       // Validate challenge
       const validation = this.validateChallenge(generatedChallenge);
 
@@ -99,8 +107,8 @@ export class ChallengeDesignAgent {
         skill_id: decision.skillId,
         user_id: decision.userId,
         difficulty: decision.difficultyTarget,
-        llm: 'claude-haiku-4-5-20251001', // Todo: populate with LLM config from env vars
-        prompt_version: 'v1',
+        llm: 'claude-haiku-4-5-20251001',
+        prompt_version: promptVersion.commit || 'v1',
         question: generatedChallenge.question,
         options_json: generatedChallenge.options,
         correct_option: generatedChallenge.correctAnswerIndex,
@@ -163,6 +171,7 @@ export class ChallengeDesignAgent {
         metadata: {
           actualDifficulty: generatedChallenge.actualDifficulty,
           targetDifficulty: decision.difficultyTarget,
+          promptVersion: promptVersion.commit,
         },
         llmCalls: [{
           model: 'claude-haiku-4-5-20251001',

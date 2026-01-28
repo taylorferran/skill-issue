@@ -55,6 +55,42 @@ export class AnthropicProvider implements LLMProvider {
     };
   }
 
+  /**
+   * Returns the prompt template with {{variable}} placeholders.
+   * Used for Opik prompt versioning — only creates a new version when the
+   * template structure changes, not when different variables are filled in.
+   */
+  static getChallengePromptTemplate(): string {
+    return `You are generating a multiple-choice challenge to test knowledge and competence.
+
+SKILL: {{skill_name}}
+DESCRIPTION: {{skill_description}}
+DIFFICULTY LEVEL: {{difficulty}}/10
+
+Generate a single MCQ challenge that tests real competence in this skill at this difficulty level.
+
+RULES:
+- Difficulty {{difficulty}} means: {{difficulty_description}}
+- Question must be answerable in under 30 seconds
+- 4 options, only 1 correct
+- Randomly shuffle the order of correct answer among the options
+- Don't repeat questions you've generated before - each challenge must be unique try to make it unique
+- Distractors should be plausible but clearly wrong to someone who knows the subject
+- Include a brief explanation of why the answer is correct
+- Tailor the question specifically to the skill described above
+
+OUTPUT FORMAT (strict JSON):
+{
+  "question": "...",
+  "options": ["A...", "B...", "C...", "D..."],
+  "correctAnswerIndex": 0,
+  "explanation": "...",
+  "actualDifficulty": {{difficulty}}
+}
+
+Generate the challenge now:`;
+  }
+
   private buildChallengePrompt(
     skillId: string,
     skillName: string | undefined,
