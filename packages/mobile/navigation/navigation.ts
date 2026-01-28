@@ -4,48 +4,54 @@ import z from "zod";
 import { Href } from "expo-router";
 import { QuizStateSchema } from "@/types/Quiz";
 
+/**
+ * Active navigation routes
+ * 
+ * Structure:
+ * - Skills Tab: skills → assessment → quiz (nested)
+ * - Profile Tab: profile (single screen)
+ */
 const pages = {
-  dashboard: {
-    path: "/" as const,
+  // Skills Tab Routes (nested: skills → assessment → quiz)
+  skills: {
+    path: "/(tabs)/(skills)" as const,
     params: z.object({}),
   },
-  skillSelection: {
-    path: "/" as const,
-    params: z.object({}),
-  },
-  topicSelection: {
-    path: "/[skill]" as const,
-    params: z.object({
-      skill: z.string(),
-    }),
-  },
-  learnTopic: {
-    path: "/[skill]/[topic]" as const,
-    params: z.object({
-      skill: z.string(),
-      topic: z.string(),
-    }),
-  },
-  questions: {
-    path: "/[skill]/questions" as const,
+  assessment: {
+    path: "/(tabs)/(skills)/assessment" as const,
     params: z.object({
       skill: z.string(),
       progress: z.number(),
     }),
   },
   quiz: {
-    path: "/[skill]/questions/quiz" as const,
+    path: "/(tabs)/(skills)/assessment/quiz" as const,
     params: z.object({
       skill: z.string(),
       data: QuizStateSchema,
     }),
   },
-
+  
+  // Profile Tab Route
   profile: {
-    path: "/profile" as const,
+    path: "/(tabs)/(profile)" as const,
     params: z.object({}),
   },
 } as const;
+
+/* 
+ * DEPRECATED ROUTES - Removed during navigation cleanup (Jan 2026)
+ * 
+ * Archived routes (no longer in use):
+ * - dashboard: "/" (duplicate of skills route)
+ * - skillSelection: "/" (renamed to 'skills')
+ * - topicSelection: "/[skill]" (archived - future subtopics feature → archived-features/topic-selection/)
+ * - learnTopic: "/[skill]/[topic]" (old pattern, not in use)
+ * - questions: "/[skill]/questions" (renamed to 'assessment', path flattened)
+ * 
+ * Deprecated files location: deprecated/(dashboard)/
+ * Archived files location: archived-features/topic-selection/
+ */
 
 function serializeParams(params: any): Record<string, string> {
   const serialized: Record<string, string> = {};

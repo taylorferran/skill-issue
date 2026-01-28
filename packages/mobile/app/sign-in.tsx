@@ -1,18 +1,85 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
-import { useOAuth } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
-import { Theme } from '@/theme/Theme';
-import { MonogramBackground } from '@/components/monogram-background/MonogramBackground';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  SafeAreaView,
+  Button,
+  Platform,
+} from "react-native";
+import { useOAuth } from "@clerk/clerk-expo";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import { Theme } from "@/theme/Theme";
+import { MonogramBackground } from "@/components/monogram-background/MonogramBackground";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 // Important: Warm up the browser for better UX
 WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const router = useRouter();
-  const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
-  const { startOAuthFlow: startGithubOAuth } = useOAuth({ strategy: 'oauth_github' });
+  const { startOAuthFlow: startGoogleOAuth } = useOAuth({
+    strategy: "oauth_google",
+  });
+  const { startOAuthFlow: startGithubOAuth } = useOAuth({
+    strategy: "oauth_github",
+  });
+  const { setExpoPushToken, setPermissionStatus } = useNotificationStore();
+
+  /**
+   * Request notification permissions using native OS prompt
+   * Called after successful OAuth sign-in
+   */
+  const requestNotificationPermission = async () => {
+    try {
+      // Skip on simulators
+      if (!Device.isDevice) {
+        console.log("[SignIn] Skipping notifications - not a physical device");
+        return;
+      }
+
+      // Request permission using native prompt
+      const { status } = await Notifications.requestPermissionsAsync();
+      setPermissionStatus(status === "granted" ? "granted" : "denied");
+
+      if (status !== "granted") {
+        console.log("[SignIn] Notification permission denied");
+        return;
+      }
+
+      // Get push token
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ||
+        "b302dea4-1c3f-42d5-bd5f-eca4acebea90";
+
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+
+      if (tokenData?.data) {
+        setExpoPushToken(tokenData.data);
+        console.log("[SignIn] Push token saved");
+      }
+
+      // Configure Android channel
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        });
+      }
+    } catch (error) {
+      // Silently handle errors - user can enable later in profile
+      console.error("[SignIn] Notification setup error:", error);
+    }
+  };
 
   const onPressGoogle = async () => {
     try {
@@ -20,11 +87,15 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        router.replace('/(tabs)/(skills)/');
+        await requestNotificationPermission();
+        router.replace("/(tabs)/(skills)");
       }
     } catch (err: any) {
-      console.error('OAuth error', err);
-      Alert.alert('Error', err.errors?.[0]?.message || 'Failed to sign in with Google');
+      console.error("OAuth error", err);
+      Alert.alert(
+        "Error",
+        err.errors?.[0]?.message || "Failed to sign in with Google",
+      );
     }
   };
 
@@ -34,11 +105,15 @@ export default function SignInScreen() {
 
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        router.replace('/(tabs)/(skills)/');
+        await requestNotificationPermission();
+        router.replace("/(tabs)/(skills)");
       }
     } catch (err: any) {
-      console.error('OAuth error', err);
-      Alert.alert('Error', err.errors?.[0]?.message || 'Failed to sign in with GitHub');
+      console.error("OAuth error", err);
+      Alert.alert(
+        "Error",
+        err.errors?.[0]?.message || "Failed to sign in with GitHub",
+      );
     }
   };
 
@@ -46,16 +121,16 @@ export default function SignInScreen() {
     <SafeAreaView style={styles.container}>
       {/* Monogram Background */}
       <MonogramBackground text="SI" opacity={0.03} />
-      
+
       {/* Main Content Container */}
       <View style={styles.mainContainer}>
         {/* Header Brand */}
         <View style={styles.header}>
           <View style={styles.brandIconContainer}>
-            <Ionicons 
-              name="diamond" 
-              size={28} 
-              color={Theme.colors.primary.main} 
+            <Ionicons
+              name="diamond"
+              size={28}
+              color={Theme.colors.primary.main}
             />
           </View>
           <Text style={styles.brandTitle}>SKILL ISSUE</Text>
@@ -72,7 +147,11 @@ export default function SignInScreen() {
 
           {/* Google OAuth Button */}
           <TouchableOpacity style={styles.googleButton} onPress={onPressGoogle}>
-            <Ionicons name="logo-google" size={20} color={Theme.colors.text.inverse} />
+            <Ionicons
+              name="logo-google"
+              size={20}
+              color={Theme.colors.text.inverse}
+            />
             <Text style={styles.buttonText}>Continue with Google</Text>
           </TouchableOpacity>
 
@@ -84,11 +163,11 @@ export default function SignInScreen() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            By continuing, you agree to our{'\n'}
-            <Text style={styles.footerLink}>Terms of Service</Text> & <Text style={styles.footerLink}>Privacy Policy</Text>.
+         <Text style={styles.footerText}>
+            By continuing, you agree to our{"\n"}
+            <Text style={styles.footerLink}>Terms of Service</Text> &{" "}
+            <Text style={styles.footerLink}>Privacy Policy</Text>.
           </Text>
-          
           {/* Home Indicator */}
           <View style={styles.homeIndicator} />
         </View>
@@ -105,16 +184,16 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     maxWidth: 430,
-    alignSelf: 'center',
-    width: '100%',
-    paddingHorizontal: Theme.spacing['3xl'],
-    paddingVertical: Theme.spacing['4xl'],
-    justifyContent: 'space-between',
+    alignSelf: "center",
+    width: "100%",
+    paddingHorizontal: Theme.spacing["3xl"],
+    paddingVertical: Theme.spacing["4xl"],
+    justifyContent: "space-between",
   },
-  
+
   // Header Brand
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: Theme.spacing.lg,
   },
   brandIconContainer: {
@@ -123,59 +202,59 @@ const styles = StyleSheet.create({
   brandTitle: {
     color: Theme.colors.text.primary,
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: "700",
     letterSpacing: 3.2,
-    textTransform: 'uppercase',
-    textAlign: 'center',
+    textTransform: "uppercase",
+    textAlign: "center",
   },
 
   // Center Content
   centerContent: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Theme.spacing['4xl'],
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: Theme.spacing["4xl"],
   },
   heroSection: {
-    alignItems: 'center',
-    marginBottom: Theme.spacing['4xl'] + Theme.spacing.lg,
+    alignItems: "center",
+    marginBottom: Theme.spacing["4xl"] + Theme.spacing.lg,
   },
   heroTitle: {
     color: Theme.colors.text.primary,
     fontSize: 42,
-    fontWeight: '700',
+    fontWeight: "700",
     lineHeight: 46,
     letterSpacing: -0.5,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: Theme.spacing.lg,
   },
   heroSubtitle: {
     color: Theme.colors.text.tertiary,
     fontSize: 18,
-    fontWeight: '400',
+    fontWeight: "400",
     lineHeight: 24,
-    textAlign: 'center',
+    textAlign: "center",
     maxWidth: 280,
   },
 
   // Google Button
   googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
     maxWidth: 320,
     height: 56,
     backgroundColor: Theme.colors.primary.main,
     borderRadius: Theme.borderRadius.lg,
     gap: Theme.spacing.md,
-    marginBottom: Theme.spacing['2xl'],
+    marginBottom: Theme.spacing["2xl"],
     ...Theme.shadows.subtle,
   },
   buttonText: {
     color: Theme.colors.text.inverse,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 0.16,
   },
 
@@ -183,32 +262,32 @@ const styles = StyleSheet.create({
   ssoText: {
     color: Theme.colors.text.secondary,
     fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
+    fontWeight: "500",
+    textAlign: "center",
   },
 
   // Footer
   footer: {
-    alignItems: 'center',
-    gap: Theme.spacing['3xl'],
+    alignItems: "center",
+    gap: Theme.spacing["3xl"],
   },
   footerText: {
     color: Theme.colors.text.secondary,
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: "500",
     letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    textAlign: 'center',
+    textTransform: "uppercase",
+    textAlign: "center",
     lineHeight: 16,
     paddingHorizontal: Theme.spacing.lg,
   },
   footerLink: {
-    textDecorationLine: 'underline',
+    textDecorationLine: "underline",
   },
   homeIndicator: {
     width: 128,
     height: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    backgroundColor: "rgba(0, 0, 0, 0.1)",
     borderRadius: Theme.borderRadius.full,
   },
 });
