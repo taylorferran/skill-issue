@@ -620,14 +620,19 @@ class OpikService {
    * Opik auto-creates a new version if the template content changed.
    * If the same template is posted again, Opik returns the existing version.
    * Returns the prompt name and commit hash for linking to traces.
+   *
+   * @param tags - Tags for organizing and filtering prompts, useful for A/B testing
+   *               (e.g., ['variant_a', 'experiment_123', 'production'])
    */
   async createOrGetPrompt(params: {
     name: string;
     template: string;
     metadata?: Record<string, unknown>;
+    tags?: string[];
   }): Promise<{ name: string; commit?: string }> {
     if (!this.isEnabled) {
-      console.log(`[Opik] Prompt registered (local): ${params.name}`);
+      const tagsStr = params.tags ? ` (tags: ${params.tags.join(', ')})` : '';
+      console.log(`[Opik] Prompt registered (local): ${params.name}${tagsStr}`);
       return { name: params.name };
     }
 
@@ -636,14 +641,16 @@ class OpikService {
         name: params.name,
         template: params.template,
         metadata: params.metadata,
-        change_description: `Auto-registered at ${new Date().toISOString()}`,
+        tags: params.tags,
+        change_description: `Auto-registered at ${new Date().toISOString()}`
       });
 
       if (response?.ok) {
         const data = await response.json() as Record<string, unknown>;
         const latestVersion = data?.latest_version as Record<string, unknown> | undefined;
         const commit = latestVersion?.commit as string | undefined;
-        console.log(`[Opik] Prompt registered: ${params.name} (commit: ${commit || 'unknown'})`);
+        const tagsStr = params.tags ? `, tags: ${params.tags.join(', ')}` : '';
+        console.log(`[Opik] Prompt registered: ${params.name} (commit: ${commit || 'unknown'}${tagsStr})`);
         return { name: params.name, commit };
       }
     } catch (error) {

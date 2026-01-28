@@ -103,7 +103,7 @@ SKILL: ${skillName || skillId}
 DESCRIPTION: ${skillDescription || 'General knowledge challenge'}
 DIFFICULTY LEVEL: ${difficulty}/10
 
-Generate a single MCQ challenge that tests real competence in this skill at this difficulty level.
+Generate a single multiple choice challenge that tests real competence in this skill at this difficulty level.
 
 RULES:
 - Difficulty ${difficulty} means: ${this.getDifficultyDescription(difficulty)}

@@ -66,10 +66,12 @@ export class ChallengeDesignAgent {
 
       // Register prompt TEMPLATE with Opik (not the interpolated version)
       // Opik only creates a new version when the template structure changes
+      // Tags can be used for A/B testing different prompt variants (e.g., ['variant_a', 'production'])
       const promptVersion = await opikService.createOrGetPrompt({
         name: 'challenge_generation',
         template: AnthropicProvider.getChallengePromptTemplate(),
         metadata: { model: 'claude-haiku-4-5-20251001' },
+        tags: ['v0.1-base'],
       });
 
       // Validate challenge
