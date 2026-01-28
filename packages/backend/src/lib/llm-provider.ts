@@ -21,10 +21,10 @@ export class AnthropicProvider implements LLMProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallengeWithUsage> {
-    const { skillId, difficulty, skillName, skillDescription } = request;
+  async generateChallenge(request: ChallengeDesignRequest & { customTemplate?: string }): Promise<GeneratedChallengeWithUsage> {
+    const { skillId, difficulty, skillName, skillDescription, customTemplate } = request;
 
-    const prompt = this.buildChallengePrompt(skillId, skillName, skillDescription, difficulty);
+    const prompt = this.buildChallengePrompt(skillId, skillName, skillDescription, difficulty, customTemplate);
 
     const message = await this.client.messages.create({
       model: 'claude-haiku-4-5-20251001', // Todo: This model is a little dumb honestly, will need to experiment
@@ -95,8 +95,19 @@ Generate the challenge now:`;
     skillId: string,
     skillName: string | undefined,
     skillDescription: string | undefined,
-    difficulty: number
+    difficulty: number,
+    customTemplate?: string
   ): string {
+    // If custom template provided, interpolate variables
+    if (customTemplate) {
+      return customTemplate
+        .replace(/\{\{skill_name\}\}/g, skillName || skillId)
+        .replace(/\{\{skill_description\}\}/g, skillDescription || 'General knowledge challenge')
+        .replace(/\{\{difficulty\}\}/g, difficulty.toString())
+        .replace(/\{\{difficulty_description\}\}/g, this.getDifficultyDescription(difficulty));
+    }
+
+    // Default template
     return `You are generating a multiple-choice challenge to test knowledge and competence.
 
 SKILL: ${skillName || skillId}
