@@ -679,6 +679,166 @@ class OpikService {
     return null;
   }
 
+  // ============= A/B Testing =============
+
+  /**
+   * Select a prompt variant for A/B testing based on weights.
+   * Uses weighted random selection to distribute traffic across variants.
+   *
+   * @param variants - Array of prompt variants with templates and traffic weights
+   * @returns Selected variant with name, template, and metadata
+   *
+   * @example
+   * ```typescript
+   * const variant = opikService.selectPromptVariant({
+   *   experimentName: 'challenge_prompt_experiment',
+   *   variants: [
+   *     {
+   *       name: 'control',
+   *       template: originalTemplate,
+   *       weight: 50,  // 50% of traffic
+   *       tags: ['control', 'experiment_1']
+   *     },
+   *     {
+   *       name: 'variant_a',
+   *       template: experimentalTemplate,
+   *       weight: 50,  // 50% of traffic
+   *       tags: ['variant_a', 'experiment_1', 'test']
+   *     }
+   *   ]
+   * });
+   * ```
+   */
+  selectPromptVariant(params: {
+    experimentName: string;
+    variants: Array<{
+      name: string;
+      template: string;
+      weight: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+    }>;
+  }): {
+    variantName: string;
+    template: string;
+    tags: string[];
+    metadata: Record<string, unknown>;
+  } {
+    const { experimentName, variants } = params;
+
+    // Validate weights
+    const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
+    if (totalWeight === 0) {
+      throw new Error(`[Opik] A/B Test '${experimentName}': Total weight cannot be 0`);
+    }
+
+    // Weighted random selection
+    const random = Math.random() * totalWeight;
+    let cumulativeWeight = 0;
+
+    for (const variant of variants) {
+      cumulativeWeight += variant.weight;
+      if (random <= cumulativeWeight) {
+        console.log(
+          `[Opik] A/B Test '${experimentName}': Selected variant '${variant.name}' (weight: ${variant.weight}/${totalWeight})`
+        );
+
+        return {
+          variantName: variant.name,
+          template: variant.template,
+          tags: [
+            ...(variant.tags || []),
+            `experiment:${experimentName}`,
+            `variant:${variant.name}`,
+          ],
+          metadata: {
+            ...(variant.metadata || {}),
+            experiment: experimentName,
+            variant: variant.name,
+            variantWeight: variant.weight,
+            totalWeight,
+          },
+        };
+      }
+    }
+
+    // Fallback to first variant (should never reach here)
+    const fallback = variants[0];
+    console.warn(
+      `[Opik] A/B Test '${experimentName}': Fallback to variant '${fallback.name}'`
+    );
+    return {
+      variantName: fallback.name,
+      template: fallback.template,
+      tags: [
+        ...(fallback.tags || []),
+        `experiment:${experimentName}`,
+        `variant:${fallback.name}`,
+      ],
+      metadata: {
+        ...(fallback.metadata || {}),
+        experiment: experimentName,
+        variant: fallback.name,
+        variantWeight: fallback.weight,
+        totalWeight,
+      },
+    };
+  }
+
+  /**
+   * Register all variants of an A/B test experiment with Opik.
+   * Each variant will be registered as a separate prompt with appropriate tags.
+   *
+   * @returns Array of registered prompt information
+   */
+  async registerABTestVariants(params: {
+    experimentName: string;
+    variants: Array<{
+      name: string;
+      template: string;
+      weight: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+    }>;
+  }): Promise<Array<{ variantName: string; promptName: string; commit?: string }>> {
+    const { experimentName, variants } = params;
+    const results = [];
+
+    console.log(
+      `[Opik] Registering A/B test '${experimentName}' with ${variants.length} variants`
+    );
+
+    for (const variant of variants) {
+      const promptName = `${experimentName}_${variant.name}`;
+      const tags = [
+        ...(variant.tags || []),
+        `experiment:${experimentName}`,
+        `variant:${variant.name}`,
+      ];
+
+      const result = await this.createOrGetPrompt({
+        name: promptName,
+        template: variant.template,
+        tags,
+        metadata: {
+          ...(variant.metadata || {}),
+          experiment: experimentName,
+          variant: variant.name,
+          weight: variant.weight,
+        },
+      });
+
+      results.push({
+        variantName: variant.name,
+        promptName: result.name,
+        commit: result.commit,
+      });
+    }
+
+    console.log(`[Opik] A/B test '${experimentName}' registered successfully`);
+    return results;
+  }
+
   // ============= Feedback & Evaluation =============
 
   /**

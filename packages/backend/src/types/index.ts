@@ -92,6 +92,7 @@ export interface ChallengeDesignRequest {
   skillDescription?: string;
   difficulty: number;
   userId: string;
+  customTemplate?: string;
 }
 
 export interface SkillUpdateRequest {
