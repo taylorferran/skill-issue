@@ -2,7 +2,7 @@
 FROM node:18-alpine AS builder
 
 # Install pnpm (lockfile version 6.0 requires pnpm 8.x)
-RUN npm install -g pnpm@8.15.9
+RUN npm install -g pnpm@10.28.2
 
 WORKDIR /monorepo
 
