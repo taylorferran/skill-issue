@@ -1,11 +1,15 @@
 import { buildApiEndpointHook } from "@/api/hooks/buildGenericApiHook";
-import { CreateUserSchema } from "@learning-platform/shared";
+import { 
+  CreateUserRequestSchema,
+  CreateUserResponseSchema 
+} from "@learning-platform/shared";
 
 
 export const useCreateUser = buildApiEndpointHook({
     method: 'POST',
     apiInstance: 'backend',
     url: '/users',
-    requestSchema: CreateUserSchema,
+    requestSchema: CreateUserRequestSchema,
+    responseSchema: CreateUserResponseSchema,
     paramType: "Body"
 });

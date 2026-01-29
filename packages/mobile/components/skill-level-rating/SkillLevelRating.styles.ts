@@ -104,6 +104,10 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     ...Theme.shadows.card,
   },
+  
+  confirmButtonDisabled: {
+    opacity: 0.6,
+  },
 
   // Current Value Display
   currentValue: {

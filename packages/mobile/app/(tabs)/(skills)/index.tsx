@@ -1,83 +1,214 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   ScrollView,
   Text,
   SafeAreaView,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Skill, skillsMock, availableSkillsMock } from "@/types/Skill";
+import { useFocusEffect } from "@react-navigation/native";
 import { SkillCard } from "@/components/skill-card/SkillCard";
 import { StatsCard } from "@/components/stats-card/StatsCard";
 import { navigateTo } from "@/navigation/navigation";
 import { styles } from "./_index.styles";
 import { spacing } from "@/theme/ThemeUtils";
 import { Theme } from "@/theme/Theme";
-import { isNotificationsEnabled } from "@/utils/getPushToken";
+import { useGetUserSkills } from "@/api-routes/getUserSkills";
+import { useGetSkills } from "@/api-routes/getSkills";
+import { useDeleteSkill } from "@/api-routes/deleteSkill";
+import { useSkillsStore } from "@/stores/skillsStore";
+import { useUser } from "@/contexts/UserContext";
+import type { 
+  GetUserSkillsResponse,
+  GetSkillsResponse 
+} from "@learning-platform/shared";
 
 export default function SkillSelectScreen() {
   const [selectedSegment, setSelectedSegment] = useState<
     "Current Skills" | "New Skills"
   >("Current Skills");
 
-  // Current skills that user is learning
-  const [currentSkills, setCurrentSkills] = useState<Skill[]>(skillsMock);
-
-  console.log(isNotificationsEnabled());
-  // Available skills to add
-  const [availableSkills, setAvailableSkills] =
-    useState<Skill[]>(availableSkillsMock);
-
-  const handleSkillSelect = (skill: Skill) => {
+  // Get userId from UserContext
+  const { userId } = useUser();
+  
+  // Zustand store for cached data
+  const {
+    userSkills,
+    availableSkills,
+    setUserSkills,
+    setAvailableSkills,
+    shouldRefetchUserSkills,
+    shouldRefetchAvailableSkills,
+  } = useSkillsStore();
+  
+  // API hooks
+  const { 
+    execute: fetchUserSkills, 
+    isLoading: isLoadingUserSkills,
+    error: userSkillsError 
+  } = useGetUserSkills();
+  
+  const { 
+    execute: fetchAvailableSkills, 
+    isLoading: isLoadingAvailableSkills,
+    error: availableSkillsError 
+  } = useGetSkills();
+  
+  const { 
+    execute: deleteSkillApi,
+    isLoading: isDeleting 
+  } = useDeleteSkill();
+  
+  // Fetch data on mount - ALWAYS fetch fresh data (no cache)
+  useEffect(() => {
+    loadSkills();
+  }, [userId]);
+  
+  // Refetch skills whenever this screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadSkills();
+    }, [userId])
+  );
+  
+  const loadSkills = async () => {
+    if (!userId) {
+      console.warn('[Skills] No userId available, skipping fetch');
+      return;
+    }
+    
+    try {
+      // ALWAYS fetch fresh data from backend
+      console.log('[Skills] 🔄 Fetching user skills from backend...');
+      const userSkillsData = await fetchUserSkills({ userId });
+      setUserSkills(userSkillsData);
+      console.log('[Skills] ✅ User skills loaded:', userSkillsData.length);
+      
+      console.log('[Skills] 🔄 Fetching available skills from backend...');
+      const availableSkillsData = await fetchAvailableSkills();
+      setAvailableSkills(availableSkillsData);
+      console.log('[Skills] ✅ Available skills loaded:', availableSkillsData.length);
+      
+    } catch (error) {
+      console.error('[Skills] ❌ Error loading skills:', error);
+      Alert.alert(
+        'Loading Failed',
+        'Could not load skills. Please try again later.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+  
+  // Handle skill selection (navigate to assessment)
+  const handleSkillSelect = (skill: GetUserSkillsResponse[number]) => {
     navigateTo("assessment", {
-      skill: skill.name,
-      progress: skill.progress,
+      skill: skill.skillName,
+      skillId: skill.skillId,
+      progress: skill.accuracy * 100, // Convert 0-1 to 0-100
+      isNewSkill: false,
     });
   };
 
-  const handleAddSkill = (skill: Skill) => {
-    // Add skill to current skills
-    setCurrentSkills((prev) => [...prev, skill]);
-
-    // Remove from available skills
-    setAvailableSkills((prev) => prev.filter((s) => s.id !== skill.id));
-
-    // Switch back to Current Skills tab
-    setSelectedSegment("Current Skills");
+  // Handle add skill (navigate to assessment for enrollment)
+  const handleAddSkill = (skill: GetSkillsResponse[number]) => {
+    // Navigate to assessment page where user will set their difficulty level
+    navigateTo("assessment", {
+      skill: skill.name,
+      skillId: skill.id,
+      progress: 0,
+      isNewSkill: true, // Flag to indicate this is enrollment flow
+    });
+  };
+  
+  // Handle delete skill
+  const handleDeleteSkill = async (skillId: string, skillName: string) => {
+    if (!userId) {
+      Alert.alert('Error', 'User not found. Please try signing in again.');
+      return;
+    }
+    
+    Alert.alert(
+      'Delete Skill',
+      `Are you sure you want to remove ${skillName}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('[Skills] 🗑️ Deleting skill:', skillName);
+              
+              await deleteSkillApi({ userId, skillId });
+              
+              console.log('[Skills] ✅ Successfully deleted skill:', skillName);
+              
+              // Refetch user skills to update UI
+              const updatedSkills = await fetchUserSkills({ userId });
+              setUserSkills(updatedSkills);
+              
+              Alert.alert('Success', `${skillName} removed successfully`);
+            } catch (error) {
+              console.error('[Skills] ❌ Delete failed:', error);
+              Alert.alert('Error', 'Could not delete skill. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Render grid item for new skills
-  const renderNewSkillCard = (skill: Skill) => (
-    <View key={skill.id} style={styles.newSkillCard}>
-      <View>
-        <View style={[styles.newSkillIconContainer]}>
-          <Ionicons name={skill.icon} size={28} color="#ffffff" />
+  const renderNewSkillCard = (skill: GetSkillsResponse[number]) => {
+    // Generate color based on skill name
+    const skillColors = [
+      '#eb8b47', '#ff6b9d', '#4a9eff', '#00d4aa', '#ffd93d', '#a78bfa'
+    ];
+    const iconColor = skillColors[
+      skill.name.charCodeAt(0) % skillColors.length
+    ];
+    
+    return (
+      <View key={skill.id} style={styles.newSkillCard}>
+        <View>
+          <View 
+            style={[
+              styles.newSkillIconContainer,
+              { backgroundColor: iconColor } // Dynamic color
+            ]}
+          >
+            <Ionicons name="code-outline" size={28} color="#ffffff" />
+          </View>
+          <Text style={styles.newSkillName}>{skill.name}</Text>
+          <Text style={styles.newSkillDescription} numberOfLines={3}>
+            {skill.description}
+          </Text>
         </View>
-        <Text style={styles.newSkillName}>{skill.name}</Text>
-        <Text style={styles.newSkillDescription} numberOfLines={3}>
-          {skill.category}
-        </Text>
+
+        {/* Add Skill Button */}
+        <TouchableOpacity
+          style={styles.addSkillButton}
+          onPress={() => handleAddSkill(skill)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="add" size={14} color={Theme.colors.text.inverse} />
+          <Text style={styles.addSkillButtonText}>Add Skill</Text>
+        </TouchableOpacity>
       </View>
+    );
+  };
 
-      {/* Add Skill Button */}
-      <TouchableOpacity
-        style={styles.addSkillButton}
-        onPress={() => handleAddSkill(skill)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="add" size={14} color={Theme.colors.text.inverse} />
-        <Text style={styles.addSkillButtonText}>Add Skill</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  const calculateTotalSkills = () => currentSkills.length;
+  const calculateTotalSkills = () => userSkills.length;
 
   const getActivePath = () => {
-    const primarySkill = currentSkills.find((skill) => skill.isPrimary);
-    return primarySkill ? primarySkill.name.split(" ")[0] : "None";
+    // Just use the first skill as active, or "None" if no skills
+    return userSkills.length > 0 ? userSkills[0].skillName.split(" ")[0] : "None";
   };
+  
+  const isLoading = isLoadingUserSkills || isLoadingAvailableSkills || isDeleting;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -158,13 +289,51 @@ export default function SkillSelectScreen() {
 
               {/* Skills Cards */}
               <View style={styles.cardsContainer}>
-                {currentSkills.map((skill) => (
-                  <SkillCard
-                    key={skill.id}
-                    skill={skill}
-                    onSelect={handleSkillSelect}
-                  />
-                ))}
+                {isLoadingUserSkills ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={Theme.colors.primary.main} />
+                    <Text style={styles.loadingText}>Loading your skills...</Text>
+                  </View>
+                ) : userSkillsError ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Failed to load skills</Text>
+                  </View>
+                ) : userSkills.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyStateText}>
+                      No skills enrolled yet. Add your first skill!
+                    </Text>
+                  </View>
+                ) : (
+                  userSkills.map((skill) => {
+                    // Generate random color for visual distinction
+                    const skillColors = [
+                      '#eb8b47', '#ff6b9d', '#4a9eff', '#00d4aa', '#ffd93d', '#a78bfa'
+                    ];
+                    const randomColor = skillColors[
+                      skill.skillName.charCodeAt(0) % skillColors.length
+                    ];
+                    
+                    return (
+                      <SkillCard
+                        key={skill.skillId}
+                        skill={{
+                          id: skill.skillId,
+                          name: skill.skillName,
+                          icon: 'code-outline' as keyof typeof Ionicons.glyphMap,
+                          category: skill.skillDescription,
+                          progress: Math.round(skill.accuracy * 100),
+                          level: skill.difficultyTarget,
+                          isPrimary: false,
+                          subtopics: skill.attemptsTotal,
+                          aiPowered: true,
+                        }}
+                        onSelect={() => handleSkillSelect(skill)}
+                        onDelete={() => handleDeleteSkill(skill.skillId, skill.skillName)}
+                      />
+                    );
+                  })
+                )}
               </View>
             </>
           )}
@@ -182,8 +351,29 @@ export default function SkillSelectScreen() {
 
               {/* Skills Grid */}
               <View style={styles.newSkillsGrid}>
-                {availableSkills.length > 0 ? (
-                  availableSkills.map(renderNewSkillCard)
+                {isLoadingAvailableSkills ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={Theme.colors.primary.main} />
+                    <Text style={styles.loadingText}>Loading available skills...</Text>
+                  </View>
+                ) : availableSkillsError ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Failed to load available skills</Text>
+                  </View>
+                ) : availableSkills.length > 0 ? (
+                  availableSkills
+                    .filter(skill => {
+                      // 1. Skill must be active
+                      if (!skill.active) return false;
+                      
+                      // 2. Skill must NOT be already enrolled by user
+                      const isEnrolled = userSkills.some(
+                        userSkill => userSkill.skillId === skill.id
+                      );
+                      
+                      return !isEnrolled; // Show only if NOT enrolled
+                    })
+                    .map(renderNewSkillCard)
                 ) : (
                   <View style={styles.emptyState}>
                     <Text style={styles.emptyStateText}>

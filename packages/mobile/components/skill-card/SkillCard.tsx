@@ -9,9 +9,17 @@ import { styles } from './SkillCard.styles';
 interface SkillCardProps {
   skill: Skill;
   onSelect: (skill: Skill) => void;
+  onDelete?: () => void; // Optional delete handler
 }
 
-export function SkillCard({ skill, onSelect }: SkillCardProps) {
+export function SkillCard({ skill, onSelect, onDelete }: SkillCardProps) {
+  
+  const handleDelete = (e: any) => {
+    if (onDelete) {
+      e.stopPropagation(); // Prevent card selection when clicking delete
+      onDelete();
+    }
+  };
   
   return (
     <TouchableOpacity 
@@ -19,6 +27,17 @@ export function SkillCard({ skill, onSelect }: SkillCardProps) {
       onPress={() => onSelect(skill)}
       activeOpacity={0.95}
     >
+      {/* Delete Button (top-right corner) */}
+      {onDelete && (
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDelete}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={18} color={Theme.colors.error.main} />
+        </TouchableOpacity>
+      )}
+      
       {/* Main Content */}
       <View style={styles.header}>
         <View style={styles.info}>

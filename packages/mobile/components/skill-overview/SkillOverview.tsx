@@ -14,27 +14,37 @@ import StatCard from "../stat-card/StatCard";
 import CircularProgress from "../circular-progress/CircularProgress";
 import { navigateTo, useRouteParams } from "@/navigation/navigation";
 import { SINGLE_QUESTION_TEST } from "@/data/QuizData";
-import { useSkillLevelStore } from "@/stores/skillLevelStore";
+import type { GetUserSkillsResponse } from "@learning-platform/shared";
 
-const SkillOverviewScreen = () => {
-  const currentLevel = 0;
+interface SkillOverviewProps {
+  // Backend data for this skill (null if not enrolled)
+  skillData: GetUserSkillsResponse[number] | null;
+  
+  // Whether user needs to rate (determined by parent)
+  needsRating: boolean;
+  
+  // Callback when user submits rating
+  onRatingSubmit: (rating: number) => void;
+  
+  // Loading state for enrollment
+  isEnrolling?: boolean;
+}
+
+const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({ 
+  skillData,
+  needsRating,
+  onRatingSubmit,
+  isEnrolling = false
+}) => {
+  const { skill } = useRouteParams('assessment');
+  
+  // Extract data from backend response (with defaults for new skills)
+  const currentLevel = skillData?.difficultyTarget ?? 0;
   const maxLevel = 10;
-  const hotStreak = 0;
-  const questionsAnswered = 0;
-
-  const {skill, progress } = useRouteParams('assessment')
+  const hotStreak = skillData?.streakCorrect ?? 0;
+  const questionsAnswered = skillData?.attemptsTotal ?? 0;
+  const accuracy = skillData?.accuracy ?? 0;
   
-  // Zustand store for skill level ratings
-  const skillLevels = useSkillLevelStore((state) => state.skillLevels);
-  const setSkillLevel = useSkillLevelStore((state) => state.setSkillLevel);
-
-  // Check if user has rated this skill (derived from state to trigger re-render)
-  const hasRated = skill in skillLevels;
-  
-  // Handler for when user submits their rating
-  const handleRatingSubmit = (rating: number) => {
-    setSkillLevel(skill, rating);
-  };
   return (
     <View style={styles.container}>
       <ScrollView
@@ -42,11 +52,12 @@ const SkillOverviewScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Skill Level Rating - Only show if not rated yet */}
-        {!hasRated && (
+        {/* Show rating component if user needs to set level */}
+        {needsRating && (
           <SkillLevelRating 
             skillName={skill}
-            onRatingSubmit={handleRatingSubmit}
+            onRatingSubmit={onRatingSubmit}
+            isSubmitting={isEnrolling}
           />
         )}
         
@@ -56,8 +67,16 @@ const SkillOverviewScreen = () => {
             <StatCard
               label="HOT STREAK"
               value={`${hotStreak} Days`}
-              subtitle="+0% vs. last week"
-              subtitleColor="#07880b"
+              subtitle={
+                hotStreak > 0 
+                  ? `${hotStreak} correct in a row!` 
+                  : "Starting fresh"
+              }
+              subtitleColor={
+                hotStreak > 0 
+                  ? "#07880b" 
+                  : Theme.colors.text.secondary
+              }
               iconName="local-fire-department"
               iconColor="#ff4d4d"
               iconFilled={true}
@@ -68,19 +87,47 @@ const SkillOverviewScreen = () => {
             <StatCard
               label="ANSWERED"
               value={`${questionsAnswered} Qs`}
-              subtitle="Starting fresh"
+              subtitle={
+                questionsAnswered > 0
+                  ? `${Math.round(accuracy * 100)}% accuracy`
+                  : "Starting fresh"
+              }
               iconName="task-alt"
               iconColor="#3B82F6"
             />
           </View>
         </View>
 
-        {/* Skill Progress Gauge */}
+        {/* Difficulty Level Gauge (from backend) */}
         <View style={styles.progressCard}>
-          <Text style={styles.progressHeader}>OVERALL SKILL PROGRESS</Text>
+          <Text style={styles.progressHeader}>YOUR DIFFICULTY LEVEL</Text>
 
-          <CircularProgress current={progress} total={100} />
-       </View>
+          {!skillData ? (
+            <View style={styles.emptyProgressContainer}>
+              <Text style={styles.emptyProgressText}>
+                Set your skill level to get started
+              </Text>
+            </View>
+          ) : (
+            <CircularProgress 
+              current={currentLevel} 
+              total={maxLevel} 
+            />
+          )}
+        </View>
+
+        {/* Optional: Show accuracy separately if user has answered questions */}
+        {skillData && questionsAnswered > 0 && (
+          <View style={styles.accuracyCard}>
+            <Text style={styles.accuracyLabel}>ACCURACY</Text>
+            <Text style={styles.accuracyValue}>
+              {Math.round(accuracy * 100)}%
+            </Text>
+            <Text style={styles.accuracySubtext}>
+              {skillData.correctTotal} correct out of {questionsAnswered}
+            </Text>
+          </View>
+        )}
 
         {/* Pro Tip Card */}
         <View style={styles.proTipCard}>
@@ -101,8 +148,8 @@ const SkillOverviewScreen = () => {
         </View>
       </ScrollView>
 
-      {/* Fixed Bottom CTA Button with Gradient - Only show if rated */}
-      {hasRated && (
+      {/* Show "Next Question" CTA only if enrolled (has difficulty level) */}
+      {!needsRating && skillData && (
         <LinearGradient
           colors={[
             "rgba(252, 249, 243, 0)",
@@ -113,7 +160,11 @@ const SkillOverviewScreen = () => {
           style={styles.bottomCTA}
           pointerEvents="box-none"
         >
-          <TouchableOpacity onPress={() => navigateTo('quiz', {skill: skill, data: SINGLE_QUESTION_TEST})} style={styles.ctaButton} activeOpacity={0.95}>
+          <TouchableOpacity 
+            onPress={() => navigateTo('quiz', { skill: skill, data: SINGLE_QUESTION_TEST })} 
+            style={styles.ctaButton} 
+            activeOpacity={0.95}
+          >
             <Text style={styles.ctaButtonText}>NEXT QUESTION</Text>
           </TouchableOpacity>
         </LinearGradient>
@@ -121,6 +172,5 @@ const SkillOverviewScreen = () => {
     </View>
   );
 };
-
 
 export default SkillOverviewScreen;

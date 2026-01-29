@@ -1,8 +1,13 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { useUser as useClerkUser, useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { CreateUserInput } from '@learning-platform/shared';
+import type { 
+  CreateUserRequest,
+  CreateUserResponse 
+} from '@learning-platform/shared';
 import { useNotificationStore } from '@/stores/notificationStore';
+import { useUpdateUser } from '@/api-routes/updateUser';
+import { clearAssessedSkills } from '@/utils/assessmentStorage';
 
 // Storage keys
 const USER_DATA_KEY = '@skill_issue_user_data';
@@ -15,16 +20,25 @@ interface AuthData {
   signOut: () => Promise<void>;
 }
 
+interface UserData extends CreateUserResponse {
+  // Backend fields from CreateUserResponse:
+  // id, deviceId, timezone, quietHoursStart, quietHoursEnd, 
+  // maxChallengesPerDay, createdAt
+}
+
 interface UserContextValue {
   // Clerk auth data (direct from hooks)
   auth: AuthData;
   
-  // App user settings (CreateUserSchema)
-  user: CreateUserInput | null;
+  // App user settings (CreateUserResponse from backend)
+  user: UserData | null;
+  
+  // Quick access to backend user ID
+  userId: string | null;
   
   // User management methods
-  setUser: (userData: CreateUserInput) => Promise<void>;
-  updateUser: (partialData: Partial<CreateUserInput>) => Promise<void>;
+  setUser: (userData: CreateUserResponse) => Promise<void>;
+  updateUser: (partialData: Partial<CreateUserRequest>) => Promise<void>;
   clearUser: () => Promise<void>;
   
   // Backend sync tracking
@@ -43,9 +57,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const { signOut: clerkSignOut } = useClerkAuth();
   
   // Local state
-  const [user, setUserState] = useState<CreateUserInput | null>(null);
+  const [user, setUserState] = useState<UserData | null>(null);
   const [isUserCreatedFlag, setIsUserCreatedFlag] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  
+  // API hook for updating user (including push token sync)
+  const { execute: updateUserApi } = useUpdateUser();
+  const { expoPushToken } = useNotificationStore();
   
   // Initialize: Load user data from AsyncStorage on mount
   useEffect(() => {
@@ -57,7 +75,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         const userDataJson = await AsyncStorage.getItem(USER_DATA_KEY);
         if (userDataJson) {
           try {
-            const userData = JSON.parse(userDataJson) as CreateUserInput;
+            const userData = JSON.parse(userDataJson) as UserData;
             setUserState(userData);
             console.log('[UserContext] ✅ User data loaded from storage');
           } catch (parseError) {
@@ -89,18 +107,62 @@ export function UserProvider({ children }: { children: ReactNode }) {
     initializeUser();
   }, []);
   
+  // Auto-sync push token to backend when user is authenticated
+  useEffect(() => {
+    const syncTokenToBackend = async () => {
+      // Only sync if:
+      // 1. User context is initialized
+      // 2. User is created in backend (has userId)
+      // 3. We have a push token
+      // 4. User is authenticated (clerk user exists)
+      // 5. Push token is different from what we have stored
+      if (!isInitialized || !isUserCreatedFlag || !user?.id || !expoPushToken || !clerkUser) {
+        return;
+      }
+
+      // Check if push token is already set to avoid unnecessary API calls
+      if (user.deviceId === expoPushToken) {
+        console.log('[UserContext] ℹ️ Push token already synced, skipping update');
+        return;
+      }
+
+      try {
+        console.log('[UserContext] 🔄 Auto-syncing push token to backend...');
+        
+        // Update user with push token using the updateUser endpoint
+        await updateUserApi({ 
+          userId: user.id,
+          deviceId: expoPushToken 
+        });
+        
+        // Update local user state with the new push token
+        await updateUser({ deviceId: expoPushToken });
+        
+        console.log('[UserContext] ✅ Push token synced successfully');
+      } catch (error) {
+        console.error('[UserContext] ❌ Failed to sync push token:', error);
+        // Don't show error to user - this is a background operation
+        // User can manually enable from Profile if needed
+      }
+    };
+
+    syncTokenToBackend();
+  }, [isInitialized, isUserCreatedFlag, user?.id, user?.deviceId, expoPushToken, clerkUser]);
+  
   // Set entire user object (for initial creation)
-  const setUser = async (userData: CreateUserInput): Promise<void> => {
+  const setUser = async (userData: CreateUserResponse): Promise<void> => {
     try {
       console.log('[UserContext] 💾 Setting user data:', {
+        id: userData.id,
         timezone: userData.timezone,
         deviceId: userData.deviceId ? '[Set]' : undefined,
         maxChallengesPerDay: userData.maxChallengesPerDay,
+        createdAt: userData.createdAt,
       });
       
       const userDataJson = JSON.stringify(userData);
       await AsyncStorage.setItem(USER_DATA_KEY, userDataJson);
-      setUserState(userData);
+      setUserState(userData as UserData);
       
       console.log('[UserContext] ✅ User data saved to storage');
     } catch (error) {
@@ -110,7 +172,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
   
   // Update partial user data (merge with existing)
-  const updateUser = async (partialData: Partial<CreateUserInput>): Promise<void> => {
+  const updateUser = async (partialData: Partial<CreateUserRequest>): Promise<void> => {
     try {
       console.log('[UserContext] 🔄 Updating user data:', partialData);
       
@@ -148,7 +210,24 @@ export function UserProvider({ children }: { children: ReactNode }) {
       const { reset: resetNotifications } = useNotificationStore.getState();
       resetNotifications();
       
-      console.log('[UserContext] ✅ User data cleared');
+      // Clear skills cache
+      try {
+        const { useSkillsStore } = await import('@/stores/skillsStore');
+        const { clearCache: clearSkillsCache } = useSkillsStore.getState();
+        clearSkillsCache();
+      } catch (error) {
+        // Skills store might not exist yet, ignore
+        console.log('[UserContext] ⚠️ Skills store not available:', error);
+      }
+      
+      // Clear assessed skills
+      try {
+        await clearAssessedSkills();
+      } catch (error) {
+        console.log('[UserContext] ⚠️ Failed to clear assessed skills:', error);
+      }
+      
+      console.log('[UserContext] ✅ User data and caches cleared');
     } catch (error) {
       console.error('[UserContext] ❌ Failed to clear user data:', error);
       throw error;
@@ -203,6 +282,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const value: UserContextValue = {
     auth,
     user,
+    userId: user?.id || null,
     setUser,
     updateUser,
     clearUser,

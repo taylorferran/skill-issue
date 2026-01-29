@@ -2,7 +2,7 @@ import { Theme } from "@/theme/Theme";
 import { useUser } from "@/contexts/UserContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Image,
   Alert,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { SettingItem } from "@/components/setting-item/SettingItem";
 import { SettingToggle } from "@/components/setting-toggle/SettingToggle";
 import { useNotificationStore } from "@/stores/notificationStore";
@@ -23,14 +23,16 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import { useCreateUser } from "@/api-routes/createUser";
-import type { CreateUserInput } from "@learning-platform/shared";
+import { useUpdateUser } from "@/api-routes/updateUser";
+import type { CreateUserRequest } from "@learning-platform/shared";
 import { styles } from "./index.styles";
 import { usePush } from "@/api-routes/usePush";
 
 export default function ProfileScreen() {
-  const { auth, setUser, updateUser, isUserCreated, markUserAsCreated } =
+  const { auth, userId, setUser, updateUser, isUserCreated, markUserAsCreated } =
     useUser();
   const { execute: createUserApi } = useCreateUser();
+  const { execute: updateUserApi } = useUpdateUser();
 
   const { getPushToken } = useNotificationStore.getState();
   // Notification state management
@@ -40,14 +42,17 @@ export default function ProfileScreen() {
   const notificationsEnabled = permissionStatus === "granted";
   const { execute } = usePush();
 
-  // Check current notification permission status on mount
-  useEffect(() => {
-    const checkPermissions = async () => {
-      const enabled = await areNotificationsEnabled();
-      setPermissionStatus(enabled ? "granted" : "denied");
-    };
-    checkPermissions();
-  }, [setPermissionStatus]);
+  // Check current notification permission status when screen comes into focus
+  // This ensures the toggle updates when user returns from system settings
+  useFocusEffect(
+    useCallback(() => {
+      const checkPermissions = async () => {
+        const enabled = await areNotificationsEnabled();
+        setPermissionStatus(enabled ? "granted" : "denied");
+      };
+      checkPermissions();
+    }, [setPermissionStatus])
+  );
 
   // Handle notification toggle
   const handleNotificationToggle = async (value: boolean) => {
@@ -88,32 +93,32 @@ export default function ProfileScreen() {
           console.log("[Profile] ✅ Push token saved to notification store");
 
           // Check if backend user exists
-          if (!isUserCreated()) {
+          if (!isUserCreated() || !userId) {
             console.log(
-              "[Profile] 🆕 First time user - creating on backend...",
+              "[Profile] ⚠️ Backend user not found - creating as fallback...",
             );
 
             try {
-              // Prepare user data
-              const userData: CreateUserInput = {
+              // Fallback: Create user if doesn't exist (edge case - should not happen normally)
+              const requestData: CreateUserRequest = {
                 timezone: Localization.getCalendars()[0]?.timeZone || "UTC",
                 deviceId: token,
                 maxChallengesPerDay: 5,
               };
 
               console.log("[Profile] 🚀 Creating user with data:", {
-                timezone: userData.timezone,
+                timezone: requestData.timezone,
                 deviceId: "[Push Token Set]",
-                maxChallengesPerDay: userData.maxChallengesPerDay,
+                maxChallengesPerDay: requestData.maxChallengesPerDay,
               });
 
               // Create on backend
-              await createUserApi(userData);
-              console.log("[Profile] ✅ User created on backend");
+              const response = await createUserApi(requestData);
+              console.log("[Profile] ✅ User created on backend with ID:", response.id);
 
-              // Store locally
-              await setUser(userData);
-              console.log("[Profile] 💾 User data saved locally");
+              // Store the RESPONSE (not the request)
+              await setUser(response);
+              console.log("[Profile] 💾 User response saved locally");
 
               // Mark as created
               await markUserAsCreated();
@@ -132,21 +137,34 @@ export default function ProfileScreen() {
             }
           } else {
             console.log(
-              "[Profile] ✅ User already exists, updating push token locally",
+              "[Profile] 🔄 User exists - updating push token on backend...",
             );
 
-            // User already exists, just update deviceId locally
+            // PRIMARY PATH: Update existing user with push token
             try {
+              console.log("[Profile] 📤 Calling updateUser API with userId:", userId);
+              
+              // Update on backend via PUT /users/:userId
+              await updateUserApi({
+                userId,
+                deviceId: token,
+              });
+              
+              console.log("[Profile] ✅ Push token updated on backend");
+
+              // Also update local UserContext state
               await updateUser({ deviceId: token });
-              console.log("[Profile] 💾 Push token updated locally");
+              console.log("[Profile] 💾 Push token updated in local context");
+
+              Alert.alert("Success", "Notifications enabled successfully!");
             } catch (error) {
-              console.error(
-                "[Profile] ⚠️ Failed to update token locally:",
-                error,
+              console.error("[Profile] ❌ Failed to update push token:", error);
+              Alert.alert(
+                "Update Failed",
+                "Could not update notification settings. Please try again.",
+                [{ text: "OK" }]
               );
             }
-
-            Alert.alert("Success", "Notifications enabled successfully!");
           }
         } else {
           console.error("[Profile] ❌ Token is null/empty");
@@ -216,7 +234,7 @@ export default function ProfileScreen() {
 
   const handleAccountDetails = () => {
     console.log("Navigate to account details");
-    var token = getPushToken();
+    const token = getPushToken();
     if (token !== null) {
       execute({ pushToken: token });
     }

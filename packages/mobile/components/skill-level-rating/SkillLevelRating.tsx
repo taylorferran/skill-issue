@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native";
 import Slider from "@react-native-community/slider";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Theme } from "@/theme/Theme";
@@ -8,16 +8,20 @@ import { styles } from "./SkillLevelRating.styles";
 type SkillLevelRatingProps = {
   skillName: string;
   onRatingSubmit: (rating: number) => void;
+  isSubmitting?: boolean; // NEW - show loading state
 };
 
 const SkillLevelRating: React.FC<SkillLevelRatingProps> = ({
   skillName,
   onRatingSubmit,
+  isSubmitting = false, // NEW
 }) => {
   const [selectedLevel, setSelectedLevel] = useState<number>(5);
 
   const handleConfirm = () => {
-    onRatingSubmit(selectedLevel);
+    if (!isSubmitting) {
+      onRatingSubmit(selectedLevel);
+    }
   };
 
   return (
@@ -67,15 +71,23 @@ const SkillLevelRating: React.FC<SkillLevelRatingProps> = ({
 
               {/* Confirm Button */}
               <TouchableOpacity
-                style={styles.confirmButton}
+                style={[
+                  styles.confirmButton,
+                  isSubmitting && styles.confirmButtonDisabled
+                ]}
                 onPress={handleConfirm}
                 activeOpacity={0.7}
+                disabled={isSubmitting}
               >
-                <MaterialIcons
-                  name="check"
-                  size={20}
-                  color={Theme.colors.text.inverse}
-                />
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color={Theme.colors.text.inverse} />
+                ) : (
+                  <MaterialIcons
+                    name="check"
+                    size={20}
+                    color={Theme.colors.text.inverse}
+                  />
+                )}
               </TouchableOpacity>
             </View>
 
