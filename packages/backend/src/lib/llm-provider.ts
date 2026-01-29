@@ -21,10 +21,10 @@ export class AnthropicProvider implements LLMProvider {
     this.client = new Anthropic({ apiKey });
   }
 
-  async generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallengeWithUsage> {
-    const { skillId, difficulty, skillName, skillDescription } = request;
+  async generateChallenge(request: ChallengeDesignRequest & { customTemplate?: string }): Promise<GeneratedChallengeWithUsage> {
+    const { skillId, difficulty, skillName, skillDescription, customTemplate } = request;
 
-    const prompt = this.buildChallengePrompt(skillId, skillName, skillDescription, difficulty);
+    const prompt = this.buildChallengePrompt(skillId, skillName, skillDescription, difficulty, customTemplate);
 
     const message = await this.client.messages.create({
       model: 'claude-haiku-4-5-20251001', // Todo: This model is a little dumb honestly, will need to experiment
@@ -55,19 +55,66 @@ export class AnthropicProvider implements LLMProvider {
     };
   }
 
+  /**
+   * Returns the prompt template with {{variable}} placeholders.
+   * Used for Opik prompt versioning — only creates a new version when the
+   * template structure changes, not when different variables are filled in.
+   */
+  static getChallengePromptTemplate(): string {
+    return `You are generating a multiple-choice challenge to test knowledge and competence.
+
+SKILL: {{skill_name}}
+DESCRIPTION: {{skill_description}}
+DIFFICULTY LEVEL: {{difficulty}}/10
+
+Generate a single MCQ challenge that tests real competence in this skill at this difficulty level.
+
+RULES:
+- Difficulty {{difficulty}} means: {{difficulty_description}}
+- Question must be answerable in under 30 seconds
+- 4 options, only 1 correct
+- Randomly shuffle the order of correct answer among the options
+- Don't repeat questions you've generated before - each challenge must be unique try to make it unique
+- Distractors should be plausible but clearly wrong to someone who knows the subject
+- Include a brief explanation of why the answer is correct
+- Tailor the question specifically to the skill described above
+
+OUTPUT FORMAT (strict JSON):
+{
+  "question": "...",
+  "options": ["A...", "B...", "C...", "D..."],
+  "correctAnswerIndex": 0,
+  "explanation": "...",
+  "actualDifficulty": {{difficulty}}
+}
+
+Generate the challenge now:`;
+  }
+
   private buildChallengePrompt(
     skillId: string,
     skillName: string | undefined,
     skillDescription: string | undefined,
-    difficulty: number
+    difficulty: number,
+    customTemplate?: string
   ): string {
+    // If custom template provided, interpolate variables
+    if (customTemplate) {
+      return customTemplate
+        .replace(/\{\{skill_name\}\}/g, skillName || skillId)
+        .replace(/\{\{skill_description\}\}/g, skillDescription || 'General knowledge challenge')
+        .replace(/\{\{difficulty\}\}/g, difficulty.toString())
+        .replace(/\{\{difficulty_description\}\}/g, this.getDifficultyDescription(difficulty));
+    }
+
+    // Default template
     return `You are generating a multiple-choice challenge to test knowledge and competence.
 
 SKILL: ${skillName || skillId}
 DESCRIPTION: ${skillDescription || 'General knowledge challenge'}
 DIFFICULTY LEVEL: ${difficulty}/10
 
-Generate a single MCQ challenge that tests real competence in this skill at this difficulty level.
+Generate a single multiple choice challenge that tests real competence in this skill at this difficulty level.
 
 RULES:
 - Difficulty ${difficulty} means: ${this.getDifficultyDescription(difficulty)}
@@ -116,22 +163,32 @@ Generate the challenge now:`;
 
       const parsed = JSON.parse(jsonStr.trim());
 
+      // Handle both correctAnswerIndex and correctOption field names (LLM sometimes uses different names)
+      const correctIndex = parsed.correctAnswerIndex ?? parsed.correctOption;
+
       // Validate structure
       if (
         !parsed.question ||
         !Array.isArray(parsed.options) ||
         parsed.options.length !== 4 ||
-        typeof parsed.correctAnswerIndex !== 'number' ||
-        parsed.correctAnswerIndex < 0 ||
-        parsed.correctAnswerIndex > 3
+        typeof correctIndex !== 'number' ||
+        correctIndex < 0 ||
+        correctIndex > 3
       ) {
+        console.error('Validation failed:', {
+          hasQuestion: !!parsed.question,
+          isOptionsArray: Array.isArray(parsed.options),
+          optionsLength: parsed.options?.length,
+          correctIndex,
+          correctIndexType: typeof correctIndex
+        });
         throw new Error('Invalid challenge structure');
       }
 
       return {
         question: parsed.question,
         options: parsed.options,
-        correctAnswerIndex: parsed.correctAnswerIndex,
+        correctAnswerIndex: correctIndex,
         explanation: parsed.explanation || '',
         actualDifficulty: parsed.actualDifficulty || targetDifficulty,
       };

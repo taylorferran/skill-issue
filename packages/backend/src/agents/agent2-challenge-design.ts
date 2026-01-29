@@ -1,6 +1,7 @@
 import { getSupabase } from '@/lib/supabase';
-import { createLLMProvider } from '@/lib/llm-provider';
+import { createLLMProvider, AnthropicProvider } from '@/lib/llm-provider';
 import { opikService } from '@/lib/opik';
+import { CHALLENGE_PROMPT_EXPERIMENT } from '@/config/ab-tests';
 import type { SchedulingDecision, Challenge, GeneratedChallenge } from '@/types';
 import type { Database } from '@/types/database';
 
@@ -52,6 +53,29 @@ export class ChallengeDesignAgent {
 
       console.log(`[Agent 2] Designing ${skill.name} challenge at difficulty ${decision.difficultyTarget}`);
 
+      // A/B Testing: Select prompt variant if experiment is enabled
+      let selectedVariant: { variantName: string; template: string; tags: string[]; metadata: Record<string, unknown> } | null = null;
+      let templateToUse: string | undefined;
+
+      if (CHALLENGE_PROMPT_EXPERIMENT.enabled) {
+        // Prepare variants with actual templates
+        const variants = CHALLENGE_PROMPT_EXPERIMENT.variants.map(v => ({
+          name: v.name,
+          template: v.template ?? AnthropicProvider.getChallengePromptTemplate(),
+          weight: v.weight,
+          tags: v.tags,
+          metadata: v.metadata,
+        }));
+
+        selectedVariant = opikService.selectPromptVariant({
+          experimentName: CHALLENGE_PROMPT_EXPERIMENT.experimentName,
+          variants,
+        });
+
+        templateToUse = selectedVariant.template;
+        console.log(`[Agent 2] Using A/B test variant: ${selectedVariant.variantName}`);
+      }
+
       // Generate challenge via LLM
       const llmStartTime = Date.now();
       const llmResult = await this.llmProvider.generateChallenge({
@@ -60,9 +84,23 @@ export class ChallengeDesignAgent {
         skillDescription: skill.description,
         difficulty: decision.difficultyTarget,
         userId: decision.userId,
+        customTemplate: templateToUse,
       });
       const llmDuration = Date.now() - llmStartTime;
       const { challenge: generatedChallenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
+
+      // Register prompt with Opik
+      const promptVersion = await opikService.createOrGetPrompt({
+        name: selectedVariant
+          ? `${CHALLENGE_PROMPT_EXPERIMENT.experimentName}_${selectedVariant.variantName}`
+          : 'challenge_generation',
+        template: templateToUse || AnthropicProvider.getChallengePromptTemplate(),
+        metadata: {
+          model: 'claude-haiku-4-5-20251001',
+          ...(selectedVariant?.metadata || {}),
+        },
+        tags: selectedVariant?.tags || ['v0.1-base'],
+      });
 
       // Validate challenge
       const validation = this.validateChallenge(generatedChallenge);
@@ -99,8 +137,8 @@ export class ChallengeDesignAgent {
         skill_id: decision.skillId,
         user_id: decision.userId,
         difficulty: decision.difficultyTarget,
-        llm: 'claude-haiku-4-5-20251001', // Todo: populate with LLM config from env vars
-        prompt_version: 'v1',
+        llm: 'claude-haiku-4-5-20251001',
+        prompt_version: promptVersion.commit || 'v1',
         question: generatedChallenge.question,
         options_json: generatedChallenge.options,
         correct_option: generatedChallenge.correctAnswerIndex,
@@ -163,6 +201,14 @@ export class ChallengeDesignAgent {
         metadata: {
           actualDifficulty: generatedChallenge.actualDifficulty,
           targetDifficulty: decision.difficultyTarget,
+          promptVersion: promptVersion.commit,
+          ...(selectedVariant && {
+            abTest: {
+              experiment: CHALLENGE_PROMPT_EXPERIMENT.experimentName,
+              variant: selectedVariant.variantName,
+              ...selectedVariant.metadata,
+            },
+          }),
         },
         llmCalls: [{
           model: 'claude-haiku-4-5-20251001',

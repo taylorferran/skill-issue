@@ -153,6 +153,45 @@ router.post('/answer', async (req: Request, res: Response) => {
       traceId,
     });
 
+    // Add feedback scores for richer evaluation data
+    // Response time score: 1.0 if fast, decays for slow responses
+    // Expected time: 10s at difficulty 1, scaling to 60s at difficulty 10
+    const expectedTimeMs = (10 + (challenge.difficulty - 1) * 5.5) * 1000;
+    const responseTimeMs = body.responseTime || 30000;
+    const rtRatio = responseTimeMs / expectedTimeMs;
+    const responseTimeScore = rtRatio <= 1 ? 1.0 : Math.max(0, 1 - (rtRatio - 1) * 0.5);
+
+    await opikService.addFeedbackScore({
+      traceId,
+      name: 'response_time',
+      value: Math.round(responseTimeScore * 100) / 100,
+      source: 'sdk',
+      reason: `${responseTimeMs}ms vs ${expectedTimeMs}ms expected (difficulty ${challenge.difficulty})`,
+    });
+
+    // Difficulty match: is the user at an appropriate difficulty level?
+    const { data: skillState } = await supabase
+      .from('user_skill_state')
+      .select('attempts_total, correct_total')
+      .eq('user_id', body.userId)
+      .eq('skill_id', challenge.skill_id)
+      .single();
+
+    if (skillState) {
+      const s = skillState as any;
+      const accuracy = s.attempts_total > 0 ? s.correct_total / s.attempts_total : 0.5;
+      // Sweet spot is 50-80% accuracy — means difficulty is well-matched
+      const inSweetSpot = accuracy >= 0.5 && accuracy <= 0.8;
+      const diffScore = inSweetSpot ? 1.0 : (accuracy > 0.8 ? Math.max(0, 1 - (accuracy - 0.8) * 5) : Math.max(0, accuracy * 2));
+      await opikService.addFeedbackScore({
+        traceId,
+        name: 'difficulty_match',
+        value: Math.round(diffScore * 100) / 100,
+        source: 'sdk',
+        reason: `User accuracy ${(accuracy * 100).toFixed(0)}% at difficulty ${challenge.difficulty}`,
+      });
+    }
+
     // Update user skill state via Agent 3 — creates a span under the root trace
     await skillStateAgent.updateSkillState({
       userId: body.userId,

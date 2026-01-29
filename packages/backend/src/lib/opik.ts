@@ -127,8 +127,14 @@ class OpikService {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[Opik] API error ${response.status}: ${errorText}`);
+        // Clone response before consuming body for error logging
+        const errorResponse = response.clone();
+        try {
+          const errorText = await errorResponse.text();
+          console.error(`[Opik] API error ${response.status}: ${errorText}`);
+        } catch (readError) {
+          console.error(`[Opik] API error ${response.status} (could not read body)`);
+        }
       }
 
       return response;
@@ -616,31 +622,100 @@ class OpikService {
   // ============= Prompt Management =============
 
   /**
-   * Create or update a prompt in Opik for versioning
+   * Register a prompt with Opik for versioning.
+   * Opik auto-creates a new version if the template content changed.
+   * If the same template is posted again, Opik returns the existing version.
+   * Returns the prompt name and commit hash for linking to traces.
+   *
+   * @param tags - Tags for organizing and filtering prompts, useful for A/B testing
+   *               (e.g., ['variant_a', 'experiment_123', 'production'])
    */
-  async createPrompt(params: {
+  async createOrGetPrompt(params: {
     name: string;
     template: string;
     metadata?: Record<string, unknown>;
     tags?: string[];
-  }): Promise<string | null> {
+  }): Promise<{ name: string; commit?: string }> {
     if (!this.isEnabled) {
-      console.log(`[Opik] Prompt created (local): ${params.name}`);
+      const tagsStr = params.tags ? ` (tags: ${params.tags.join(', ')})` : '';
+      console.log(`[Opik] Prompt registered (local): ${params.name}${tagsStr}`);
+      return { name: params.name };
+    }
+
+    try {
+      // First check if prompt already exists to avoid 409 errors
+      const existingPrompt = await this.getPromptWithVersion(params.name);
+      if (existingPrompt) {
+        console.log(`[Opik] Using existing prompt: ${params.name} (commit: ${existingPrompt.commit || 'unknown'})`);
+        return { name: params.name, commit: existingPrompt.commit };
+      }
+
+      // Prompt doesn't exist, create it
+      const response = await this.request('POST', '/prompts', {
+        name: params.name,
+        template: params.template,
+        metadata: params.metadata,
+        tags: params.tags,
+        change_description: `Auto-registered at ${new Date().toISOString()}`
+      });
+
+      if (response?.ok) {
+        try {
+          const data = await response.json() as Record<string, unknown>;
+          const latestVersion = data?.latest_version as Record<string, unknown> | undefined;
+          const commit = latestVersion?.commit as string | undefined;
+          const tagsStr = params.tags ? `, tags: ${params.tags.join(', ')}` : '';
+          console.log(`[Opik] Prompt registered: ${params.name} (commit: ${commit || 'unknown'}${tagsStr})`);
+          return { name: params.name, commit };
+        } catch (jsonError) {
+          console.error('[Opik] Failed to parse prompt registration response:', jsonError);
+          // Still return success with just the name if we got an OK status
+          return { name: params.name };
+        }
+      } else {
+        console.error(`[Opik] Prompt registration failed with status: ${response?.status}`);
+      }
+    } catch (error) {
+      console.error('[Opik] Failed to register prompt:', error);
+    }
+
+    return { name: params.name };
+  }
+
+  /**
+   * Get a prompt by name with version info (uses the detail endpoint)
+   */
+  private async getPromptWithVersion(name: string): Promise<{ name: string; commit?: string } | null> {
+    if (!this.isEnabled) {
       return null;
     }
 
-    const promptData: Partial<OpikPrompt> = {
-      name: params.name,
-      template: params.template,
-      metadata: params.metadata,
-      tags: params.tags,
-    };
-
-    const response = await this.request('POST', '/prompts', promptData);
-    if (response?.ok) {
-      console.log(`[Opik] Prompt created: ${params.name}`);
+    // First get the prompt ID from the list
+    const listResponse = await this.request(
+      'GET',
+      `/prompts?name=${encodeURIComponent(name)}`
+    );
+    if (!listResponse?.ok) {
+      return null;
     }
-    return params.name;
+
+    const listData = await listResponse.json() as { content?: Array<{ id?: string; name?: string }> };
+    const promptInfo = listData.content?.find(p => p.name === name);
+    if (!promptInfo?.id) {
+      return null;
+    }
+
+    // Now get the full prompt details including latest_version
+    const detailResponse = await this.request('GET', `/prompts/${promptInfo.id}`);
+    if (!detailResponse?.ok) {
+      return { name };
+    }
+
+    const detailData = await detailResponse.json() as Record<string, unknown>;
+    const latestVersion = detailData?.latest_version as Record<string, unknown> | undefined;
+    const commit = latestVersion?.commit as string | undefined;
+
+    return { name, commit };
   }
 
   /**
@@ -660,6 +735,166 @@ class OpikService {
       return data.content?.[0] || null;
     }
     return null;
+  }
+
+  // ============= A/B Testing =============
+
+  /**
+   * Select a prompt variant for A/B testing based on weights.
+   * Uses weighted random selection to distribute traffic across variants.
+   *
+   * @param variants - Array of prompt variants with templates and traffic weights
+   * @returns Selected variant with name, template, and metadata
+   *
+   * @example
+   * ```typescript
+   * const variant = opikService.selectPromptVariant({
+   *   experimentName: 'challenge_prompt_experiment',
+   *   variants: [
+   *     {
+   *       name: 'control',
+   *       template: originalTemplate,
+   *       weight: 50,  // 50% of traffic
+   *       tags: ['control', 'experiment_1']
+   *     },
+   *     {
+   *       name: 'variant_a',
+   *       template: experimentalTemplate,
+   *       weight: 50,  // 50% of traffic
+   *       tags: ['variant_a', 'experiment_1', 'test']
+   *     }
+   *   ]
+   * });
+   * ```
+   */
+  selectPromptVariant(params: {
+    experimentName: string;
+    variants: Array<{
+      name: string;
+      template: string;
+      weight: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+    }>;
+  }): {
+    variantName: string;
+    template: string;
+    tags: string[];
+    metadata: Record<string, unknown>;
+  } {
+    const { experimentName, variants } = params;
+
+    // Validate weights
+    const totalWeight = variants.reduce((sum, v) => sum + v.weight, 0);
+    if (totalWeight === 0) {
+      throw new Error(`[Opik] A/B Test '${experimentName}': Total weight cannot be 0`);
+    }
+
+    // Weighted random selection
+    const random = Math.random() * totalWeight;
+    let cumulativeWeight = 0;
+
+    for (const variant of variants) {
+      cumulativeWeight += variant.weight;
+      if (random <= cumulativeWeight) {
+        console.log(
+          `[Opik] A/B Test '${experimentName}': Selected variant '${variant.name}' (weight: ${variant.weight}/${totalWeight})`
+        );
+
+        return {
+          variantName: variant.name,
+          template: variant.template,
+          tags: [
+            ...(variant.tags || []),
+            `experiment:${experimentName}`,
+            `variant:${variant.name}`,
+          ],
+          metadata: {
+            ...(variant.metadata || {}),
+            experiment: experimentName,
+            variant: variant.name,
+            variantWeight: variant.weight,
+            totalWeight,
+          },
+        };
+      }
+    }
+
+    // Fallback to first variant (should never reach here)
+    const fallback = variants[0];
+    console.warn(
+      `[Opik] A/B Test '${experimentName}': Fallback to variant '${fallback.name}'`
+    );
+    return {
+      variantName: fallback.name,
+      template: fallback.template,
+      tags: [
+        ...(fallback.tags || []),
+        `experiment:${experimentName}`,
+        `variant:${fallback.name}`,
+      ],
+      metadata: {
+        ...(fallback.metadata || {}),
+        experiment: experimentName,
+        variant: fallback.name,
+        variantWeight: fallback.weight,
+        totalWeight,
+      },
+    };
+  }
+
+  /**
+   * Register all variants of an A/B test experiment with Opik.
+   * Each variant will be registered as a separate prompt with appropriate tags.
+   *
+   * @returns Array of registered prompt information
+   */
+  async registerABTestVariants(params: {
+    experimentName: string;
+    variants: Array<{
+      name: string;
+      template: string;
+      weight: number;
+      tags?: string[];
+      metadata?: Record<string, unknown>;
+    }>;
+  }): Promise<Array<{ variantName: string; promptName: string; commit?: string }>> {
+    const { experimentName, variants } = params;
+    const results = [];
+
+    console.log(
+      `[Opik] Registering A/B test '${experimentName}' with ${variants.length} variants`
+    );
+
+    for (const variant of variants) {
+      const promptName = `${experimentName}_${variant.name}`;
+      const tags = [
+        ...(variant.tags || []),
+        `experiment:${experimentName}`,
+        `variant:${variant.name}`,
+      ];
+
+      const result = await this.createOrGetPrompt({
+        name: promptName,
+        template: variant.template,
+        tags,
+        metadata: {
+          ...(variant.metadata || {}),
+          experiment: experimentName,
+          variant: variant.name,
+          weight: variant.weight,
+        },
+      });
+
+      results.push({
+        variantName: variant.name,
+        promptName: result.name,
+        commit: result.commit,
+      });
+    }
+
+    console.log(`[Opik] A/B test '${experimentName}' registered successfully`);
+    return results;
   }
 
   // ============= Feedback & Evaluation =============
