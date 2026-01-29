@@ -31,6 +31,9 @@ const tokenCache = {
 
 function RootLayoutContent() {
   const { isSignedIn } = useAuth();
+  
+  // Notification permissions will be requested after successful sign-in
+  // See sign-in.tsx for implementation
 
   // Initialize notification handler and listeners on app mount
   useEffect(() => {
@@ -57,9 +60,15 @@ function RootLayoutContent() {
 export default function RootLayout() {
   // Memoize service URLs to prevent unnecessary re-renders in ApiProvider
   // Uses environment variable with fallback for local development
-  const serviceUrls = useMemo(() => ({
-    backend: process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000/api'
-  }), []);
+  const serviceUrls = useMemo(() => {
+    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000/api';
+    console.log('[RootLayout] 🌐 Backend URL configured:', backendUrl);
+    console.log('[RootLayout] 📍 Environment variables:', {
+      EXPO_PUBLIC_BACKEND_URL: process.env.EXPO_PUBLIC_BACKEND_URL,
+      NODE_ENV: process.env.NODE_ENV
+    });
+    return { backend: backendUrl };
+  }, []);
 
   return (
     <ClerkProvider
@@ -67,14 +76,14 @@ export default function RootLayout() {
       tokenCache={tokenCache}
     >
       <ClerkLoaded>
-        <UserProvider>
-          <ApiProvider serviceUrls={serviceUrls}>
+        <ApiProvider serviceUrls={serviceUrls}>
+          <UserProvider>
             <QuizProvider>
               <RootLayoutContent />
               <StatusBar style="auto" />
             </QuizProvider>
-          </ApiProvider>
-        </UserProvider>
+          </UserProvider>
+        </ApiProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );

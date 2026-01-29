@@ -35,6 +35,19 @@ export const styles = StyleSheet.create({
     flex: 1,
   },
   
+  // Loading State
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Theme.spacing['2xl'],
+    minHeight: 200,
+  },
+  loadingText: {
+    ...createTextStyle('sm', 'regular', 'secondary'),
+    marginTop: Theme.spacing.md,
+  },
+  
   // Assessment Card
   assessmentCard: {
     backgroundColor: Theme.colors.background.secondary,

@@ -1,3 +1,4 @@
+import React from "react";
 import {
   View,
   Text,
@@ -5,20 +6,24 @@ import {
   StyleSheet,
   Alert,
   SafeAreaView,
-  Button,
-  Platform,
+  ActivityIndicator,
 } from "react-native";
 import { useOAuth } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
-import Constants from "expo-constants";
+import * as Localization from "expo-localization";
 import { Theme } from "@/theme/Theme";
 import { MonogramBackground } from "@/components/monogram-background/MonogramBackground";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useUser } from "@/contexts/UserContext";
+import { useCreateUser } from "@/api-routes/createUser";
+import { useUpdateUser } from "@/api-routes/updateUser";
+import { useGetUserSkills } from "@/api-routes/getUserSkills";
+import { useGetSkills } from "@/api-routes/getSkills";
+import { useSkillsStore } from "@/stores/skillsStore";
+import { registerForPushNotificationsAsync } from "@/utils/notifications";
+import type { CreateUserRequest } from "@learning-platform/shared";
 
 // Important: Warm up the browser for better UX
 WebBrowser.maybeCompleteAuthSession();
@@ -31,63 +36,132 @@ export default function SignInScreen() {
   const { startOAuthFlow: startGithubOAuth } = useOAuth({
     strategy: "oauth_github",
   });
-  const { setExpoPushToken, setPermissionStatus } = useNotificationStore();
+  const { setExpoPushToken, setPermissionStatus, getPushToken } = useNotificationStore();
+  const { setUser, markUserAsCreated, isUserCreated } = useUser();
+  const { execute: createUserApi } = useCreateUser();
+  const { execute: updateUserApi } = useUpdateUser();
+  const { execute: fetchUserSkills } = useGetUserSkills();
+  const { execute: fetchAvailableSkills } = useGetSkills();
+  const { setUserSkills, setAvailableSkills } = useSkillsStore();
+  
+  // Loading state for the entire sign-in process
+  const [isSigningIn, setIsSigningIn] = React.useState(false);
+  const [loadingMessage, setLoadingMessage] = React.useState("Setting up your account...");
 
   /**
-   * Request notification permissions using native OS prompt
+   * Create backend user with push token (if granted)
    * Called after successful OAuth sign-in
    */
-  const requestNotificationPermission = async () => {
-    try {
-      // Skip on simulators
-      if (!Device.isDevice) {
-        console.log("[SignIn] Skipping notifications - not a physical device");
-        return;
-      }
-
-      // Request permission using native prompt
-      const { status } = await Notifications.requestPermissionsAsync();
-      setPermissionStatus(status === "granted" ? "granted" : "denied");
-
-      if (status !== "granted") {
-        console.log("[SignIn] Notification permission denied");
-        return;
-      }
-
-      // Get push token
-      const projectId =
-        Constants.expoConfig?.extra?.eas?.projectId ||
-        "b302dea4-1c3f-42d5-bd5f-eca4acebea90";
-
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-
-      if (tokenData?.data) {
-        setExpoPushToken(tokenData.data);
-        console.log("[SignIn] Push token saved");
-      }
-
-      // Configure Android channel
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
-          name: "default",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: "#FF231F7C",
-        });
-      }
-    } catch (error) {
-      // Silently handle errors - user can enable later in profile
-      console.error("[SignIn] Notification setup error:", error);
+  const createBackendUser = async () => {
+    // Check if user already exists (e.g., reinstall scenario)
+    if (isUserCreated()) {
+      console.log("[SignIn] ✅ Backend user already exists, skipping creation");
+      return;
     }
+
+    console.log("[SignIn] 🆕 Creating backend user...");
+
+    // Get push token from store (if notification was granted earlier)
+    const pushToken = getPushToken();
+
+    // Prepare user data with push token if available
+    const userData: CreateUserRequest = {
+      timezone: Localization.getCalendars()[0]?.timeZone || "UTC",
+      maxChallengesPerDay: 5,
+      ...(pushToken && { deviceId: pushToken }),
+    };
+
+    console.log("[SignIn] 📤 Sending user creation request:", {
+      timezone: userData.timezone,
+      maxChallengesPerDay: userData.maxChallengesPerDay,
+      hasDeviceId: !!userData.deviceId,
+    });
+
+    // Create user on backend
+    const response = await createUserApi(userData);
+    console.log("[SignIn] ✅ Backend user created with ID:", response.id);
+
+    // Save to UserContext
+    await setUser(response);
+    await markUserAsCreated();
+
+    console.log("[SignIn] 💾 User data saved to local context");
+    
+    return response;
   };
+
+  // Note: Notification permissions are now auto-requested via useAutoRequestNotifications hook
+  // in _layout.tsx. No manual button needed here.
 
   const onPressGoogle = async () => {
     try {
+      setIsSigningIn(true);
+      setLoadingMessage("Signing in with Google...");
+      
       const { createdSessionId, setActive } = await startGoogleOAuth();
 
       if (createdSessionId && setActive) {
+        // Activate the Clerk session
         await setActive({ session: createdSessionId });
-        await requestNotificationPermission();
+        console.log("[SignIn] ✅ Clerk session activated");
+        
+        // Small delay to ensure token propagates through React context
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Create backend user with push token
+        setLoadingMessage("Creating your account...");
+        const user = await createBackendUser();
+        
+        if (user?.id) {
+          // Request notification permissions immediately after sign-in
+          setLoadingMessage("Setting up notifications...");
+          try {
+            console.log("[SignIn] 🔔 Requesting notification permissions...");
+            const token = await registerForPushNotificationsAsync();
+            
+            if (token) {
+              console.log("[SignIn] ✅ Notification token received, updating user...");
+              
+              // Update backend with device ID
+              await updateUserApi({
+                userId: user.id,
+                deviceId: token,
+              });
+              
+              // Update local notification store
+              setExpoPushToken(token);
+              setPermissionStatus('granted');
+              
+              console.log("[SignIn] ✅ Notification token saved to backend and store");
+            } else {
+              console.log("[SignIn] ℹ️ Notification permission denied or unavailable");
+              setPermissionStatus('denied');
+            }
+          } catch (error) {
+            // Non-blocking - user can enable later in settings
+            console.warn("[SignIn] ⚠️ Failed to request notifications:", error);
+          }
+          
+          // Pre-fetch skills data before navigation
+          setLoadingMessage("Loading your skills...");
+          try {
+            const [userSkills, availableSkills] = await Promise.all([
+              fetchUserSkills({ userId: user.id }),
+              fetchAvailableSkills(),
+            ]);
+            
+            // Cache skills data in store
+            setUserSkills(userSkills);
+            setAvailableSkills(availableSkills);
+            
+            console.log("[SignIn] ✅ Skills data pre-fetched and cached");
+          } catch (error) {
+            // Non-blocking - skills screen will fetch if needed
+            console.warn("[SignIn] ⚠️ Failed to pre-fetch skills:", error);
+          }
+        }
+        
+        // Navigate to skills screen
         router.replace("/(tabs)/(skills)");
       }
     } catch (err: any) {
@@ -96,16 +170,80 @@ export default function SignInScreen() {
         "Error",
         err.errors?.[0]?.message || "Failed to sign in with Google",
       );
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
   const onPressGithub = async () => {
     try {
+      setIsSigningIn(true);
+      setLoadingMessage("Signing in with GitHub...");
+      
       const { createdSessionId, setActive } = await startGithubOAuth();
 
       if (createdSessionId && setActive) {
+        // Activate the Clerk session
         await setActive({ session: createdSessionId });
-        await requestNotificationPermission();
+        console.log("[SignIn] ✅ Clerk session activated");
+        
+        // Small delay to ensure token propagates through React context
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Create backend user with push token
+        setLoadingMessage("Creating your account...");
+        const user = await createBackendUser();
+        
+        if (user?.id) {
+          // Request notification permissions immediately after sign-in
+          setLoadingMessage("Setting up notifications...");
+          try {
+            console.log("[SignIn] 🔔 Requesting notification permissions...");
+            const token = await registerForPushNotificationsAsync();
+            
+            if (token) {
+              console.log("[SignIn] ✅ Notification token received, updating user...");
+              
+              // Update backend with device ID
+              await updateUserApi({
+                userId: user.id,
+                deviceId: token,
+              });
+              
+              // Update local notification store
+              setExpoPushToken(token);
+              setPermissionStatus('granted');
+              
+              console.log("[SignIn] ✅ Notification token saved to backend and store");
+            } else {
+              console.log("[SignIn] ℹ️ Notification permission denied or unavailable");
+              setPermissionStatus('denied');
+            }
+          } catch (error) {
+            // Non-blocking - user can enable later in settings
+            console.warn("[SignIn] ⚠️ Failed to request notifications:", error);
+          }
+          
+          // Pre-fetch skills data before navigation
+          setLoadingMessage("Loading your skills...");
+          try {
+            const [userSkills, availableSkills] = await Promise.all([
+              fetchUserSkills({ userId: user.id }),
+              fetchAvailableSkills(),
+            ]);
+            
+            // Cache skills data in store
+            setUserSkills(userSkills);
+            setAvailableSkills(availableSkills);
+            
+            console.log("[SignIn] ✅ Skills data pre-fetched and cached");
+          } catch (error) {
+            // Non-blocking - skills screen will fetch if needed
+            console.warn("[SignIn] ⚠️ Failed to pre-fetch skills:", error);
+          }
+        }
+        
+        // Navigate to skills screen
         router.replace("/(tabs)/(skills)");
       }
     } catch (err: any) {
@@ -114,6 +252,8 @@ export default function SignInScreen() {
         "Error",
         err.errors?.[0]?.message || "Failed to sign in with GitHub",
       );
+    } finally {
+      setIsSigningIn(false);
     }
   };
 
@@ -146,7 +286,11 @@ export default function SignInScreen() {
           </View>
 
           {/* Google OAuth Button */}
-          <TouchableOpacity style={styles.googleButton} onPress={onPressGoogle}>
+          <TouchableOpacity 
+            style={styles.googleButton} 
+            onPress={onPressGoogle}
+            disabled={isSigningIn}
+          >
             <Ionicons
               name="logo-google"
               size={20}
@@ -156,10 +300,24 @@ export default function SignInScreen() {
           </TouchableOpacity>
 
           {/* SSO Option */}
-          <TouchableOpacity onPress={onPressGithub}>
+          <TouchableOpacity 
+            onPress={onPressGithub}
+            disabled={isSigningIn}
+          >
             <Text style={styles.ssoText}>Use single sign-on (SSO)</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Loading Overlay */}
+        {isSigningIn && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator 
+              size="large" 
+              color={Theme.colors.primary.main} 
+            />
+            <Text style={styles.loadingText}>{loadingMessage}</Text>
+          </View>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -258,11 +416,61 @@ const styles = StyleSheet.create({
     letterSpacing: 0.16,
   },
 
+  // Notification Prompt
+  notificationPrompt: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 320,
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: Theme.colors.card.border,
+    marginBottom: Theme.spacing["2xl"],
+    gap: Theme.spacing.md,
+  },
+  notificationTextContainer: {
+    flex: 1,
+  },
+  notificationTitle: {
+    color: Theme.colors.text.primary,
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 2,
+  },
+  notificationSubtitle: {
+    color: Theme.colors.text.secondary,
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 16,
+  },
+
   // SSO Option
   ssoText: {
     color: Theme.colors.text.secondary,
     fontSize: 14,
     fontWeight: "500",
+    textAlign: "center",
+  },
+
+  // Loading Overlay
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: Theme.colors.text.inverse,
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: Theme.spacing.lg,
     textAlign: "center",
   },
 

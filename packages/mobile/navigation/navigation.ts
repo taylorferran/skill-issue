@@ -21,7 +21,9 @@ const pages = {
     path: "/(tabs)/(skills)/assessment" as const,
     params: z.object({
       skill: z.string(),
+      skillId: z.string().uuid().optional(),
       progress: z.number(),
+      isNewSkill: z.boolean().optional(),
     }),
   },
   quiz: {

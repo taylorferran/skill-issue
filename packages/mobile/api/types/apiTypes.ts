@@ -44,7 +44,7 @@ interface NoParams {
 interface WithParams<T extends z.Schema | null> {
   paramType: T extends z.Schema ? ParamType : never;
 }
-export type ParamType = "Path" | "Query" | "Body";
+export type ParamType = "Path" | "Query" | "Body" | "PathAndBody" | "PathAndQuery";
 
 export type BaseRequestOptions = {
   method: HttpMethod;

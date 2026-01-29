@@ -24,17 +24,20 @@ export function createAuthenticatedApiClient(
   });
 
   axiosInstance.interceptors.request.use(async (config) => {
-    if (authHandlers.isAuthenticated) {
-      try {
-        const token = await authHandlers.getAccessToken();
-        if (token) {
-          config.headers = config.headers || {};
-          config.headers['Authorization'] = `Bearer ${token}`;
-        }
-      } catch (error) {
-        console.error('Error getting access token:', error);
-      }
-    }
+    // try {
+    //   const token = await authHandlers.getAccessToken();
+    //   if (token) {
+    //     config.headers = config.headers || {};
+    //     config.headers['Authorization'] = `Bearer ${token}`;
+    //     console.log('[apiService] ✅ Authorization header added');
+    //   } else {
+    //     console.log('[apiService] ℹ️ No token available (user not authenticated)');
+    //   }
+    // } catch (error) {
+    //   console.error('[apiService] ❌ Error getting access token:', error);
+    // }
+    
+    // CRITICAL: Must return config, otherwise axios receives undefined
     return config;
   });
 

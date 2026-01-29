@@ -202,4 +202,31 @@ export const styles = StyleSheet.create({
     fontWeight: Theme.typography.fontWeight.medium,
     color: Theme.colors.text.secondary,
   },
+
+  // ============= LOADING & ERROR STATES =============
+  loadingContainer: {
+    ...flex.center,
+    padding: Theme.spacing["2xl"],
+    gap: Theme.spacing.md,
+  },
+  loadingText: {
+    ...createTextStyle("base", "medium", "secondary"),
+  },
+  errorContainer: {
+    ...flex.center,
+    padding: Theme.spacing["2xl"],
+    backgroundColor: Theme.colors.background.tertiary,
+    borderRadius: Theme.borderRadius.md,
+    margin: Theme.spacing.lg,
+  },
+  errorText: {
+    ...createTextStyle("base", "bold", "primary"),
+    textAlign: "center",
+    color: "#ef4444", // Red color for errors
+  },
+
+  // ============= DISABLED BUTTON STATE =============
+  addSkillButtonDisabled: {
+    opacity: 0.5,
+  },
 });

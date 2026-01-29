@@ -5,14 +5,7 @@ import { schedulerService } from '@/services/scheduler.service';
 import { opikService } from '@/lib/opik';
 import { apiKeyAuth } from '@/middleware/auth';
 import type { Database } from '@/types/database';
-import {
-  AnswerChallengeSchema,
-  CreateUserSchema,
-  UpdateUserSchema,
-  EnrollSkillSchema,
-  UpdateUserSkillSchema,
-} from '@learning-platform/shared/schemas';
-
+import { AnswerChallengeRequestSchema, CreateUserRequestSchema, EnrollSkillRequestSchema, UpdateUserRequestSchema, UpdateUserSkillRequestSchema } from '@shared/schemas';
 const router = express.Router();
 
 // Log all incoming requests for debugging
@@ -51,7 +44,7 @@ type UserSkillStateUpdate = Database['public']['Tables']['user_skill_state']['Up
 router.post('/answer', async (req: Request, res: Response) => {
   let traceId: string | undefined;
   try {
-    const validation = AnswerChallengeSchema.safeParse(req.body);
+    const validation = AnswerChallengeRequestSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
         error: 'Invalid request',
@@ -479,7 +472,7 @@ router.post('/users', async (req: Request, res: Response) => {
   console.log('[POST /users] Route handler called');
   console.log('[POST /users] Request body:', JSON.stringify(req.body));
   try {
-    const validation = CreateUserSchema.safeParse(req.body);
+    const validation = CreateUserRequestSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({
         error: 'Invalid request',
@@ -603,7 +596,7 @@ router.get('/users/:userId', async (req: Request, res: Response) => {
 router.put('/users/:userId', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const validation = UpdateUserSchema.safeParse(req.body);
+    const validation = UpdateUserRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
       return res.status(400).json({
@@ -670,7 +663,7 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
 router.post('/users/:userId/skills', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const validation = EnrollSkillSchema.safeParse(req.body);
+    const validation = EnrollSkillRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
       return res.status(400).json({
@@ -768,7 +761,7 @@ router.post('/users/:userId/skills', async (req: Request, res: Response) => {
 router.put('/users/:userId/skills/:skillId', async (req: Request, res: Response) => {
   try {
     const { userId, skillId } = req.params;
-    const validation = UpdateUserSkillSchema.safeParse(req.body);
+    const validation = UpdateUserSkillRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
       return res.status(400).json({

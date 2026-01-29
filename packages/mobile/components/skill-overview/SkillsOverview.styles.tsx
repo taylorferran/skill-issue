@@ -128,6 +128,47 @@ export const styles = StyleSheet.create({
     maxWidth: 200,
     marginTop: Theme.spacing["3xl"],
   },
+  
+  // Empty State
+  emptyProgressContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Theme.spacing["2xl"],
+  },
+  
+  emptyProgressText: {
+    ...createTextStyle("sm", "regular", "secondary"),
+    textAlign: "center",
+  },
+  
+  // Accuracy Card
+  accuracyCard: {
+    alignItems: "center",
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.success.light,
+    ...Theme.shadows.card,
+  },
+  
+  accuracyLabel: {
+    ...createTextStyle("xs", "bold", "secondary"),
+    letterSpacing: 1.6,
+    marginBottom: Theme.spacing.xs,
+  },
+  
+  accuracyValue: {
+    fontSize: 32,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.success.main,
+    marginBottom: Theme.spacing.xs,
+  },
+  
+  accuracySubtext: {
+    ...createTextStyle("xs", "regular", "secondary"),
+    textAlign: "center",
+  },
 
   // Pro Tip Card
   proTipCard: {
