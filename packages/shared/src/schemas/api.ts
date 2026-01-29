@@ -60,12 +60,12 @@ export const UpdateUserSkillRequestSchema = z.object({
 });
 
 /**
- * Response schema for deleting a user skill
+ * Request schema for deleting a user skill
  * DELETE /api/users/:userId/skills/:skillId
  */
-export const DeleteSkillResponseSchema = z.object({
-  success: z.boolean(),
-  message: z.string().optional(),
+export const DeleteSkillRequestSchema = z.object({
+  userId: z.string().uuid(),
+  skillId: z.string().uuid(),
 });
 
 /**
@@ -87,6 +87,15 @@ export const SendPushNotificationRequestSchema = z.object({
 export const HealthResponseSchema = z.object({
   status: z.string(),
   timestamp: z.string(),
+});
+
+/**
+ * Response schema for deleting a user skill
+ * DELETE /api/users/:userId/skills/:skillId
+ */
+export const DeleteSkillResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
 });
 
 /**
@@ -326,6 +335,7 @@ export type UpdateUserRequest = z.infer<typeof UpdateUserRequestSchema>;
 export type EnrollSkillRequest = z.infer<typeof EnrollSkillRequestSchema>;
 export type UpdateUserSkillRequest = z.infer<typeof UpdateUserSkillRequestSchema>;
 export type SendPushNotificationRequest = z.infer<typeof SendPushNotificationRequestSchema>;
+export type DeleteSkillRequest = z.infer<typeof DeleteSkillRequestSchema>;
 
 // Response types
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
