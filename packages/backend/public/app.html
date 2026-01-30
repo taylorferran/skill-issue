@@ -458,7 +458,35 @@
             background: #fee2e2;
             color: #991b1b;
         }
-        
+
+        /* Confidence Buttons */
+        .confidence-btn {
+            flex: 1;
+            padding: 12px 8px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .confidence-btn:hover {
+            border-color: var(--primary);
+            background: #f5f7ff;
+        }
+
+        .confidence-btn.selected {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Timer */
+        #answerTimer {
+            font-family: monospace;
+        }
+
         /* Results */
         .results {
             text-align: center;
@@ -817,16 +845,67 @@
 
             <!-- Challenges Page -->
             <div id="challengesPage" class="page">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">Pending Challenges</div>
-                        <button class="btn btn-primary" onclick="loadPendingChallenges()" style="width: auto; padding: 8px 16px;">Refresh</button>
+                <!-- Challenge Answer Modal -->
+                <div id="challengeAnswerModal" style="display: none;">
+                    <div class="quiz-container" style="margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <span class="badge badge-primary" id="answerSkillName">Skill Name</span>
+                            <span class="quiz-difficulty" id="answerDifficulty" style="margin: 0;">Difficulty: 5</span>
+                        </div>
+                        
+                        <div class="quiz-question" id="answerQuestionText">Question goes here...</div>
+                        
+                        <div class="quiz-options" id="answerOptions">
+                            <!-- Options will be inserted here -->
+                        </div>
+
+                        <!-- Feedback Section (shown after answering) -->
+                        <div id="answerFeedbackSection" style="display: none; margin-top: 24px; padding-top: 24px; border-top: 2px solid #e5e7eb;">
+                            <div class="feedback" id="answerFeedbackResult">
+                                <!-- Feedback content -->
+                            </div>
+                            
+                            <div style="margin-top: 16px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">How confident were you? (1-5)</label>
+                                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                                    <button type="button" class="confidence-btn" data-value="1" onclick="selectConfidence(1)">1 😰</button>
+                                    <button type="button" class="confidence-btn" data-value="2" onclick="selectConfidence(2)">2 😕</button>
+                                    <button type="button" class="confidence-btn" data-value="3" onclick="selectConfidence(3)">3 😐</button>
+                                    <button type="button" class="confidence-btn" data-value="4" onclick="selectConfidence(4)">4 🙂</button>
+                                    <button type="button" class="confidence-btn" data-value="5" onclick="selectConfidence(5)">5 😎</button>
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 16px;">
+                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Feedback (optional)</label>
+                                <textarea id="answerUserFeedback" rows="3" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; resize: vertical;" placeholder="Was this question clear? Too easy or hard? Let us know!"></textarea>
+                            </div>
+
+                            <button class="btn btn-primary" onclick="submitAnswerWithFeedback()" style="width: 100%;">
+                                Submit Feedback & Continue
+                            </button>
+                        </div>
+
+                        <!-- Timer (optional) -->
+                        <div id="answerTimer" style="margin-top: 16px; text-align: center; color: #6b7280; font-size: 14px;">
+                            Time: <span id="timerDisplay">0:00</span>
+                        </div>
                     </div>
-                    
-                    <div id="pendingChallengesList">
-                        <div class="loading">
-                            <div class="spinner"></div>
-                            Loading challenges...
+                </div>
+
+                <!-- Pending Challenges List -->
+                <div id="pendingChallengesSection">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Pending Challenges</div>
+                            <button class="btn btn-primary" onclick="loadPendingChallenges()" style="width: auto; padding: 8px 16px;">Refresh</button>
+                        </div>
+                        
+                        <div id="pendingChallengesList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading challenges...
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1416,38 +1495,176 @@
             }
         }
 
+        // Challenge Answer State
+        let currentChallenge = null;
+        let selectedAnswer = null;
+        let answerStartTime = null;
+        let answerTimerInterval = null;
+        let selectedConfidence = null;
+
         async function answerChallenge(challengeId) {
             try {
-                const challenge = await apiRequest(`/challenges/${challengeId}`);
+                currentChallenge = await apiRequest(`/challenges/${challengeId}`);
+                selectedAnswer = null;
+                selectedConfidence = null;
+                answerStartTime = Date.now();
                 
-                // Simple prompt-based answer for now
-                const answer = prompt(`${challenge.skillName} - Difficulty ${challenge.difficulty}/10\n\n${challenge.question}\n\nA: ${challenge.options[0]}\nB: ${challenge.options[1]}\nC: ${challenge.options[2]}\nD: ${challenge.options[3]}\n\nEnter your answer (A, B, C, or D):`);
+                // Show the answer modal
+                document.getElementById('pendingChallengesSection').style.display = 'none';
+                document.getElementById('challengeHistoryList').parentElement.style.display = 'none';
+                document.getElementById('challengeAnswerModal').style.display = 'block';
                 
-                if (!answer) return;
+                // Populate challenge data
+                document.getElementById('answerSkillName').textContent = currentChallenge.skillName;
+                document.getElementById('answerDifficulty').textContent = `Difficulty: ${currentChallenge.difficulty}/10`;
+                document.getElementById('answerQuestionText').textContent = currentChallenge.question;
                 
-                const optionMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3 };
-                const selectedOption = optionMap[answer];
+                // Create answer options
+                document.getElementById('answerOptions').innerHTML = currentChallenge.options.map((option, index) => `
+                    <button class="quiz-option" onclick="selectAnswer(${index})" data-index="${index}">
+                        <strong>${String.fromCharCode(65 + index)}.</strong> ${option}
+                    </button>
+                `).join('');
                 
-                if (selectedOption === undefined) {
-                    showToast('Invalid answer. Please enter A, B, C, or D.', 'error');
-                    return;
-                }
+                // Reset feedback section
+                document.getElementById('answerFeedbackSection').style.display = 'none';
+                document.getElementById('answerUserFeedback').value = '';
+                document.querySelectorAll('.confidence-btn').forEach(btn => btn.classList.remove('selected'));
                 
-                const result = await apiRequest('/answer', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        challengeId,
-                        userId: state.user.id,
-                        selectedOption
-                    })
-                });
+                // Start timer
+                startAnswerTimer();
                 
-                showToast(result.isCorrect ? '✅ Correct!' : '❌ Incorrect', result.isCorrect ? 'success' : 'error');
-                loadPendingChallenges();
-                loadChallengeHistory();
             } catch (error) {
                 showToast(error.message, 'error');
             }
+        }
+
+        function startAnswerTimer() {
+            const timerDisplay = document.getElementById('timerDisplay');
+            answerTimerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - answerStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        function stopAnswerTimer() {
+            if (answerTimerInterval) {
+                clearInterval(answerTimerInterval);
+                answerTimerInterval = null;
+            }
+        }
+
+        function selectAnswer(index) {
+            if (selectedAnswer !== null) return; // Already answered
+            
+            selectedAnswer = index;
+            
+            // Disable all options
+            document.querySelectorAll('#answerOptions .quiz-option').forEach(btn => {
+                btn.disabled = true;
+            });
+            
+            // Highlight selected
+            document.querySelector(`#answerOptions .quiz-option[data-index="${index}"]`).classList.add('selected');
+            
+            // Submit answer immediately to check correctness
+            submitAnswer();
+        }
+
+        async function submitAnswer() {
+            stopAnswerTimer();
+            
+            const responseTime = Date.now() - answerStartTime;
+            
+            try {
+                const result = await apiRequest('/answer', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        challengeId: currentChallenge.id,
+                        userId: state.user.id,
+                        selectedOption: selectedAnswer,
+                        responseTime: responseTime
+                    })
+                });
+                
+                // Show feedback
+                const feedbackSection = document.getElementById('answerFeedbackSection');
+                const feedbackResult = document.getElementById('answerFeedbackResult');
+                
+                feedbackSection.style.display = 'block';
+                feedbackResult.className = `feedback ${result.isCorrect ? 'correct' : 'incorrect'}`;
+                feedbackResult.innerHTML = `
+                    <strong>${result.isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
+                    ${result.explanation || ''}
+                `;
+                
+                // Highlight correct/incorrect options
+                document.querySelectorAll('#answerOptions .quiz-option').forEach((btn, idx) => {
+                    if (idx === result.correctOption) {
+                        btn.classList.add('correct');
+                    } else if (idx === selectedAnswer && !result.isCorrect) {
+                        btn.classList.add('incorrect');
+                    }
+                });
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function selectConfidence(value) {
+            selectedConfidence = value;
+            document.querySelectorAll('.confidence-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                if (parseInt(btn.dataset.value) === value) {
+                    btn.classList.add('selected');
+                }
+            });
+        }
+
+        async function submitAnswerWithFeedback() {
+            const feedback = document.getElementById('answerUserFeedback').value;
+            
+            // If they haven't selected confidence, default to 3
+            const confidence = selectedConfidence || 3;
+            
+            try {
+                // Submit updated answer with feedback and confidence
+                await apiRequest('/answer', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        challengeId: currentChallenge.id,
+                        userId: state.user.id,
+                        selectedOption: selectedAnswer,
+                        responseTime: Date.now() - answerStartTime,
+                        confidence: confidence,
+                        userFeedback: feedback
+                    })
+                });
+                
+                showToast('Answer submitted with feedback!', 'success');
+                
+                // Reset and go back to list
+                closeAnswerModal();
+                loadPendingChallenges();
+                loadChallengeHistory();
+                
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function closeAnswerModal() {
+            document.getElementById('challengeAnswerModal').style.display = 'none';
+            document.getElementById('pendingChallengesSection').style.display = 'block';
+            document.getElementById('challengeHistoryList').parentElement.style.display = 'block';
+            
+            stopAnswerTimer();
+            currentChallenge = null;
+            selectedAnswer = null;
+            selectedConfidence = null;
         }
 
         // Initialize
