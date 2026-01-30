@@ -893,9 +893,10 @@
 
         // Utility Functions
         function getHeaders() {
+            const apiKey = state.apiKey || localStorage.getItem('skillIssueApiKey');
             return {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${state.apiKey}`
+                'Authorization': `Bearer ${apiKey || ''}`
             };
         }
 
@@ -955,11 +956,13 @@
             const userId = document.getElementById('loginUserId').value;
             const apiKey = document.getElementById('loginApiKey').value;
             
+            // Set API key in state before making request
+            state.apiKey = apiKey;
+            
             try {
-                const user = await apiRequest(`/users/${userId}`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+                const user = await apiRequest(`/users/${userId}`);
                 
                 state.user = user;
-                state.apiKey = apiKey;
                 
                 localStorage.setItem('skillIssueUser', JSON.stringify(user));
                 localStorage.setItem('skillIssueApiKey', apiKey);
@@ -977,15 +980,16 @@
             const timezone = document.getElementById('createTimezone').value;
             const maxChallenges = parseInt(document.getElementById('createMaxChallenges').value);
             
+            // Set API key in state before making request
+            state.apiKey = apiKey;
+            
             try {
                 const user = await apiRequest('/users', {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${apiKey}` },
                     body: JSON.stringify({ timezone, maxChallengesPerDay: maxChallenges })
                 });
                 
                 state.user = user;
-                state.apiKey = apiKey;
                 
                 localStorage.setItem('skillIssueUser', JSON.stringify(user));
                 localStorage.setItem('skillIssueApiKey', apiKey);
@@ -1475,6 +1479,9 @@
                     initApp();
                 } catch (e) {
                     console.error('Failed to restore session:', e);
+                    // Clear invalid session data
+                    localStorage.removeItem('skillIssueUser');
+                    localStorage.removeItem('skillIssueApiKey');
                 }
             }
         };
