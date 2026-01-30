@@ -1,8 +1,10 @@
 import { getSupabase } from '@/lib/supabase';
 import { createLLMProvider, AnthropicProvider } from '@/lib/llm-provider';
 import { opikService } from '@/lib/opik';
+import { getEvaluator, isEvaluationEnabled } from '@/lib/evaluator';
 import { CHALLENGE_PROMPT_EXPERIMENT } from '@/config/ab-tests';
-import type { SchedulingDecision, Challenge, GeneratedChallenge } from '@/types';
+import { EVALUATION_CONFIG } from '@/config/evaluation';
+import type { SchedulingDecision, Challenge, GeneratedChallenge, ChallengeEvaluation } from '@/types';
 import type { Database } from '@/types/database';
 
 type SkillRow = Database['public']['Tables']['skills']['Row'];
@@ -132,6 +134,84 @@ export class ChallengeDesignAgent {
         return null;
       }
 
+      // LLM-as-Judge Evaluation (quality gate)
+      let evaluation: ChallengeEvaluation | null = null;
+      if (isEvaluationEnabled()) {
+        console.log('[Agent 2] Running LLM-as-Judge evaluation...');
+        const evaluator = getEvaluator();
+
+        evaluation = await evaluator.evaluate({
+          challenge: generatedChallenge,
+          skillName: skill.name,
+          skillDescription: skill.description,
+          targetDifficulty: decision.difficultyTarget,
+        });
+
+        // Track evaluation as an LLM span
+        if (traceId) {
+          await opikService.createSpan({
+            traceId,
+            name: 'llm_judge_evaluation',
+            type: 'llm',
+            model: EVALUATION_CONFIG.model,
+            provider: 'anthropic',
+            input: {
+              challenge: {
+                question: generatedChallenge.question,
+                options: generatedChallenge.options,
+                correctAnswerIndex: generatedChallenge.correctAnswerIndex,
+              },
+              targetDifficulty: decision.difficultyTarget,
+            },
+            output: {
+              scores: evaluation.scores,
+              reasons: evaluation.reasons,
+              compositeScore: evaluation.compositeScore,
+              passed: evaluation.passed,
+            },
+            promptTokens: evaluation.usage.inputTokens,
+            completionTokens: evaluation.usage.outputTokens,
+            durationMs: evaluation.durationMs,
+          });
+
+          // Add individual feedback scores with per-dimension LLM reasoning
+          await opikService.addFeedbackScores(traceId, [
+            { name: 'judge_clarity', value: evaluation.scores.clarity, reason: evaluation.reasons.clarity },
+            { name: 'judge_difficulty', value: evaluation.scores.difficultyAlignment, reason: evaluation.reasons.difficultyAlignment },
+            { name: 'judge_distractors', value: evaluation.scores.distractorQuality, reason: evaluation.reasons.distractorQuality },
+            { name: 'judge_educational', value: evaluation.scores.educationalValue, reason: evaluation.reasons.educationalValue },
+            { name: 'judge_relevance', value: evaluation.scores.skillRelevance, reason: evaluation.reasons.skillRelevance },
+            { name: 'judge_composite', value: evaluation.compositeScore, reason: evaluation.reasons.overall },
+          ], 'online_scoring');
+        }
+
+        // Quality gate: reject low-quality challenges
+        if (!evaluation.passed) {
+          console.warn(`[Agent 2] Challenge rejected by LLM judge: score=${evaluation.compositeScore.toFixed(2)}, threshold=${EVALUATION_CONFIG.qualityThreshold}`);
+          console.warn(`[Agent 2] Reasoning: ${evaluation.reasons.overall}`);
+
+          await opikService.trackAgentExecution({
+            agentName: 'challenge_design',
+            input: { decision, skill },
+            output: {
+              error: 'Quality gate failed',
+              evaluation: {
+                compositeScore: evaluation.compositeScore,
+                threshold: EVALUATION_CONFIG.qualityThreshold,
+                reasons: evaluation.reasons,
+              },
+            },
+            durationMs: Date.now() - startTime,
+            success: false,
+            traceId,
+          });
+
+          return null;
+        }
+
+        console.log(`[Agent 2] Challenge passed quality gate: score=${evaluation.compositeScore.toFixed(2)}`);
+      }
+
       // Store challenge in database
       const insertData: ChallengeInsert = {
         skill_id: decision.skillId,
@@ -209,15 +289,25 @@ export class ChallengeDesignAgent {
               ...selectedVariant.metadata,
             },
           }),
+          ...(evaluation && {
+            evaluation: {
+              compositeScore: evaluation.compositeScore,
+              scores: evaluation.scores,
+              passed: evaluation.passed,
+            },
+          }),
         },
-        llmCalls: [{
-          model: 'claude-haiku-4-5-20251001',
-          prompt: actualPrompt,
-          response: rawResponse,
-          promptTokens: usage.inputTokens,
-          completionTokens: usage.outputTokens,
-          durationMs: llmDuration,
-        }],
+        llmCalls: [
+          {
+            model: 'claude-haiku-4-5-20251001',
+            prompt: actualPrompt,
+            response: rawResponse,
+            promptTokens: usage.inputTokens,
+            completionTokens: usage.outputTokens,
+            durationMs: llmDuration,
+          },
+          // Note: Evaluation LLM call is tracked separately via llm_judge_evaluation span
+        ],
       });
 
       // Convert database row to Challenge type
