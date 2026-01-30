@@ -34,7 +34,7 @@ CREATE TABLE user_skill_state (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
-  difficulty_target INT NOT NULL DEFAULT 2 CHECK (difficulty_target >= 1 AND difficulty_target <= 10),
+  difficulty_target INT NOT NULL DEFAULT 0 CHECK (difficulty_target >= 0 AND difficulty_target <= 10),
   streak_correct INT NOT NULL DEFAULT 0,
   streak_incorrect INT NOT NULL DEFAULT 0,
   attempts_total INT NOT NULL DEFAULT 0,
@@ -104,6 +104,54 @@ CREATE TABLE scheduling_log (
 );
 
 -- ============================================================================
+-- CALIBRATION_QUESTIONS TABLE (shared questions for calibration)
+-- ============================================================================
+CREATE TABLE calibration_questions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  difficulty INT NOT NULL CHECK (difficulty >= 1 AND difficulty <= 10),
+  question TEXT NOT NULL,
+  options_json JSONB NOT NULL,
+  correct_option INT NOT NULL CHECK (correct_option >= 0 AND correct_option <= 3),
+  explanation TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(skill_id, difficulty)
+);
+
+-- ============================================================================
+-- USER_CALIBRATION_STATE TABLE (tracks user's calibration progress)
+-- ============================================================================
+CREATE TABLE user_calibration_state (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  questions_generated_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  calculated_difficulty_target INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, skill_id)
+);
+
+-- ============================================================================
+-- USER_CALIBRATION_ANSWERS TABLE (stores answers during calibration)
+-- ============================================================================
+CREATE TABLE user_calibration_answers (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+  difficulty INT NOT NULL CHECK (difficulty >= 1 AND difficulty <= 10),
+  question TEXT NOT NULL,
+  options_json JSONB NOT NULL,
+  selected_option INT NOT NULL CHECK (selected_option >= 0 AND selected_option <= 3),
+  correct_option INT NOT NULL CHECK (correct_option >= 0 AND correct_option <= 3),
+  is_correct BOOLEAN NOT NULL,
+  explanation TEXT,
+  answered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================================
 -- INDEXES
 -- ============================================================================
 CREATE INDEX idx_user_skill_state_user_id ON user_skill_state(user_id);
@@ -117,6 +165,11 @@ CREATE INDEX idx_answers_answered_at ON answers(answered_at);
 CREATE INDEX idx_push_events_challenge_id ON push_events(challenge_id);
 CREATE INDEX idx_push_events_sent_at ON push_events(sent_at);
 CREATE INDEX idx_scheduling_log_created_at ON scheduling_log(created_at);
+CREATE INDEX idx_calibration_questions_skill_id ON calibration_questions(skill_id);
+CREATE INDEX idx_user_calibration_state_user_id ON user_calibration_state(user_id);
+CREATE INDEX idx_user_calibration_state_skill_id ON user_calibration_state(skill_id);
+CREATE INDEX idx_user_calibration_answers_user_id ON user_calibration_answers(user_id);
+CREATE INDEX idx_user_calibration_answers_skill_id ON user_calibration_answers(skill_id);
 
 -- ============================================================================
 -- TRIGGERS
@@ -131,5 +184,10 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_user_skill_state_updated_at
   BEFORE UPDATE ON user_skill_state
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_calibration_state_updated_at
+  BEFORE UPDATE ON user_calibration_state
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();

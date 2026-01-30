@@ -91,7 +91,6 @@ export interface ChallengeDesignRequest {
   skillName?: string;
   skillDescription?: string;
   difficulty: number;
-  userId: string;
   customTemplate?: string;
 }
 
@@ -118,6 +117,11 @@ export interface GeneratedChallengeWithUsage {
 
 export interface LLMProvider {
   generateChallenge(request: ChallengeDesignRequest): Promise<GeneratedChallengeWithUsage>;
+  generateSkillDescription(skillName: string): Promise<{
+    description: string;
+    isVague: boolean;
+    message: string;
+  }>;
 }
 
 export interface GeneratedChallenge {

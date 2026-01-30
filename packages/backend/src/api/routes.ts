@@ -5,7 +5,18 @@ import { schedulerService } from '@/services/scheduler.service';
 import { opikService } from '@/lib/opik';
 import { apiKeyAuth } from '@/middleware/auth';
 import type { Database } from '@/types/database';
-import { AnswerChallengeRequestSchema, CreateUserRequestSchema, EnrollSkillRequestSchema, UpdateUserRequestSchema, UpdateUserSkillRequestSchema } from '@shared/schemas';
+import {
+  AnswerChallengeRequestSchema,
+  CreateUserRequestSchema,
+  EnrollSkillRequestSchema,
+  UpdateUserRequestSchema,
+  UpdateUserSkillRequestSchema,
+  GenerateSkillDescriptionRequestSchema,
+  CreateSkillRequestSchema,
+  SubmitCalibrationAnswerRequestSchema,
+} from '@shared/schemas';
+import { calibrationService } from '@/services/calibration.service';
+import { createLLMProvider } from '@/lib/llm-provider';
 const router = express.Router();
 
 // Log all incoming requests for debugging
@@ -349,19 +360,37 @@ router.get('/users/:userId/skills', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to load user skills' });
     }
 
-    const formatted = (userSkills || []).map((us: any) => ({
-      skillId: us.skill_id,
-      skillName: us.skills.name,
-      skillDescription: us.skills.description,
-      difficultyTarget: us.difficulty_target,
-      attemptsTotal: us.attempts_total,
-      correctTotal: us.correct_total,
-      accuracy: us.attempts_total > 0 ? us.correct_total / us.attempts_total : 0,
-      streakCorrect: us.streak_correct,
-      streakIncorrect: us.streak_incorrect,
-      lastChallengedAt: us.last_challenged_at,
-      lastResult: us.last_result,
-    }));
+    // Get calibration states for all skills
+    const skillIds = (userSkills || []).map((us: any) => us.skill_id);
+    const { data: calibrationStates } = await supabase
+      .from('user_calibration_state')
+      .select('skill_id, status')
+      .eq('user_id', userId)
+      .in('skill_id', skillIds);
+
+    const calibrationStatusMap = new Map(
+      (calibrationStates || []).map((cs: any) => [cs.skill_id, cs.status])
+    );
+
+    const formatted = (userSkills || []).map((us: any) => {
+      const needsCalibration = us.difficulty_target === 0 || 
+        calibrationStatusMap.get(us.skill_id) !== 'completed';
+
+      return {
+        skillId: us.skill_id,
+        skillName: us.skills.name,
+        skillDescription: us.skills.description,
+        difficultyTarget: us.difficulty_target,
+        attemptsTotal: us.attempts_total,
+        correctTotal: us.correct_total,
+        accuracy: us.attempts_total > 0 ? us.correct_total / us.attempts_total : 0,
+        streakCorrect: us.streak_correct,
+        streakIncorrect: us.streak_incorrect,
+        lastChallengedAt: us.last_challenged_at,
+        lastResult: us.last_result,
+        needsCalibration,
+      };
+    });
 
     res.json(formatted);
   } catch (error) {
@@ -948,6 +977,332 @@ router.post('/scheduler/tick', async (_req: Request, res: Response) => {
       error: 'Failed to run scheduling tick',
       message: error instanceof Error ? error.message : String(error),
     });
+  }
+});
+
+// ============================================================================
+// SKILL CALIBRATION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/skills/generate-description
+ * Generate a skill description from a skill name using LLM
+ */
+router.post('/skills/generate-description', async (req: Request, res: Response) => {
+  try {
+    const validation = GenerateSkillDescriptionRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: validation.error.errors,
+      });
+    }
+
+    const { skillName } = validation.data;
+    const llmProvider = createLLMProvider();
+
+    const result = await llmProvider.generateSkillDescription(skillName);
+
+    res.json({
+      skillName,
+      description: result.description,
+      isVague: result.isVague,
+      message: result.message,
+    });
+  } catch (error) {
+    console.error('Generate skill description error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/skills
+ * Create a new skill
+ */
+router.post('/skills', async (req: Request, res: Response) => {
+  try {
+    const validation = CreateSkillRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: validation.error.errors,
+      });
+    }
+
+    const { name, description } = validation.data;
+    const supabase = getSupabase();
+
+    // Check if skill with this name already exists
+    const { data: existingSkill } = await supabase
+      .from('skills')
+      .select('id')
+      .eq('name', name)
+      .single();
+
+    if (existingSkill) {
+      return res.status(409).json({ error: 'Skill with this name already exists' });
+    }
+
+    const { data: skill, error } = await supabase
+      .from('skills')
+      // @ts-expect-error - Supabase type inference issue
+      .insert({
+        name,
+        description,
+        active: true,
+      })
+      .select()
+      .single();
+
+    if (error || !skill) {
+      console.error('Failed to create skill:', error);
+      return res.status(500).json({ error: 'Failed to create skill' });
+    }
+
+    const skillData = skill as any;
+    res.status(201).json({
+      id: skillData.id,
+      name: skillData.name,
+      description: skillData.description,
+      active: skillData.active,
+      createdAt: skillData.created_at,
+    });
+  } catch (error) {
+    console.error('Create skill error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/skills/:skillId/calibration/generate
+ * Generate 10 calibration questions for a skill (difficulties 1-10)
+ */
+router.post('/skills/:skillId/calibration/generate', async (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.params;
+    const supabase = getSupabase();
+
+    // Check if skill exists
+    const { data: skill } = await supabase
+      .from('skills')
+      .select('id, name')
+      .eq('id', skillId)
+      .single();
+
+    if (!skill) {
+      return res.status(404).json({ error: 'Skill not found' });
+    }
+
+    const skillData = skill as any;
+
+    // Generate calibration questions
+    const result = await calibrationService.generateCalibrationQuestions(skillId);
+
+    res.json({
+      skillId,
+      skillName: skillData.name,
+      status: result.status,
+      questionsCount: result.questions.length,
+      message: result.status === 'already_exists'
+        ? 'Calibration questions already exist for this skill'
+        : 'Calibration questions generated successfully',
+    });
+  } catch (error) {
+    console.error('Generate calibration questions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/users/:userId/skills/:skillId/calibration/start
+ * Start calibration for a user
+ */
+router.post('/users/:userId/skills/:skillId/calibration/start', async (req: Request, res: Response) => {
+  try {
+    const { userId, skillId } = req.params;
+    const supabase = getSupabase();
+
+    // Check if user exists
+    const { data: user } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single();
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if skill exists
+    const { data: skill } = await supabase
+      .from('skills')
+      .select('id, name')
+      .eq('id', skillId)
+      .single();
+
+    if (!skill) {
+      return res.status(404).json({ error: 'Skill not found' });
+    }
+
+    const skillData = skill as any;
+
+    // Start calibration
+    const result = await calibrationService.startCalibration(userId, skillId);
+
+    res.json({
+      userId,
+      skillId,
+      skillName: skillData.name,
+      status: result.status,
+      questions: result.questions,
+      message: result.status === 'ready'
+        ? 'Calibration ready. Answer all 10 questions to determine your starting difficulty.'
+        : result.status === 'completed'
+        ? 'Calibration already completed for this skill.'
+        : 'Calibration questions are still being generated. Please try again in a moment.',
+    });
+  } catch (error) {
+    console.error('Start calibration error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/users/:userId/skills/:skillId/calibration/answer
+ * Submit a calibration answer
+ */
+router.post('/users/:userId/skills/:skillId/calibration/answer', async (req: Request, res: Response) => {
+  try {
+    const { userId, skillId } = req.params;
+    const validation = SubmitCalibrationAnswerRequestSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        details: validation.error.errors,
+      });
+    }
+
+    const { difficulty, selectedOption } = validation.data;
+
+    // Submit answer
+    const result = await calibrationService.submitCalibrationAnswer(
+      userId,
+      skillId,
+      difficulty,
+      selectedOption
+    );
+
+    res.json({
+      isCorrect: result.isCorrect,
+      correctOption: result.correctOption,
+      explanation: result.explanation,
+      progress: result.progress,
+    });
+  } catch (error) {
+    console.error('Submit calibration answer error:', error);
+    if (error instanceof Error && error.message.includes('Already answered')) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error instanceof Error && error.message.includes('not found')) {
+      return res.status(404).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * POST /api/users/:userId/skills/:skillId/calibration/complete
+ * Complete calibration and calculate difficulty target
+ */
+router.post('/users/:userId/skills/:skillId/calibration/complete', async (req: Request, res: Response) => {
+  try {
+    const { userId, skillId } = req.params;
+    const supabase = getSupabase();
+
+    // Get skill name
+    const { data: skill } = await supabase
+      .from('skills')
+      .select('name')
+      .eq('id', skillId)
+      .single();
+
+    const skillData = skill as any;
+
+    // Complete calibration
+    const result = await calibrationService.completeCalibration(userId, skillId);
+
+    res.json({
+      userId,
+      skillId,
+      skillName: skillData?.name || 'Unknown Skill',
+      difficultyTarget: result.calculatedDifficultyTarget,
+      calibrationResults: {
+        totalAnswered: result.totalAnswered,
+        totalCorrect: result.totalCorrect,
+        accuracy: Math.round(result.accuracy * 100) / 100,
+        averageCorrectDifficulty: Math.round(result.averageCorrectDifficulty * 100) / 100,
+      },
+      message: `Calibration complete! Your starting difficulty is ${result.calculatedDifficultyTarget}/10.`,
+    });
+  } catch (error) {
+    console.error('Complete calibration error:', error);
+    if (error instanceof Error && error.message.includes('No calibration answers')) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/users/:userId/skills/:skillId/calibration/status
+ * Get calibration status for a user-skill pair
+ */
+router.get('/users/:userId/skills/:skillId/calibration/status', async (req: Request, res: Response) => {
+  try {
+    const { userId, skillId } = req.params;
+    const supabase = getSupabase();
+
+    // Get calibration state
+    const { data: calibrationState } = await supabase
+      .from('user_calibration_state')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('skill_id', skillId)
+      .single();
+
+    const calibrationStateData = calibrationState as any;
+
+    // Get progress if in progress
+    let progress = null;
+    if (calibrationStateData?.status === 'in_progress') {
+      const { data: answers } = await supabase
+        .from('user_calibration_answers')
+        .select('difficulty, is_correct')
+        .eq('user_id', userId)
+        .eq('skill_id', skillId);
+
+      const answersData = answers as any[];
+
+      progress = {
+        answered: answersData?.length || 0,
+        total: 10,
+        correct: answersData?.filter(a => a.is_correct).length || 0,
+      };
+    }
+
+    res.json({
+      userId,
+      skillId,
+      status: calibrationStateData?.status || 'pending',
+      questionsGeneratedAt: calibrationStateData?.questions_generated_at,
+      completedAt: calibrationStateData?.completed_at,
+      calculatedDifficultyTarget: calibrationStateData?.calculated_difficulty_target,
+      progress,
+    });
+  } catch (error) {
+    console.error('Get calibration status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
