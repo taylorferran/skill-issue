@@ -222,3 +222,37 @@ export interface LLMResponse<T> {
     outputTokens: number;
   };
 }
+
+// ============= LLM-as-Judge Evaluation Types =============
+export interface EvaluationScores {
+  clarity: number;           // 0-1: Is the question unambiguous?
+  difficultyAlignment: number; // 0-1: Does difficulty match target?
+  distractorQuality: number; // 0-1: Are wrong options plausible but incorrect?
+  educationalValue: number;  // 0-1: Does explanation teach effectively?
+  skillRelevance: number;    // 0-1: Does it test the stated skill?
+}
+
+export interface EvaluationReasons {
+  clarity: string;
+  difficultyAlignment: string;
+  distractorQuality: string;
+  educationalValue: string;
+  skillRelevance: string;
+  overall: string;           // Overall summary
+}
+
+export interface ChallengeEvaluation {
+  scores: EvaluationScores;
+  reasons: EvaluationReasons; // Per-dimension reasoning from LLM
+  compositeScore: number;    // Weighted average of all scores
+  passed: boolean;           // Whether it meets quality threshold
+  usage: LLMUsage;           // Token usage for the evaluation call
+  durationMs: number;        // How long the evaluation took
+}
+
+export interface EvaluationRequest {
+  challenge: GeneratedChallenge;
+  skillName: string;
+  skillDescription: string;
+  targetDifficulty: number;
+}

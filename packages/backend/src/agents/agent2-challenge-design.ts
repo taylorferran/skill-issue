@@ -1,8 +1,11 @@
+import { randomUUID } from 'crypto';
 import { getSupabase } from '@/lib/supabase';
 import { createLLMProvider, AnthropicProvider } from '@/lib/llm-provider';
 import { opikService } from '@/lib/opik';
+import { getEvaluator, isEvaluationEnabled } from '@/lib/evaluator';
 import { CHALLENGE_PROMPT_EXPERIMENT } from '@/config/ab-tests';
-import type { SchedulingDecision, Challenge, GeneratedChallenge } from '@/types';
+import { EVALUATION_CONFIG } from '@/config/evaluation';
+import type { SchedulingDecision, Challenge, GeneratedChallenge, ChallengeEvaluation } from '@/types';
 import type { Database } from '@/types/database';
 
 type SkillRow = Database['public']['Tables']['skills']['Row'];
@@ -29,28 +32,62 @@ interface ValidationResult {
   errors: string[];
 }
 
+interface ChallengeResult {
+  challenge: Challenge;
+  traceId: string;
+}
+
 export class ChallengeDesignAgent {
   private llmProvider = createLLMProvider();
 
   /**
-   * Design and create a challenge based on scheduling decision
+   * Design and create a challenge based on scheduling decision.
+   * Creates its own trace for this challenge generation.
+   *
+   * @param decision - The scheduling decision from Agent 1
+   * @param tickTraceId - Optional trace ID from the scheduling tick (for linking)
+   * @returns Challenge with its generation trace ID, or null if failed
    */
-  async designChallenge(decision: SchedulingDecision, traceId?: string): Promise<Challenge | null> {
+  async designChallenge(decision: SchedulingDecision, tickTraceId?: string): Promise<ChallengeResult | null> {
     const startTime = Date.now();
     const supabase = getSupabase();
 
+    // Generate challenge ID upfront so we can use it in trace tags
+    const challengeId = randomUUID();
+
+    // Load skill details first so we can include skill name in tags
+    const { data: skill, error: skillError } = await supabase
+      .from('skills')
+      .select('*')
+      .eq('id', decision.skillId)
+      .single<SkillRow>();
+
+    if (skillError || !skill) {
+      console.error(`[Agent 2] Skill not found: ${decision.skillId}`);
+      return null;
+    }
+
+    // Create our own root trace for this challenge generation
+    const traceId = await opikService.startTrace({
+      name: 'challenge_generation',
+      input: {
+        challengeId,
+        userId: decision.userId,
+        skillId: decision.skillId,
+        skillName: skill.name,
+        targetDifficulty: decision.difficultyTarget,
+      },
+      metadata: {
+        tickTraceId, // Link back to scheduling tick
+      },
+      tags: [
+        `challenge:${challengeId}`,
+        `skill:${skill.name}`,
+        `difficulty:${decision.difficultyTarget}`,
+      ],
+    });
+
     try {
-      // Load skill details
-      const { data: skill, error: skillError } = await supabase
-        .from('skills')
-        .select('*')
-        .eq('id', decision.skillId)
-        .single<SkillRow>();
-
-      if (skillError || !skill) {
-        throw new Error(`Skill not found: ${decision.skillId}`);
-      }
-
       console.log(`[Agent 2] Designing ${skill.name} challenge at difficulty ${decision.difficultyTarget}`);
 
       // A/B Testing: Select prompt variant if experiment is enabled
@@ -106,34 +143,101 @@ export class ChallengeDesignAgent {
       const validation = this.validateChallenge(generatedChallenge);
 
       // Track validation step as a span
-      if (traceId) {
-        await opikService.createSpan({
-          traceId,
-          name: 'validate_challenge',
-          type: 'general',
-          input: { question: generatedChallenge.question, optionCount: generatedChallenge.options?.length },
-          output: { isValid: validation.isValid, errors: validation.errors },
-        });
-      }
+      await opikService.createSpan({
+        traceId,
+        name: 'validate_challenge',
+        type: 'general',
+        input: { question: generatedChallenge.question, optionCount: generatedChallenge.options?.length },
+        output: { isValid: validation.isValid, errors: validation.errors },
+      });
 
       if (!validation.isValid) {
         console.error('[Agent 2] Invalid challenge generated:', validation.errors);
 
-        // Track failure
-        await opikService.trackAgentExecution({
-          agentName: 'challenge_design',
-          input: { decision, skill },
-          output: { error: 'Validation failed', errors: validation.errors },
-          durationMs: Date.now() - startTime,
-          success: false,
+        // End trace with failure
+        await opikService.endTrace({
           traceId,
+          output: { error: 'Validation failed', errors: validation.errors },
+          error: new Error('Validation failed'),
         });
 
         return null;
       }
 
+      // LLM-as-Judge Evaluation (quality gate)
+      let evaluation: ChallengeEvaluation | null = null;
+      if (isEvaluationEnabled()) {
+        console.log('[Agent 2] Running LLM-as-Judge evaluation...');
+        const evaluator = getEvaluator();
+
+        evaluation = await evaluator.evaluate({
+          challenge: generatedChallenge,
+          skillName: skill.name,
+          skillDescription: skill.description,
+          targetDifficulty: decision.difficultyTarget,
+        });
+
+        // Track evaluation as an LLM span
+        await opikService.createSpan({
+          traceId,
+          name: 'llm_judge_evaluation',
+          type: 'llm',
+          model: EVALUATION_CONFIG.model,
+          provider: 'anthropic',
+          input: {
+            challenge: {
+              question: generatedChallenge.question,
+              options: generatedChallenge.options,
+              correctAnswerIndex: generatedChallenge.correctAnswerIndex,
+            },
+            targetDifficulty: decision.difficultyTarget,
+          },
+          output: {
+            scores: evaluation.scores,
+            reasons: evaluation.reasons,
+            compositeScore: evaluation.compositeScore,
+            passed: evaluation.passed,
+          },
+          promptTokens: evaluation.usage.inputTokens,
+          completionTokens: evaluation.usage.outputTokens,
+          durationMs: evaluation.durationMs,
+        });
+
+        // Add individual feedback scores with per-dimension LLM reasoning
+        await opikService.addFeedbackScores(traceId, [
+          { name: 'judge_clarity', value: evaluation.scores.clarity, reason: evaluation.reasons.clarity },
+          { name: 'judge_difficulty', value: evaluation.scores.difficultyAlignment, reason: evaluation.reasons.difficultyAlignment },
+          { name: 'judge_distractors', value: evaluation.scores.distractorQuality, reason: evaluation.reasons.distractorQuality },
+          { name: 'judge_educational', value: evaluation.scores.educationalValue, reason: evaluation.reasons.educationalValue },
+          { name: 'judge_relevance', value: evaluation.scores.skillRelevance, reason: evaluation.reasons.skillRelevance },
+          { name: 'judge_composite', value: evaluation.compositeScore, reason: evaluation.reasons.overall },
+        ], 'online_scoring');
+
+        // Quality gate: reject low-quality challenges
+        if (!evaluation.passed) {
+          console.warn(`[Agent 2] Challenge rejected by LLM judge: score=${evaluation.compositeScore.toFixed(2)}, threshold=${EVALUATION_CONFIG.qualityThreshold}`);
+          console.warn(`[Agent 2] Reasoning: ${evaluation.reasons.overall}`);
+
+          // End trace with failure
+          await opikService.endTrace({
+            traceId,
+            output: {
+              error: 'Quality gate failed',
+              compositeScore: evaluation.compositeScore,
+              threshold: EVALUATION_CONFIG.qualityThreshold,
+            },
+            error: new Error('Quality gate failed'),
+          });
+
+          return null;
+        }
+
+        console.log(`[Agent 2] Challenge passed quality gate: score=${evaluation.compositeScore.toFixed(2)}`);
+      }
+
       // Store challenge in database
       const insertData: ChallengeInsert = {
+        id: challengeId, // Use our pre-generated ID for trace linking
         skill_id: decision.skillId,
         user_id: decision.userId,
         difficulty: decision.difficultyTarget,
@@ -179,59 +283,49 @@ export class ChallengeDesignAgent {
         .eq('user_id', decision.userId)
         .eq('skill_id', decision.skillId);
 
-      // Track successful execution with nested LLM span
-      await opikService.trackAgentExecution({
-        agentName: 'challenge_design',
-        input: {
-          decision,
-          skill,
-        },
-        output: {
-          challengeId: challenge.id,
-          generatedChallenge: {
-            question: generatedChallenge.question,
-            options: generatedChallenge.options,
-            correctAnswerIndex: generatedChallenge.correctAnswerIndex,
-            explanation: generatedChallenge.explanation,
-          },
-        },
-        durationMs: Date.now() - startTime,
-        success: true,
+      // Create LLM generation span
+      await opikService.createSpan({
         traceId,
-        metadata: {
-          actualDifficulty: generatedChallenge.actualDifficulty,
-          targetDifficulty: decision.difficultyTarget,
-          promptVersion: promptVersion.commit,
-          ...(selectedVariant && {
-            abTest: {
-              experiment: CHALLENGE_PROMPT_EXPERIMENT.experimentName,
-              variant: selectedVariant.variantName,
-              ...selectedVariant.metadata,
-            },
-          }),
-        },
-        llmCalls: [{
-          model: 'claude-haiku-4-5-20251001',
-          prompt: actualPrompt,
-          response: rawResponse,
-          promptTokens: usage.inputTokens,
-          completionTokens: usage.outputTokens,
-          durationMs: llmDuration,
-        }],
+        name: 'llm_generation',
+        type: 'llm',
+        model: 'claude-haiku-4-5-20251001',
+        provider: 'anthropic',
+        input: { prompt: actualPrompt },
+        output: { response: rawResponse },
+        promptTokens: usage.inputTokens,
+        completionTokens: usage.outputTokens,
+        durationMs: llmDuration,
       });
 
-      // Convert database row to Challenge type
-      return this.dbRowToChallenge(challenge);
+      // End trace with success
+      await opikService.endTrace({
+        traceId,
+        output: {
+          challengeId: challenge.id,
+          question: generatedChallenge.question,
+          difficulty: decision.difficultyTarget,
+          ...(evaluation && {
+            judgeScore: evaluation.compositeScore,
+          }),
+          ...(selectedVariant && {
+            abTestVariant: selectedVariant.variantName,
+          }),
+        },
+      });
+
+      // Convert database row to Challenge type and return with trace ID
+      return {
+        challenge: this.dbRowToChallenge(challenge),
+        traceId,
+      };
     } catch (error) {
       console.error('[Agent 2] Challenge design error:', error);
 
-      await opikService.trackAgentExecution({
-        agentName: 'challenge_design',
-        input: { decision },
-        output: { error: String(error) },
-        durationMs: Date.now() - startTime,
-        success: false,
+      // End trace with error
+      await opikService.endTrace({
         traceId,
+        output: { error: String(error) },
+        error: error as Error,
       });
 
       return null;
