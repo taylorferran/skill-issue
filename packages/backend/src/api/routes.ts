@@ -56,10 +56,11 @@ router.post('/answer', async (req: Request, res: Response) => {
     const supabase = getSupabase();
 
     // Create a single root trace for the entire answer submission flow
+    // Tags will be added after we load the challenge
     traceId = await opikService.startTrace({
       name: 'answer_submission',
       input: { challengeId: body.challengeId, userId: body.userId },
-      tags: ['answer'],
+      tags: [`challenge:${body.challengeId}`], // Add challenge tag immediately
     });
 
     // Load challenge to check correct answer
@@ -169,7 +170,41 @@ router.post('/answer', async (req: Request, res: Response) => {
       reason: `${responseTimeMs}ms vs ${expectedTimeMs}ms expected (difficulty ${challenge.difficulty})`,
     });
 
-    // Difficulty match: is the user at an appropriate difficulty level?
+    // Confidence calibration: did user's confidence match their result?
+    // High confidence + correct = well calibrated (1.0)
+    // High confidence + wrong = overconfident (0.0)
+    // Low confidence + wrong = well calibrated (1.0)
+    // Low confidence + correct = underconfident (0.5)
+    if (body.confidence) {
+      const isHighConfidence = body.confidence >= 4;
+      let calibrationScore: number;
+      let calibrationReason: string;
+
+      if (isHighConfidence && isCorrect) {
+        calibrationScore = 1.0;
+        calibrationReason = 'High confidence, correct answer - well calibrated';
+      } else if (isHighConfidence && !isCorrect) {
+        calibrationScore = 0.0;
+        calibrationReason = 'High confidence, wrong answer - overconfident (possible misconception)';
+      } else if (!isHighConfidence && !isCorrect) {
+        calibrationScore = 1.0;
+        calibrationReason = 'Low confidence, wrong answer - well calibrated';
+      } else {
+        calibrationScore = 0.5;
+        calibrationReason = 'Low confidence, correct answer - underconfident or lucky guess';
+      }
+
+      await opikService.addFeedbackScore({
+        traceId,
+        name: 'confidence_calibration',
+        value: calibrationScore,
+        source: 'sdk',
+        reason: `Confidence ${body.confidence}/5: ${calibrationReason}`,
+      });
+    }
+
+    // Difficulty calibration: is the user at an appropriate difficulty level?
+    // Calculate accuracy INCLUDING this answer (fixes stale data bug)
     const { data: skillState } = await supabase
       .from('user_skill_state')
       .select('attempts_total, correct_total')
@@ -179,16 +214,33 @@ router.post('/answer', async (req: Request, res: Response) => {
 
     if (skillState) {
       const s = skillState as any;
-      const accuracy = s.attempts_total > 0 ? s.correct_total / s.attempts_total : 0.5;
+      // Include current answer in the calculation
+      const newAttempts = (s.attempts_total || 0) + 1;
+      const newCorrect = (s.correct_total || 0) + (isCorrect ? 1 : 0);
+      const accuracy = newCorrect / newAttempts;
+
       // Sweet spot is 50-80% accuracy — means difficulty is well-matched
       const inSweetSpot = accuracy >= 0.5 && accuracy <= 0.8;
-      const diffScore = inSweetSpot ? 1.0 : (accuracy > 0.8 ? Math.max(0, 1 - (accuracy - 0.8) * 5) : Math.max(0, accuracy * 2));
+      let diffScore: number;
+      let diffReason: string;
+
+      if (inSweetSpot) {
+        diffScore = 1.0;
+        diffReason = 'Accuracy in sweet spot (50-80%) - difficulty well matched';
+      } else if (accuracy > 0.8) {
+        diffScore = Math.max(0, 1 - (accuracy - 0.8) * 5);
+        diffReason = 'Accuracy too high - consider increasing difficulty';
+      } else {
+        diffScore = Math.max(0, accuracy * 2);
+        diffReason = 'Accuracy too low - consider decreasing difficulty';
+      }
+
       await opikService.addFeedbackScore({
         traceId,
         name: 'difficulty_match',
         value: Math.round(diffScore * 100) / 100,
         source: 'sdk',
-        reason: `User accuracy ${(accuracy * 100).toFixed(0)}% at difficulty ${challenge.difficulty}`,
+        reason: `User accuracy ${(accuracy * 100).toFixed(0)}% (${newCorrect}/${newAttempts}) at difficulty ${challenge.difficulty}: ${diffReason}`,
       });
     }
 
@@ -201,10 +253,17 @@ router.post('/answer', async (req: Request, res: Response) => {
       difficulty: challenge.difficulty,
     }, traceId);
 
-    // End the root trace
+    // End the root trace with linking metadata
     await opikService.endTrace({
       traceId,
-      output: { isCorrect, correctOption: challenge.correct_option },
+      output: {
+        isCorrect,
+        correctOption: challenge.correct_option,
+        // Linking metadata for analysis
+        challengeId: challenge.id,
+        skillId: challenge.skill_id,
+        difficulty: challenge.difficulty,
+      },
     });
 
     // Return result
