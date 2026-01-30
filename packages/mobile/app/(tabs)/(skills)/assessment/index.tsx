@@ -1,20 +1,24 @@
 import { Theme } from "@/theme/Theme";
-import { spacing, flex, createBadgeStyle } from "@/theme/ThemeUtils";
-import { MaterialIcons } from "@expo/vector-icons";
+import { spacing } from "@/theme/ThemeUtils";
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { styles } from "./_index.styles";
 import SkillOverviewScreen from "@/components/skill-overview/SkillOverview";
 import SkillLevelRating from "@/components/skill-level-rating/SkillLevelRating";
-import { MCQItem } from "@/types/Quiz";
-import { useRouteParams } from "@/navigation/navigation";
+import { challengeToMCQQuestion, type Challenge } from "@/types/Quiz";
+import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useGetUserSkills } from "@/api-routes/getUserSkills";
+import { useGetPendingChallenges } from "@/api-routes/getPendingChallenges";
+import { useGetChallengeHistory } from "@/api-routes/getChallengeHistory";
 import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useUser } from "@/contexts/UserContext";
 import { useSkillsStore } from "@/stores/skillsStore";
-import type { GetUserSkillsResponse } from "@learning-platform/shared";
+import type { GetUserSkillsResponse, GetChallengeHistoryResponse } from "@learning-platform/shared";
 import { hasAssessedSkill, markSkillAssessed } from "@/utils/assessmentStorage";
+import { ChallengeHistoryCard } from "@/components/challenge-history-card/ChallengeHistoryCard";
+
+const CHALLENGES_PER_PAGE = 10;
 
 const ReviewHistoryScreen = () => {
   const [selectedSegment, setSelectedSegment] = useState<"overview" | "review">(
@@ -22,11 +26,14 @@ const ReviewHistoryScreen = () => {
   );
   
   // Get route params
-  const { skill, skillId, isNewSkill } = useRouteParams('assessment');
+  const { skill, skillId } = useRouteParams('assessment');
+  const params = useLocalSearchParams();
   
   // Context & API hooks
   const { userId } = useUser();
-  const { execute: fetchUserSkills, isLoading: isFetchingSkills } = useGetUserSkills();
+  const { execute: fetchUserSkills } = useGetUserSkills();
+  const { execute: fetchPendingChallenges, isLoading: isFetchingChallenges } = useGetPendingChallenges();
+  const { execute: fetchChallengeHistory, isLoading: isFetchingHistory } = useGetChallengeHistory();
   const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
   const { setUserSkills } = useSkillsStore();
   
@@ -35,13 +42,37 @@ const ReviewHistoryScreen = () => {
   const [isLoadingSkill, setIsLoadingSkill] = useState(true);
   const [hasLocalAssessment, setHasLocalAssessment] = useState(false);
   
+  // State for pending challenges
+  const [pendingChallenges, setPendingChallenges] = useState<Challenge[]>([]);
+  
+  // State for challenge history
+  const [challengeHistory, setChallengeHistory] = useState<GetChallengeHistoryResponse>([]);
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
+  const [recentlyAnswered, setRecentlyAnswered] = useState<GetChallengeHistoryResponse>([]);
+  
   // Determine if user needs to set difficulty level
-  // User needs to rate if ALL of the following are true:
-  // 1. No local assessment record (hasLocalAssessment = false), AND
-  // 2. No backend record OR backend record has no difficultyTarget
   const needsRating = !hasLocalAssessment && (!skillData || !skillData.difficultyTarget);
   
-  // Fetch skill data from backend on mount
+  // Check for recently answered challenge from navigation params
+  useEffect(() => {
+    if (params.answeredChallenge) {
+      try {
+        const answeredChallenge = JSON.parse(params.answeredChallenge as string);
+        if (answeredChallenge.skillId === skillId) {
+          // Add to recently answered list (optimistic update)
+          setRecentlyAnswered(prev => [answeredChallenge, ...prev]);
+          // Clear the param to avoid re-adding on re-renders
+          // Note: We can't actually clear router params, but the effect only runs once
+        }
+      } catch (e) {
+        console.error('[Assessment] Failed to parse answered challenge:', e);
+      }
+    }
+  }, [params.answeredChallenge, skillId]);
+  
+  // Fetch skill data and pending challenges from backend on mount
   useEffect(() => {
     loadSkillData();
   }, [userId, skill]);
@@ -50,7 +81,11 @@ const ReviewHistoryScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadSkillData();
-    }, [userId, skill])
+      // Also refresh challenge history when coming back from quiz
+      if (selectedSegment === "review") {
+        loadChallengeHistory(true);
+      }
+    }, [userId, skill, selectedSegment])
   );
   
   const loadSkillData = async () => {
@@ -86,8 +121,21 @@ const ReviewHistoryScreen = () => {
           await markSkillAssessed(skillId, currentSkill.difficultyTarget);
           setHasLocalAssessment(true);
         }
+        
+        // Fetch pending challenges for this skill
+        console.log('[Assessment] 🔄 Loading pending challenges...');
+        const challenges = await fetchPendingChallenges({ userId });
+        // Filter challenges for this skill only
+        const skillChallenges = challenges.filter(c => c.skillId === skillId);
+        setPendingChallenges(skillChallenges);
+        console.log('[Assessment] ✅ Pending challenges loaded:', skillChallenges.length);
+        
+        // Fetch challenge history for this skill
+        await loadChallengeHistory(true);
       } else {
         console.log('[Assessment] ℹ️ No backend record for this skill (new enrollment)');
+        setPendingChallenges([]);
+        setChallengeHistory([]);
       }
       
     } catch (error) {
@@ -96,6 +144,56 @@ const ReviewHistoryScreen = () => {
     } finally {
       setIsLoadingSkill(false);
     }
+  };
+  
+  const loadChallengeHistory = async (reset = false) => {
+    if (!userId || !skillId) return;
+    
+    try {
+      const offset = reset ? 0 : historyOffset;
+      console.log('[Assessment] 🔄 Loading challenge history...', { offset, limit: CHALLENGES_PER_PAGE });
+      
+      const history = await fetchChallengeHistory({ 
+        userId,
+        limit: CHALLENGES_PER_PAGE,
+        offset 
+      });
+      
+      // Filter by current skill and sort by answeredAt descending
+      const skillHistory = history
+        .filter(h => h.skillId === skillId)
+        .sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime());
+      
+      if (reset) {
+        setChallengeHistory(skillHistory);
+        setHistoryOffset(CHALLENGES_PER_PAGE);
+        // Clear recently answered when doing a fresh load
+        setRecentlyAnswered([]);
+      } else {
+        // Merge and deduplicate
+        const existingIds = new Set(challengeHistory.map(h => h.answerId));
+        const newItems = skillHistory.filter(h => !existingIds.has(h.answerId));
+        setChallengeHistory(prev => [...prev, ...newItems]);
+        setHistoryOffset(prev => prev + CHALLENGES_PER_PAGE);
+      }
+      
+      // Check if there might be more (if we got a full page)
+      setHasMoreHistory(history.length === CHALLENGES_PER_PAGE);
+      
+      console.log('[Assessment] ✅ Challenge history loaded:', skillHistory.length);
+    } catch (error) {
+      console.error('[Assessment] ❌ Failed to load challenge history:', error);
+    }
+  };
+  
+  const handleLoadMore = () => {
+    if (!isFetchingHistory && hasMoreHistory) {
+      loadChallengeHistory(false);
+    }
+  };
+  
+  const handleToggleExpand = (answerId: string) => {
+    setExpandedChallengeId(prev => prev === answerId ? null : answerId);
   };
   
   // Handler when user submits difficulty rating
@@ -109,7 +207,6 @@ const ReviewHistoryScreen = () => {
       console.log('[Assessment] 📝 Enrolling in skill with difficulty:', rating);
       
       // STEP 1: Mark as assessed locally IMMEDIATELY (optimistic update)
-      // This hides the slider right away, even if API call is slow/fails
       await markSkillAssessed(skillId, rating);
       setHasLocalAssessment(true);
       console.log('[Assessment] ✅ Local assessment saved');
@@ -131,6 +228,12 @@ const ReviewHistoryScreen = () => {
       const newSkillData = updatedSkills.find(s => s.skillId === skillId);
       setSkillData(newSkillData || null);
       
+      // STEP 4: Fetch pending challenges for this skill
+      console.log('[Assessment] 🔄 Loading pending challenges after enrollment...');
+      const challenges = await fetchPendingChallenges({ userId });
+      const skillChallenges = challenges.filter(c => c.skillId === skillId);
+      setPendingChallenges(skillChallenges);
+      
       // Show success message and switch to Overview tab
       Alert.alert(
         'Enrollment Complete!',
@@ -139,7 +242,6 @@ const ReviewHistoryScreen = () => {
           { 
             text: 'View Overview',
             onPress: () => {
-              // Switch to overview tab to show enrolled skill stats
               setSelectedSegment('overview');
             }
           }
@@ -149,10 +251,6 @@ const ReviewHistoryScreen = () => {
     } catch (error) {
       console.error('[Assessment] ❌ Enrollment failed:', error);
       
-      // Note: We don't revert the local assessment flag here
-      // This prevents the slider from reappearing immediately
-      // User can retry from settings if needed
-      
       Alert.alert(
         'Enrollment Failed',
         'Your assessment was saved locally, but we could not sync with the server. Your progress will sync when connection is restored.',
@@ -161,32 +259,25 @@ const ReviewHistoryScreen = () => {
     }
   };
   
-  // Mock MCQ data (keep as-is)
-  const mcqAnswers: MCQItem[] = [
-    {
-      question: "How do you define a decorator?",
-      id: 1,
-      isCorrect: true,
-      timestamp: "2 days ago",
-    },
-    {
-      question: "Time complexity of Dict lookups?",
-      id: 2,
-      isCorrect: false,
-      timestamp: "3 days ago",
-    },
-    {
-      question: "Difference between __str__ & __repr__",
-      id: 3,
-      isCorrect: true,
-      timestamp: "5 days ago",
-    },
-    {
-      question: "List comprehensions vs Generators",
-      id: 4,
-      isCorrect: false,
-      timestamp: "1 week ago",
-    },
+  // Handler when user selects a challenge
+  const handleChallengeSelect = (challenge: Challenge) => {
+    console.log('[Assessment] 📝 Challenge selected:', challenge.challengeId);
+    
+    // Convert challenge to MCQQuestion format
+    const mcqQuestion = challengeToMCQQuestion(challenge);
+    
+    // Navigate to quiz with this challenge
+    navigateTo('quiz', { 
+      skill: skill,
+      data: mcqQuestion,
+      challengeId: challenge.challengeId
+    });
+  };
+
+  // Combine recently answered with fetched history (for optimistic updates)
+  const displayHistory = [
+    ...recentlyAnswered,
+    ...challengeHistory.filter(h => !recentlyAnswered.some(r => r.answerId === h.answerId))
   ];
 
   return (
@@ -234,7 +325,7 @@ const ReviewHistoryScreen = () => {
       </View>
 
       {/* Show loading state while fetching skill data */}
-      {isLoadingSkill ? (
+      {isLoadingSkill || isFetchingChallenges ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Theme.colors.primary.main} />
           <Text style={styles.loadingText}>Loading skill data...</Text>
@@ -247,6 +338,9 @@ const ReviewHistoryScreen = () => {
               needsRating={needsRating}
               onRatingSubmit={handleRatingSubmit}
               isEnrolling={isEnrolling}
+              pendingChallenges={pendingChallenges}
+              onChallengeSelect={handleChallengeSelect}
+              skillName={skill}
             />
           ) : (
             <View style={styles.historyList}>
@@ -259,74 +353,41 @@ const ReviewHistoryScreen = () => {
                 />
               )}
               
-              {/* MCQ History */}
-              {mcqAnswers.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.historyItem,
-                    index !== mcqAnswers.length - 1 && styles.historyItemBorder,
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <View style={flex.row}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        item.isCorrect
-                          ? styles.iconContainerSuccess
-                          : styles.iconContainerError,
-                      ]}
+              {/* Challenge History Cards */}
+              {displayHistory.length === 0 && !isFetchingHistory ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>
+                    No challenges answered yet. Start practicing to see your history here!
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {displayHistory.map((challenge) => (
+                    <ChallengeHistoryCard
+                      key={challenge.answerId}
+                      challenge={challenge}
+                      isExpanded={expandedChallengeId === challenge.answerId}
+                      onToggle={() => handleToggleExpand(challenge.answerId)}
+                    />
+                  ))}
+                  
+                  {/* Load More Button */}
+                  {hasMoreHistory && (
+                    <TouchableOpacity
+                      style={styles.loadMoreButton}
+                      onPress={handleLoadMore}
+                      disabled={isFetchingHistory}
+                      activeOpacity={0.7}
                     >
-                      <MaterialIcons
-                        name={item.isCorrect ? "check-circle" : "cancel"}
-                        size={24}
-                        color={
-                          item.isCorrect
-                            ? Theme.colors.success.main
-                            : Theme.colors.primary.main
-                        }
-                      />
-                    </View>
-
-                    <View style={styles.historyContent}>
-                      <Text style={styles.questionText} numberOfLines={1}>
-                        {item.question}
-                      </Text>
-
-                      <View style={[flex.row, styles.historyMeta]}>
-                        <View
-                          style={[
-                            createBadgeStyle(
-                              item.isCorrect ? "success" : "primary",
-                            ),
-                            styles.statusBadge,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              item.isCorrect
-                                ? styles.statusBadgeTextSuccess
-                                : styles.statusBadgeTextError,
-                            ]}
-                          >
-                            {item.isCorrect ? "CORRECT" : "INCORRECT"}
-                          </Text>
-                        </View>
-
-                        <Text style={styles.timestampText}>{item.timestamp}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <MaterialIcons
-                    name="chevron-right"
-                    size={24}
-                    color={Theme.colors.settings.chevron}
-                  />
-                </TouchableOpacity>
-              ))}
+                      {isFetchingHistory ? (
+                        <ActivityIndicator size="small" color={Theme.colors.primary.main} />
+                      ) : (
+                        <Text style={styles.loadMoreText}>Load More</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </View>
           )}
         </>

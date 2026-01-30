@@ -296,4 +296,33 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
     borderRadius: 3,
   },
+  
+  // Empty State
+  emptyState: {
+    padding: Theme.spacing['2xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    ...createTextStyle('sm', 'regular', 'secondary'),
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  
+  // Load More Button
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Theme.spacing.lg,
+    marginTop: Theme.spacing.md,
+    backgroundColor: Theme.colors.background.primary,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
+  },
+  loadMoreText: {
+    ...createTextStyle('sm', 'medium', 'primary'),
+    color: Theme.colors.primary.main,
+  },
 });

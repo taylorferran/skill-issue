@@ -12,6 +12,16 @@ type MCQQuizProps = {
   data: QuizState;
   onFinish: () => void;
   timePerQuestion?: number;
+  challengeId?: string;
+  userId?: string;
+  onSubmitAnswer?: (answerData: {
+    challengeId: string;
+    userId: string;
+    selectedOption: number;
+    responseTime: number;
+    confidence: number | null;
+    userFeedback: string;
+  }) => Promise<void>;
 };
 
 interface QuizSessionState {
@@ -21,7 +31,7 @@ interface QuizSessionState {
   isCorrect: boolean;
   timeLeft: number;
   isTimeUp: boolean;
-  difficultyRating: number | null;
+  confidenceRating: number | null;
   usefulRating: number | null;
 }
 
@@ -29,6 +39,9 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   data,
   onFinish,
   timePerQuestion = 30,
+  challengeId,
+  userId,
+  onSubmitAnswer,
 }) => {
   const { setQuizState } = useQuiz();
   const isSingleQuestion = !Array.isArray(data);
@@ -42,7 +55,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     isCorrect: false,
     timeLeft: timePerQuestion,
     isTimeUp: false,
-    difficultyRating: null,
+    confidenceRating: null,
     usefulRating: null
   });
 
@@ -86,7 +99,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
       timeLeft: timePerQuestion,
       isTimeUp: false,
       usefulRating: null,
-      difficultyRating: null
+      confidenceRating: null
     });
   }, [data, timePerQuestion]);
 
@@ -176,6 +189,28 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     console.log(`User rated question ${currentQuestion.id} with ${selectedRating} stars`);
   };
 
+  const handleFinish = async () => {
+    if (!quizSession.confidenceRating || !quizSession.usefulRating || quizSession.selectedAnswerId === null) {
+      return;
+    }
+
+    const responseTime = (timePerQuestion - quizSession.timeLeft) * 1000;
+    const userFeedback = `User rated usefulness ${quizSession.usefulRating} out of 5`;
+
+    if (onSubmitAnswer && challengeId && userId) {
+      await onSubmitAnswer({
+        challengeId,
+        userId,
+        selectedOption: quizSession.selectedAnswerId,
+        responseTime,
+        confidence: quizSession.confidenceRating,
+        userFeedback,
+      });
+    }
+
+    onFinish();
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.mainContent}>
@@ -208,16 +243,16 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
               explanation={currentQuestion.explanation} 
             />
             <StarRating 
-              text='How difficult was this question?'
-              rating={quizSession.difficultyRating} 
-              onRatingSelect={(rating) => setQuizSession((prev => ({...prev, difficultyRating: rating})))} />
+              text='How confident were you?'
+              rating={quizSession.confidenceRating} 
+              onRatingSelect={(rating) => setQuizSession((prev => ({...prev, confidenceRating: rating})))} />
             <StarRating 
               rating={quizSession.usefulRating} 
               text='How useful was this question?'
               onRatingSelect={(rating) => setQuizSession((prev => ({...prev, usefulRating: rating})))} />
-            {quizSession.usefulRating!== null && quizSession.difficultyRating && (
+            {quizSession.usefulRating!== null && quizSession.confidenceRating && (
               <View style={styles.buttonContainer}>
-                <FinishButton onPress={onFinish} text={'Finish'} />
+                <FinishButton onPress={handleFinish} text={'Finish'} />
               </View>
             )}
           </View>

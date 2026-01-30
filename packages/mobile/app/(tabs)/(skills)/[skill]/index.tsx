@@ -96,7 +96,7 @@ export const TopicSelectScreen: React.FC = () => {
           </View>
         </View>
         <Text style={styles.progressMessage}>
-          Keep pushing, you're getting there!
+          Keep pushing, you&apos;re getting there!
         </Text>
       </View>
 

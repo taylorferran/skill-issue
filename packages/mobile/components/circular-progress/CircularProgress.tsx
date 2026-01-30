@@ -6,25 +6,26 @@ import { Theme } from "@/theme/Theme";
 interface SimpleCircularProgressProps {
   current: number;
   total: number;
+  compact?: boolean;
 }
 
 const CircularProgress: React.FC<SimpleCircularProgressProps> = ({
   current,
   total,
+  compact = false,
 }) => {
   const progress = current / total;
-  const percentage = Math.round(progress * 100);
 
-  // Circle properties
-  const size = 180;
-  const strokeWidth = 8;
+  // Circle properties - smaller for compact mode
+  const size = compact ? 100 : 180;
+  const strokeWidth = compact ? 6 : 8;
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const strokeDashoffset = circumference - (progress * circumference);
 
   return (
-    <View style={styles.simpleGaugeContainer}>
-      <View style={styles.svgContainer}>
+    <View style={[styles.simpleGaugeContainer, compact && styles.compactGaugeContainer]}>
+      <View style={[styles.svgContainer, compact && styles.compactSvgContainer]}>
         <Svg width={size} height={size}>
           {/* Background circle */}
           <Circle
@@ -53,9 +54,9 @@ const CircularProgress: React.FC<SimpleCircularProgressProps> = ({
         
         {/* Center text */}
         <View style={styles.gaugeInner}>
-          <Text style={styles.gaugeNumber}>
+          <Text style={[styles.gaugeNumber, compact && styles.compactGaugeNumber]}>
             {current}
-            <Text style={styles.gaugeTotal}>/{total}</Text>
+            <Text style={[styles.gaugeTotal, compact && styles.compactGaugeTotal]}>/{total}</Text>
           </Text>
         </View>
       </View>

@@ -1,6 +1,6 @@
 
 import { Theme } from "@/theme/Theme";
-import { createTextStyle } from "@/theme/ThemeUtils";
+import { createTextStyle, createCardStyle, flex } from "@/theme/ThemeUtils";
 import { StyleSheet } from "react-native";
 
 export const styles = StyleSheet.create({
@@ -133,11 +133,31 @@ export const styles = StyleSheet.create({
   emptyProgressContainer: {
     alignItems: "center",
     justifyContent: "center",
-    padding: Theme.spacing["2xl"],
+    padding: Theme.spacing.md,
   },
   
   emptyProgressText: {
-    ...createTextStyle("sm", "regular", "secondary"),
+    ...createTextStyle("xs", "regular", "secondary"),
+    textAlign: "center",
+  },
+
+  // Compact Progress Card (for 2x2 grid)
+  compactProgressCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
+    ...Theme.shadows.card,
+    flex: 1,
+  },
+
+  compactProgressHeader: {
+    ...createTextStyle("xs", "bold", "secondary"),
+    letterSpacing: 1,
+    marginBottom: Theme.spacing.sm,
     textAlign: "center",
   },
   
@@ -150,6 +170,37 @@ export const styles = StyleSheet.create({
     borderWidth: Theme.borderWidth.thin,
     borderColor: Theme.colors.success.light,
     ...Theme.shadows.card,
+  },
+
+  // Compact Accuracy Card (for 2x2 grid)
+  compactAccuracyCard: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Theme.spacing.lg,
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.success.light,
+    ...Theme.shadows.card,
+    flex: 1,
+  },
+
+  compactAccuracyLabel: {
+    ...createTextStyle("xs", "bold", "secondary"),
+    letterSpacing: 1,
+    marginBottom: Theme.spacing.xs,
+  },
+
+  compactAccuracyValue: {
+    fontSize: 28,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.success.main,
+    marginBottom: Theme.spacing.xs,
+  },
+
+  compactAccuracySubtext: {
+    ...createTextStyle("xs", "regular", "secondary"),
+    textAlign: "center",
   },
   
   accuracyLabel: {
@@ -225,5 +276,83 @@ export const styles = StyleSheet.create({
     fontSize: Theme.typography.fontSize.lg,
     fontWeight: Theme.typography.fontWeight.bold,
     color: Theme.colors.text.inverse,
+  },
+
+  // Challenges Section
+  challengesSection: {
+    marginTop: Theme.spacing.lg,
+  },
+
+  challengesHeader: {
+    ...createTextStyle("xs", "bold", "secondary"),
+    letterSpacing: 1.6,
+    marginBottom: Theme.spacing.lg,
+    paddingLeft: Theme.spacing.xs,
+  },
+
+  emptyChallengesCard: {
+    ...createCardStyle("default"),
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Theme.spacing["3xl"],
+    gap: Theme.spacing.lg,
+  },
+
+  emptyChallengesText: {
+    ...createTextStyle("sm", "regular", "secondary"),
+    textAlign: "center",
+  },
+
+  challengesList: {
+    gap: Theme.spacing.md,
+  },
+
+  challengeCard: {
+    ...createCardStyle("default"),
+    padding: Theme.spacing.lg,
+  },
+
+  challengeHeader: {
+    ...flex.rowBetween,
+    marginBottom: Theme.spacing.md,
+  },
+
+  challengeNumberBadge: {
+    backgroundColor: Theme.colors.primary.main,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.xs,
+    borderRadius: Theme.borderRadius.md,
+  },
+
+  challengeNumberText: {
+    ...createTextStyle("xs", "bold", "inverse"),
+  },
+
+  difficultyBadge: {
+    ...flex.rowCenter,
+    backgroundColor: Theme.colors.warning.main,
+    paddingHorizontal: Theme.spacing.sm,
+    paddingVertical: Theme.spacing.xs / 2,
+    borderRadius: Theme.borderRadius.md,
+    gap: 2,
+  },
+
+  difficultyText: {
+    ...createTextStyle("xs", "bold", "inverse"),
+  },
+
+  challengeQuestion: {
+    ...createTextStyle("base", "medium", "primary"),
+    marginBottom: Theme.spacing.md,
+    lineHeight: 22,
+  },
+
+  challengeFooter: {
+    ...flex.rowBetween,
+    alignItems: "center",
+  },
+
+  challengeDate: {
+    ...createTextStyle("xs", "regular", "secondary"),
   },
 }) 

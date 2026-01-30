@@ -31,6 +31,7 @@ const pages = {
     params: z.object({
       skill: z.string(),
       data: QuizStateSchema,
+      challengeId: z.string().uuid(),
     }),
   },
   
