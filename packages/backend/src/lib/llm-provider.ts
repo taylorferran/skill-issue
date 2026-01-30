@@ -217,6 +217,77 @@ Generate the challenge now:`;
       actualDifficulty: difficulty,
     };
   }
+
+  /**
+   * Generate a skill description from a skill name
+   * Returns description and whether the name is too vague
+   */
+  async generateSkillDescription(skillName: string): Promise<{
+    description: string;
+    isVague: boolean;
+    message: string;
+  }> {
+    const prompt = `You are helping create a learning platform skill. Given a skill name, generate a detailed description and assess if the name is specific enough.
+
+SKILL NAME: "${skillName}"
+
+Analyze this skill name and provide:
+1. A detailed description (2-3 sentences) of what this skill encompasses
+2. Whether the name is too vague/general (e.g., "Coding", "Math", "Science" are vague; "Python Programming", "Algebra I", "Organic Chemistry" are specific)
+3. A helpful message for the user
+
+OUTPUT FORMAT (strict JSON):
+{
+  "description": "Detailed description of the skill...",
+  "isVague": true/false,
+  "message": "If vague: Suggest being more specific. If specific: Confirmation message."
+}
+
+Examples:
+- "Coding" -> isVague: true, message: "This is quite general. Try something more specific like 'Python Programming', 'JavaScript Basics', or 'C++ Data Structures'"
+- "Python Programming" -> isVague: false, message: "Great! This is a specific, well-defined skill."
+
+Generate the response now:`;
+
+    try {
+      const message = await this.client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 500,
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      const responseText = message.content[0].type === 'text'
+        ? message.content[0].text
+        : '';
+
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/```json\n?(.*?)\n?```/s) || responseText.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
+
+      const parsed = JSON.parse(jsonStr.trim());
+
+      return {
+        description: parsed.description || `${skillName} - A skill for learning and mastering ${skillName}.`,
+        isVague: parsed.isVague ?? false,
+        message: parsed.message || 'Skill description generated successfully.',
+      };
+    } catch (error) {
+      console.error('Failed to generate skill description:', error);
+      
+      // Return a basic description on error
+      return {
+        description: `${skillName} - A skill for learning and mastering ${skillName}.`,
+        isVague: false,
+        message: 'Description generated with default template.',
+      };
+    }
+  }
 }
 
 // Factory function to create provider

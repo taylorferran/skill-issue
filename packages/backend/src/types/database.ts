@@ -102,6 +102,114 @@ export interface Database {
           updated_at?: string;
         };
       };
+      calibration_questions: {
+        Row: {
+          id: string;
+          skill_id: string;
+          difficulty: number;
+          question: string;
+          options_json: any;
+          correct_option: number;
+          explanation: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          skill_id: string;
+          difficulty: number;
+          question: string;
+          options_json: any;
+          correct_option: number;
+          explanation?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          skill_id?: string;
+          difficulty?: number;
+          question?: string;
+          options_json?: any;
+          correct_option?: number;
+          explanation?: string | null;
+          created_at?: string;
+        };
+      };
+      user_calibration_state: {
+        Row: {
+          id: string;
+          user_id: string;
+          skill_id: string;
+          status: 'pending' | 'in_progress' | 'completed';
+          questions_generated_at: string | null;
+          completed_at: string | null;
+          calculated_difficulty_target: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          skill_id: string;
+          status?: 'pending' | 'in_progress' | 'completed';
+          questions_generated_at?: string | null;
+          completed_at?: string | null;
+          calculated_difficulty_target?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          skill_id?: string;
+          status?: 'pending' | 'in_progress' | 'completed';
+          questions_generated_at?: string | null;
+          completed_at?: string | null;
+          calculated_difficulty_target?: number | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      user_calibration_answers: {
+        Row: {
+          id: string;
+          user_id: string;
+          skill_id: string;
+          difficulty: number;
+          question: string;
+          options_json: any;
+          selected_option: number;
+          correct_option: number;
+          is_correct: boolean;
+          explanation: string | null;
+          answered_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          skill_id: string;
+          difficulty: number;
+          question: string;
+          options_json: any;
+          selected_option: number;
+          correct_option: number;
+          is_correct: boolean;
+          explanation?: string | null;
+          answered_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          skill_id?: string;
+          difficulty?: number;
+          question?: string;
+          options_json?: any;
+          selected_option?: number;
+          correct_option?: number;
+          is_correct?: boolean;
+          explanation?: string | null;
+          answered_at?: string;
+        };
+      };
       challenges: {
         Row: {
           id: string;

@@ -83,7 +83,6 @@ export class ChallengeDesignAgent {
         skillName: skill.name,
         skillDescription: skill.description,
         difficulty: decision.difficultyTarget,
-        userId: decision.userId,
         customTemplate: templateToUse,
       });
       const llmDuration = Date.now() - llmStartTime;
