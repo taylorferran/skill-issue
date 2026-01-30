@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skill Issue - User App</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg: #f3f4f6;
+            --card: #ffffff;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        
+        .app { display: none; }
+        .app.active { display: block; }
+        
+        /* Login Screen */
+        .login-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 32px;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 24px;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-light);
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        /* Main App */
+        .main-app {
+            display: none;
+        }
+        
+        .main-app.active {
+            display: block;
+        }
+        
+        .navbar {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 0 20px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 64px;
+        }
+        
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .nav-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .nav-link {
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-light);
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .nav-link:hover, .nav-link.active {
+            background: #f3f4f6;
+            color: var(--primary);
+        }
+        
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-id {
+            font-size: 14px;
+            color: var(--text-light);
+        }
+        
+        .logout-btn {
+            padding: 8px 16px;
+            border: none;
+            background: #fee2e2;
+            color: var(--error);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        /* Content */
+        .content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+        }
+        
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stat-label {
+            color: var(--text-light);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        
+        /* Lists */
+        .list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .list-item {
+            background: #f9fafb;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .list-item:hover {
+            border-color: var(--primary);
+            background: white;
+        }
+        
+        .list-item-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .list-item-desc {
+            font-size: 14px;
+            color: var(--text-light);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-primary {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        /* Quiz */
+        .quiz-container {
+            background: white;
+            border-radius: 20px;
+            padding: 32px;
+        }
+        
+        .quiz-progress {
+            margin-bottom: 32px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--text-light);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        .quiz-difficulty {
+            display: inline-block;
+            padding: 6px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        .quiz-question {
+            font-size: 20px;
+            font-weight: 600;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+        
+        .quiz-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .quiz-option {
+            padding: 16px 20px;
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        
+        .quiz-option:hover {
+            border-color: var(--primary);
+            background: white;
+        }
+        
+        .quiz-option.selected {
+            border-color: var(--primary);
+            background: #e0e7ff;
+        }
+        
+        .quiz-option.correct {
+            border-color: var(--success);
+            background: #d1fae5;
+        }
+        
+        .quiz-option.incorrect {
+            border-color: var(--error);
+            background: #fee2e2;
+        }
+        
+        .feedback {
+            margin-top: 24px;
+            padding: 20px;
+            border-radius: 12px;
+        }
+        
+        .feedback.correct {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .feedback.incorrect {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        /* Results */
+        .results {
+            text-align: center;
+            padding: 48px 24px;
+        }
+        
+        .results-score {
+            font-size: 72px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+        
+        .results-message {
+            font-size: 20px;
+            color: var(--text-light);
+            margin-bottom: 32px;
+        }
+        
+        /* Toast */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .toast {
+            padding: 16px 24px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+            max-width: 400px;
+        }
+        
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--error); }
+        .toast.info { background: var(--primary); }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        /* Loading */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 48px;
+            color: var(--text-light);
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid #e5e7eb;
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 64px 24px;
+            color: var(--text-light);
+        }
+        
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        /* Mobile Nav */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 8px;
+            z-index: 100;
+        }
+        
+        .mobile-nav-links {
+            display: flex;
+            justify-content: space-around;
+        }
+        
+        .mobile-nav-link {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 16px;
+            text-decoration: none;
+            color: var(--text-light);
+            font-size: 12px;
+        }
+        
+        .mobile-nav-link.active {
+            color: var(--primary);
+        }
+        
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .mobile-nav { display: block; }
+            .content { padding-bottom: 80px; }
+            .navbar-content { padding: 0 16px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="logo">🎯</div>
+                <h1>Skill Issue</h1>
+                <p style="color: #6b7280;">Master any skill with AI-powered learning</p>
+            </div>
+            
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('login')">Sign In</div>
+                <div class="tab" onclick="switchTab('create')">Create Account</div>
+            </div>
+            
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>User ID</label>
+                    <input type="text" id="loginUserId" placeholder="Enter your user ID" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" id="loginApiKey" placeholder="Enter your API key" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Sign In</button>
+            </form>
+            
+            <form id="createForm" onsubmit="handleCreateAccount(event)" style="display: none;">
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="password" id="createApiKey" placeholder="Enter your API key" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Timezone</label>
+                    <select id="createTimezone">
+                        <option value="UTC">UTC</option>
+                        <option value="America/New_York">Eastern Time</option>
+                        <option value="America/Chicago">Central Time</option>
+                        <option value="America/Denver">Mountain Time</option>
+                        <option value="America/Los_Angeles">Pacific Time</option>
+                        <option value="Europe/London">London</option>
+                        <option value="Europe/Paris">Paris</option>
+                        <option value="Asia/Tokyo">Tokyo</option>
+                        <option value="Australia/Sydney">Sydney</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Max Challenges Per Day</label>
+                    <input type="number" id="createMaxChallenges" value="5" min="1" max="20">
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="mainApp" class="main-app">
+        <nav class="navbar">
+            <div class="navbar-content">
+                <div class="nav-brand">
+                    <div class="nav-logo">🎯</div>
+                    Skill Issue
+                </div>
+                
+                <div class="nav-links">
+                    <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
+                    <a href="#" class="nav-link" data-page="skills">Skills</a>
+                    <a href="#" class="nav-link" data-page="calibration">Calibration</a>
+                    <a href="#" class="nav-link" data-page="challenges">Challenges</a>
+                </div>
+                
+                <div class="nav-user">
+                    <span class="user-id" id="navUserId"></span>
+                    <button class="logout-btn" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="content">
+            <!-- Dashboard Page -->
+            <div id="dashboardPage" class="page active">
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="statSkills">-</div>
+                        <div class="stat-label">Skills Enrolled</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statPending">-</div>
+                        <div class="stat-label">Pending Challenges</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statCompleted">-</div>
+                        <div class="stat-label">Completed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="statAccuracy">-</div>
+                        <div class="stat-label">Accuracy</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">My Skills</div>
+                        <button class="btn btn-primary" onclick="showPage('skills')" style="width: auto; padding: 8px 16px;">Browse Skills</button>
+                    </div>
+                    <div id="dashboardSkillsList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Skills Page -->
+            <div id="skillsPage" class="page">
+                <div class="grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Available Skills</div>
+                        </div>
+                        <div id="availableSkillsList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading skills...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Create New Skill</div>
+                        </div>
+                        
+                        <form onsubmit="handleCreateSkill(event)">
+                            <div class="form-group">
+                                <label>Skill Name</label>
+                                <input type="text" id="newSkillName" placeholder="e.g., Advanced Python" required>
+                            </div>
+                            
+                            <button type="button" class="btn btn-secondary" onclick="generateSkillDescription()" style="margin-bottom: 16px;">
+                                🤖 Generate Description
+                            </button>
+                            
+                            <div class="form-group">
+                                <label>Description</label>
+                                <textarea id="newSkillDescription" rows="4" placeholder="Enter description or generate above" required></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">Create Skill</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calibration Page -->
+            <div id="calibrationPage" class="page">
+                <div id="calibrationSetup">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Skill Calibration</div>
+                        </div>
+                        
+                        <p style="color: #6b7280; margin-bottom: 20px;">
+                            Select a skill that needs calibration. You'll answer 10 questions to determine your starting difficulty level.
+                        </p>
+                        
+                        <div id="calibrationSkillsList">
+                            <div class="loading">
+                                <div class="spinner"></div>
+                                Loading...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="calibrationQuiz" style="display: none;">
+                    <div class="quiz-container">
+                        <div class="quiz-progress">
+                            <div class="progress-header">
+                                <span>Question <span id="currentQuestionNum">1</span> of 10</span>
+                                <span id="progressPercent">10%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="quizProgressBar" style="width: 10%"></div>
+                            </div>
+                        </div>
+
+                        <div class="quiz-difficulty" id="quizDifficulty">Difficulty: 1</div>
+                        
+                        <div class="quiz-question" id="quizQuestion"></div>
+                        
+                        <div class="quiz-options" id="quizOptions"></div>
+
+                        <div id="quizFeedback"></div>
+                    </div>
+                </div>
+
+                <div id="calibrationResults" style="display: none;">
+                    <div class="results">
+                        <div class="results-score" id="resultsScore"></div>
+                        <div class="results-message" id="resultsMessage"></div>
+                        
+                        <div class="stats" style="margin-bottom: 32px;">
+                            <div class="stat-card">
+                                <div class="stat-value" id="resultCorrect">-</div>
+                                <div class="stat-label">Correct</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="resultAccuracy">-</div>
+                                <div class="stat-label">Accuracy</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="resultDifficulty">-</div>
+                                <div class="stat-label">Starting Level</div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="finishCalibration()" style="max-width: 300px;">
+                            Continue to Dashboard
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Challenges Page -->
+            <div id="challengesPage" class="page">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Pending Challenges</div>
+                        <button class="btn btn-primary" onclick="loadPendingChallenges()" style="width: auto; padding: 8px 16px;">Refresh</button>
+                    </div>
+                    
+                    <div id="pendingChallengesList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading challenges...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Challenge History</div>
+                    </div>
+                    
+                    <div id="challengeHistoryList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading history...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation -->
+        <nav class="mobile-nav">
+            <div class="mobile-nav-links">
+                <a href="#" class="mobile-nav-link active" data-page="dashboard">
+                    <span>🏠</span>
+                    Home
+                </a>
+                <a href="#" class="mobile-nav-link" data-page="skills">
+                    <span>📚</span>
+                    Skills
+                </a>
+                <a href="#" class="mobile-nav-link" data-page="calibration">
+                    <span>🎯</span>
+                    Calibrate
+                </a>
+                <a href="#" class="mobile-nav-link" data-page="challenges">
+                    <span>🎮</span>
+                    Play
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script>
+        // App State
+        const state = {
+            user: null,
+            apiKey: null,
+            skills: [],
+            mySkills: [],
+            pendingChallenges: [],
+            challengeHistory: [],
+            calibrationData: {
+                skillId: null,
+                questions: [],
+                currentIndex: 0,
+                answers: []
+            }
+        };
+
+        const API_BASE = window.location.origin;
+
+        // Utility Functions
+        function getHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${state.apiKey}`
+            };
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 5000);
+        }
+
+        function showLoading(elementId) {
+            document.getElementById(elementId).innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    Loading...
+                </div>
+            `;
+        }
+
+        // API Functions
+        async function apiRequest(endpoint, options = {}) {
+            const response = await fetch(`${API_BASE}/api${endpoint}`, {
+                ...options,
+                headers: getHeaders()
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || data.message || 'Request failed');
+            }
+            
+            return data;
+        }
+
+        // Auth Functions
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (tab === 'login') {
+                document.getElementById('loginForm').style.display = 'block';
+                document.getElementById('createForm').style.display = 'none';
+            } else {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('createForm').style.display = 'block';
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const userId = document.getElementById('loginUserId').value;
+            const apiKey = document.getElementById('loginApiKey').value;
+            
+            try {
+                const user = await apiRequest(`/users/${userId}`, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+                
+                state.user = user;
+                state.apiKey = apiKey;
+                
+                localStorage.setItem('skillIssueUser', JSON.stringify(user));
+                localStorage.setItem('skillIssueApiKey', apiKey);
+                
+                showToast('Welcome back!', 'success');
+                initApp();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function handleCreateAccount(e) {
+            e.preventDefault();
+            const apiKey = document.getElementById('createApiKey').value;
+            const timezone = document.getElementById('createTimezone').value;
+            const maxChallenges = parseInt(document.getElementById('createMaxChallenges').value);
+            
+            try {
+                const user = await apiRequest('/users', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ timezone, maxChallengesPerDay: maxChallenges })
+                });
+                
+                state.user = user;
+                state.apiKey = apiKey;
+                
+                localStorage.setItem('skillIssueUser', JSON.stringify(user));
+                localStorage.setItem('skillIssueApiKey', apiKey);
+                
+                showToast('Account created! Your ID: ' + user.id.substring(0, 8) + '...', 'success');
+                initApp();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function logout() {
+            state.user = null;
+            state.apiKey = null;
+            localStorage.removeItem('skillIssueUser');
+            localStorage.removeItem('skillIssueApiKey');
+            
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('mainApp').classList.remove('active');
+        }
+
+        // Navigation
+        function showPage(pageName) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.querySelectorAll('.mobile-nav-link').forEach(l => l.classList.remove('active'));
+            
+            document.getElementById(pageName + 'Page').classList.add('active');
+            document.querySelectorAll(`[data-page="${pageName}"]`).forEach(el => el.classList.add('active'));
+            
+            // Load page data
+            if (pageName === 'dashboard') loadDashboard();
+            if (pageName === 'skills') loadSkills();
+            if (pageName === 'calibration') loadCalibrationSkills();
+            if (pageName === 'challenges') loadChallenges();
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const [mySkills, pending] = await Promise.all([
+                    apiRequest(`/users/${state.user.id}/skills`),
+                    apiRequest(`/users/${state.user.id}/challenges/pending`)
+                ]);
+                
+                state.mySkills = mySkills || [];
+                state.pendingChallenges = pending || [];
+                
+                // Update stats
+                document.getElementById('statSkills').textContent = state.mySkills.length;
+                document.getElementById('statPending').textContent = state.pendingChallenges.length;
+                document.getElementById('statCompleted').textContent = '-';
+                document.getElementById('statAccuracy').textContent = '-';
+                
+                // Render skills list
+                renderDashboardSkills();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function renderDashboardSkills() {
+            const container = document.getElementById('dashboardSkillsList');
+            
+            if (state.mySkills.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📚</div>
+                        <p>No skills enrolled yet</p>
+                        <button class="btn btn-primary" onclick="showPage('skills')" style="margin-top: 16px;">Browse Skills</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="list">${state.mySkills.map(skill => `
+                    <div class="list-item" onclick="startCalibrationForSkill('${skill.skillId}')">
+                        <div class="list-item-title">${skill.skillName}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                            <span class="list-item-desc">Difficulty: ${skill.difficultyTarget}/10 • Accuracy: ${(skill.accuracy * 100).toFixed(0)}%</span>
+                            ${skill.needsCalibration ? '<span class="badge badge-warning">Needs Calibration</span>' : '<span class="badge badge-success">Ready</span>'}
+                        </div>
+                    </div>
+                `).join('')}</div>
+            `;
+        }
+
+        // Skills
+        async function loadSkills() {
+            showLoading('availableSkillsList');
+            
+            try {
+                const [allSkills, mySkills] = await Promise.all([
+                    apiRequest('/skills'),
+                    apiRequest(`/users/${state.user.id}/skills`)
+                ]);
+                
+                state.skills = allSkills || [];
+                state.mySkills = mySkills || [];
+                
+                const enrolledIds = new Set(state.mySkills.map(s => s.skillId));
+                const availableSkills = state.skills.filter(s => !enrolledIds.has(s.id));
+                
+                const container = document.getElementById('availableSkillsList');
+                
+                if (availableSkills.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎉</div>
+                            <p>You've enrolled in all available skills!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="list">${availableSkills.map(skill => `
+                        <div class="list-item" onclick="enrollInSkill('${skill.id}')">
+                            <div class="list-item-title">${skill.name}</div>
+                            <div class="list-item-desc">${skill.description.substring(0, 100)}...</div>
+                        </div>
+                    `).join('')}</div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function enrollInSkill(skillId) {
+            try {
+                await apiRequest(`/users/${state.user.id}/skills`, {
+                    method: 'POST',
+                    body: JSON.stringify({ skillId, difficultyTarget: 0 })
+                });
+                
+                showToast('Enrolled successfully! Start calibration to begin learning.', 'success');
+                loadSkills();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function generateSkillDescription() {
+            const name = document.getElementById('newSkillName').value;
+            if (!name) {
+                showToast('Please enter a skill name first', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiRequest('/skills/generate-description', {
+                    method: 'POST',
+                    body: JSON.stringify({ skillName: name })
+                });
+                
+                document.getElementById('newSkillDescription').value = result.description;
+                showToast(result.isVague ? 'Description generated (skill name may be too vague)' : 'Description generated!', result.isVague ? 'warning' : 'success');
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function handleCreateSkill(e) {
+            e.preventDefault();
+            const name = document.getElementById('newSkillName').value;
+            const description = document.getElementById('newSkillDescription').value;
+            
+            try {
+                await apiRequest('/skills', {
+                    method: 'POST',
+                    body: JSON.stringify({ name, description })
+                });
+                
+                showToast('Skill created successfully!', 'success');
+                document.getElementById('newSkillName').value = '';
+                document.getElementById('newSkillDescription').value = '';
+                loadSkills();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Calibration
+        async function loadCalibrationSkills() {
+            showLoading('calibrationSkillsList');
+            
+            try {
+                const mySkills = await apiRequest(`/users/${state.user.id}/skills`);
+                state.mySkills = mySkills || [];
+                
+                const needsCalibration = state.mySkills.filter(s => s.needsCalibration);
+                
+                const container = document.getElementById('calibrationSkillsList');
+                
+                if (needsCalibration.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">✅</div>
+                            <p>All your skills are calibrated!</p>
+                            <button class="btn btn-primary" onclick="showPage('skills')" style="margin-top: 16px;">Enroll in New Skill</button>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="list">${needsCalibration.map(skill => `
+                        <div class="list-item" onclick="startCalibrationForSkill('${skill.skillId}')">
+                            <div class="list-item-title">${skill.skillName}</div>
+                            <div style="margin-top: 8px;">
+                                <span class="badge badge-warning">Click to Start Calibration</span>
+                            </div>
+                        </div>
+                    `).join('')}</div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function startCalibrationForSkill(skillId) {
+            state.calibrationData.skillId = skillId;
+            state.calibrationData.currentIndex = 0;
+            state.calibrationData.answers = [];
+            
+            try {
+                // Generate questions if needed
+                await apiRequest(`/skills/${skillId}/calibration/generate`, { method: 'POST' });
+                
+                // Start calibration
+                const result = await apiRequest(`/users/${state.user.id}/skills/${skillId}/calibration/start`, {
+                    method: 'POST'
+                });
+                
+                if (result.status === 'ready') {
+                    state.calibrationData.questions = result.questions;
+                    showCalibrationQuiz();
+                } else {
+                    showToast('Questions are still being generated. Please try again in a moment.', 'info');
+                }
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function showCalibrationQuiz() {
+            document.getElementById('calibrationSetup').style.display = 'none';
+            document.getElementById('calibrationQuiz').style.display = 'block';
+            document.getElementById('calibrationResults').style.display = 'none';
+            
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const question = state.calibrationData.questions[state.calibrationData.currentIndex];
+            const progress = ((state.calibrationData.currentIndex + 1) / 10) * 100;
+            
+            document.getElementById('currentQuestionNum').textContent = state.calibrationData.currentIndex + 1;
+            document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+            document.getElementById('quizProgressBar').style.width = progress + '%';
+            document.getElementById('quizDifficulty').textContent = `Difficulty: ${question.difficulty}`;
+            document.getElementById('quizQuestion').textContent = question.question;
+            
+            document.getElementById('quizOptions').innerHTML = question.options.map((option, index) => `
+                <button class="quiz-option" onclick="submitCalibrationAnswer(${index})">
+                    <strong>${String.fromCharCode(65 + index)}.</strong> ${option}
+                </button>
+            `).join('');
+            
+            document.getElementById('quizFeedback').innerHTML = '';
+        }
+
+        async function submitCalibrationAnswer(selectedOption) {
+            const question = state.calibrationData.questions[state.calibrationData.currentIndex];
+            
+            // Disable all options
+            document.querySelectorAll('.quiz-option').forEach(btn => btn.disabled = true);
+            
+            try {
+                const result = await apiRequest(`/users/${state.user.id}/skills/${state.calibrationData.skillId}/calibration/answer`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        difficulty: question.difficulty,
+                        selectedOption
+                    })
+                });
+                
+                state.calibrationData.answers.push(result);
+                
+                // Show feedback
+                const options = document.querySelectorAll('.quiz-option');
+                options[selectedOption].classList.add(result.isCorrect ? 'correct' : 'incorrect');
+                options[result.correctOption].classList.add('correct');
+                
+                document.getElementById('quizFeedback').innerHTML = `
+                    <div class="feedback ${result.isCorrect ? 'correct' : 'incorrect'}">
+                        <strong>${result.isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
+                        ${result.explanation || ''}
+                    </div>
+                    <button class="btn btn-primary" onclick="nextCalibrationQuestion()" style="margin-top: 16px;">
+                        ${state.calibrationData.currentIndex < 9 ? 'Next Question →' : 'Complete Calibration'}
+                    </button>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function nextCalibrationQuestion() {
+            state.calibrationData.currentIndex++;
+            
+            if (state.calibrationData.currentIndex < 10) {
+                renderQuestion();
+            } else {
+                await completeCalibration();
+            }
+        }
+
+        async function completeCalibration() {
+            try {
+                const result = await apiRequest(`/users/${state.user.id}/skills/${state.calibrationData.skillId}/calibration/complete`, {
+                    method: 'POST'
+                });
+                
+                document.getElementById('calibrationQuiz').style.display = 'none';
+                document.getElementById('calibrationResults').style.display = 'block';
+                
+                const correct = state.calibrationData.answers.filter(a => a.isCorrect).length;
+                const accuracy = Math.round((correct / state.calibrationData.answers.length) * 100);
+                
+                document.getElementById('resultsScore').textContent = accuracy + '%';
+                document.getElementById('resultsMessage').textContent = result.message;
+                document.getElementById('resultCorrect').textContent = `${correct}/10`;
+                document.getElementById('resultAccuracy').textContent = accuracy + '%';
+                document.getElementById('resultDifficulty').textContent = result.difficultyTarget;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        function finishCalibration() {
+            document.getElementById('calibrationSetup').style.display = 'block';
+            document.getElementById('calibrationQuiz').style.display = 'none';
+            document.getElementById('calibrationResults').style.display = 'none';
+            loadCalibrationSkills();
+        }
+
+        // Challenges
+        async function loadChallenges() {
+            await Promise.all([
+                loadPendingChallenges(),
+                loadChallengeHistory()
+            ]);
+        }
+
+        async function loadPendingChallenges() {
+            showLoading('pendingChallengesList');
+            
+            try {
+                const challenges = await apiRequest(`/users/${state.user.id}/challenges/pending`);
+                state.pendingChallenges = challenges || [];
+                
+                const container = document.getElementById('pendingChallengesList');
+                
+                if (state.pendingChallenges.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎉</div>
+                            <p>No pending challenges! You're all caught up.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="list">${state.pendingChallenges.map(challenge => `
+                        <div class="list-item" onclick="answerChallenge('${challenge.challengeId}')">
+                            <div class="list-item-title">${challenge.skillName}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                                <span class="list-item-desc">Difficulty: ${challenge.difficulty}/10</span>
+                                <span class="badge badge-primary">Click to Answer</span>
+                            </div>
+                        </div>
+                    `).join('')}</div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function loadChallengeHistory() {
+            showLoading('challengeHistoryList');
+            
+            try {
+                const history = await apiRequest(`/users/${state.user.id}/challenges/history?limit=10`);
+                state.challengeHistory = history || [];
+                
+                const container = document.getElementById('challengeHistoryList');
+                
+                if (state.challengeHistory.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📝</div>
+                            <p>No challenge history yet. Start answering challenges!</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="list">${state.challengeHistory.map(item => `
+                        <div class="list-item">
+                            <div class="list-item-title">${item.skillName}</div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                                <span class="list-item-desc">${new Date(item.answeredAt).toLocaleDateString()}</span>
+                                <span class="badge ${item.isCorrect ? 'badge-success' : 'badge-warning'}">${item.isCorrect ? '✅ Correct' : '❌ Incorrect'}</span>
+                            </div>
+                        </div>
+                    `).join('')}</div>
+                `;
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function answerChallenge(challengeId) {
+            try {
+                const challenge = await apiRequest(`/challenges/${challengeId}`);
+                
+                // Simple prompt-based answer for now
+                const answer = prompt(`${challenge.skillName} - Difficulty ${challenge.difficulty}/10\n\n${challenge.question}\n\nA: ${challenge.options[0]}\nB: ${challenge.options[1]}\nC: ${challenge.options[2]}\nD: ${challenge.options[3]}\n\nEnter your answer (A, B, C, or D):`);
+                
+                if (!answer) return;
+                
+                const optionMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3 };
+                const selectedOption = optionMap[answer];
+                
+                if (selectedOption === undefined) {
+                    showToast('Invalid answer. Please enter A, B, C, or D.', 'error');
+                    return;
+                }
+                
+                const result = await apiRequest('/answer', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        challengeId,
+                        userId: state.user.id,
+                        selectedOption
+                    })
+                });
+                
+                showToast(result.isCorrect ? '✅ Correct!' : '❌ Incorrect', result.isCorrect ? 'success' : 'error');
+                loadPendingChallenges();
+                loadChallengeHistory();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        // Initialize
+        function initApp() {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('mainApp').classList.add('active');
+            document.getElementById('navUserId').textContent = state.user.id.substring(0, 8) + '...';
+            
+            // Setup navigation
+            document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    showPage(link.dataset.page);
+                });
+            });
+            
+            loadDashboard();
+        }
+
+        // Check for saved session
+        window.onload = () => {
+            const savedUser = localStorage.getItem('skillIssueUser');
+            const savedApiKey = localStorage.getItem('skillIssueApiKey');
+            
+            if (savedUser && savedApiKey) {
+                try {
+                    state.user = JSON.parse(savedUser);
+                    state.apiKey = savedApiKey;
+                    initApp();
+                } catch (e) {
+                    console.error('Failed to restore session:', e);
+                }
+            }
+        };
+    </script>
+</body>
+</html>
