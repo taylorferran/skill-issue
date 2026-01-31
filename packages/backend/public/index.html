@@ -689,7 +689,7 @@
       <div class="logo">
         <div class="logo-icon">🎯</div>
         Skill Issue
-        <span style="background: var(--error); color: white; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-left: 12px;">Admin</span>
+        <span style="background: white; color: var(--error); padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-left: 12px; border: 2px solid var(--error);">Admin</span>
       </div>
       <div class="api-config">
         <input type="password" class="api-input" id="apiKey" placeholder="Enter Bearer Token (e.g., whiteclaw)">
@@ -727,7 +727,7 @@
 
     <!-- Dashboard Tab -->
     <div id="dashboard" class="tab-content active">
-      <div class="stats-grid">
+      <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
         <div class="stat-card">
           <div class="stat-value" id="totalUsers">-</div>
           <div class="stat-label">Total Users</div>
@@ -735,14 +735,6 @@
         <div class="stat-card">
           <div class="stat-value" id="totalSkills">-</div>
           <div class="stat-label">Total Skills</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="totalChallenges">-</div>
-          <div class="stat-label">Total Challenges</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" id="totalAnswers">-</div>
-          <div class="stat-label">Total Answers</div>
         </div>
       </div>
 
@@ -790,6 +782,21 @@
             </div>
             <span>→</span>
           </div>
+        </div>
+
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+          <div class="info-box" style="margin-bottom: 1rem;">
+            <span class="info-box-icon">⚡</span>
+            <div class="info-box-content">
+              <strong>Run Scheduler</strong> Manually trigger the scheduling agent to create challenges for eligible users. 
+              This runs automatically every 30 minutes via cron job. Response may take a few seconds.
+            </div>
+          </div>
+          <button class="btn btn-primary" id="dashboardSchedulerBtn" onclick="triggerSchedulerFromDashboard()" style="width: 100%;">
+            <span id="dashboardSchedulerText">🚀 Run Scheduler Tick</span>
+            <span id="dashboardSchedulerSpinner" class="loading-spinner" style="display: none; margin-left: 8px; width: 16px; height: 16px; border-width: 2px;"></span>
+          </button>
+          <div id="dashboardSchedulerResponse"></div>
         </div>
       </div>
     </div>
@@ -1331,8 +1338,6 @@
         
         document.getElementById('totalUsers').textContent = Array.isArray(users) ? users.length : '-';
         document.getElementById('totalSkills').textContent = Array.isArray(skills) ? skills.length : '-';
-        document.getElementById('totalChallenges').textContent = '-';
-        document.getElementById('totalAnswers').textContent = '-';
       } catch (error) {
         console.error('Failed to load dashboard stats:', error);
       }
@@ -2072,6 +2077,34 @@
         showResponse('schedulerResponse', data, !response.ok);
       } catch (error) {
         showResponse('schedulerResponse', { error: error.message }, true);
+      }
+    }
+
+    async function triggerSchedulerFromDashboard() {
+      const btn = document.getElementById('dashboardSchedulerBtn');
+      const text = document.getElementById('dashboardSchedulerText');
+      const spinner = document.getElementById('dashboardSchedulerSpinner');
+      
+      // Disable button and show spinner
+      btn.disabled = true;
+      text.textContent = 'Running Scheduler...';
+      spinner.style.display = 'inline-block';
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/scheduler/tick`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        showResponse('dashboardSchedulerResponse', data, !response.ok);
+      } catch (error) {
+        showResponse('dashboardSchedulerResponse', { error: error.message }, true);
+      } finally {
+        // Re-enable button and hide spinner
+        btn.disabled = false;
+        text.textContent = '🚀 Run Scheduler Tick';
+        spinner.style.display = 'none';
       }
     }
 

@@ -1889,16 +1889,74 @@
                     </div>
                 </div>
 
-                <div class="divider"></div>
+                <div id="challengeHistorySection">
+                    <div class="divider"></div>
 
-                <div class="section-header">
-                    <div class="section-title">Challenge History</div>
+                    <div class="section-header">
+                        <div class="section-title">Challenge History</div>
+                    </div>
+                    
+                    <div id="challengeHistoryList">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            Loading history...
+                        </div>
+                    </div>
                 </div>
-                
-                <div id="challengeHistoryList">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading history...
+
+                <!-- Challenge History Detail Modal -->
+                <div id="challengeHistoryDetailModal" style="display: none;">
+                    <div class="quiz-container" style="margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <span class="badge badge-primary" id="historyDetailSkillName">Skill Name</span>
+                            <span class="quiz-difficulty" id="historyDetailDifficulty" style="margin: 0;">Difficulty: 5</span>
+                        </div>
+                        
+                        <div class="quiz-question" id="historyDetailQuestion">Question goes here...</div>
+                        
+                        <div class="quiz-options" id="historyDetailOptions">
+                            <!-- Options will be inserted here -->
+                        </div>
+
+                        <!-- Answer Details -->
+                        <div style="margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--gray-200);">
+                            <div class="feedback" id="historyDetailFeedback">
+                                <!-- Feedback content -->
+                            </div>
+                            
+                            <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+                                <div style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md);">
+                                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Your Answer</div>
+                                    <div id="historyDetailUserAnswer" style="font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); margin-top: 4px;">-</div>
+                                </div>
+                                <div style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md);">
+                                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Correct Answer</div>
+                                    <div id="historyDetailCorrectAnswer" style="font-size: var(--text-lg); font-weight: 700; color: var(--success); margin-top: 4px;">-</div>
+                                </div>
+                                <div style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md);">
+                                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Confidence</div>
+                                    <div id="historyDetailConfidence" style="font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); margin-top: 4px;">-</div>
+                                </div>
+                                <div style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md);">
+                                    <div style="font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Response Time</div>
+                                    <div id="historyDetailResponseTime" style="font-size: var(--text-lg); font-weight: 700; color: var(--text-primary); margin-top: 4px;">-</div>
+                                </div>
+                            </div>
+
+                            <div id="historyDetailUserFeedbackSection" style="margin-top: 16px; display: none;">
+                                <div style="font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Your Feedback</div>
+                                <div id="historyDetailUserFeedback" style="background: var(--bg-secondary); padding: 12px; border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--text-primary);"></div>
+                            </div>
+
+                            <div style="margin-top: 16px;">
+                                <div style="font-size: var(--text-xs); font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Answered On</div>
+                                <div id="historyDetailAnsweredAt" style="font-size: var(--text-sm); color: var(--text-primary);"></div>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="closeChallengeHistoryDetail()" style="width: 100%; margin-top: 24px;">
+                            Close
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2869,7 +2927,7 @@
                 
                 container.innerHTML = `
                     <div class="list">${state.challengeHistory.map(item => `
-                        <div class="list-item">
+                        <div class="list-item" onclick="viewChallengeHistoryDetail('${item.challengeId}')" style="cursor: pointer;">
                             <div class="list-item-title">${item.skillName}</div>
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
                                 <span class="list-item-desc">${new Date(item.answeredAt).toLocaleDateString()}</span>
@@ -2892,7 +2950,7 @@
                 
                 // Show the answer modal
                 document.getElementById('pendingChallengesSection').style.display = 'none';
-                document.getElementById('challengeHistoryList').parentElement.style.display = 'none';
+                document.getElementById('challengeHistorySection').style.display = 'none';
                 document.getElementById('challengeAnswerModal').style.display = 'block';
                 
                 // Populate challenge data
@@ -3024,12 +3082,99 @@
         function closeAnswerModal() {
             document.getElementById('challengeAnswerModal').style.display = 'none';
             document.getElementById('pendingChallengesSection').style.display = 'block';
-            document.getElementById('challengeHistoryList').parentElement.style.display = 'block';
+            document.getElementById('challengeHistorySection').style.display = 'block';
             
             stopAnswerTimer();
             currentChallenge = null;
             selectedAnswer = null;
             selectedConfidence = null;
+        }
+
+        // Challenge History Detail Functions
+        async function viewChallengeHistoryDetail(challengeId) {
+            try {
+                // Find the history item
+                const historyItem = state.challengeHistory.find(item => item.challengeId === challengeId);
+                if (!historyItem) {
+                    showToast('Challenge not found in history', 'error');
+                    return;
+                }
+
+                // Fetch the full challenge details
+                const challenge = await apiRequest(`/challenges/${challengeId}`);
+                
+                // Hide other sections and show detail modal
+                document.getElementById('pendingChallengesSection').style.display = 'none';
+                document.getElementById('challengeHistorySection').style.display = 'none';
+                document.getElementById('challengeHistoryDetailModal').style.display = 'block';
+                
+                // Populate challenge data
+                document.getElementById('historyDetailSkillName').textContent = challenge.skillName;
+                document.getElementById('historyDetailDifficulty').textContent = `Difficulty: ${challenge.difficulty}/10`;
+                document.getElementById('historyDetailQuestion').textContent = challenge.question;
+                
+                // Create answer options (readonly)
+                document.getElementById('historyDetailOptions').innerHTML = challenge.options.map((option, index) => {
+                    const isCorrect = index === historyItem.correctOption;
+                    const isUserAnswer = index === historyItem.selectedOption;
+                    let className = 'quiz-option';
+                    if (isCorrect) className += ' correct';
+                    else if (isUserAnswer && !isCorrect) className += ' incorrect';
+                    
+                    return `
+                        <div class="${className}" style="cursor: default; opacity: ${isCorrect || isUserAnswer ? '1' : '0.6'};">
+                            <strong>${String.fromCharCode(65 + index)}.</strong> ${option}
+                            ${isCorrect ? ' ✅' : ''}
+                            ${isUserAnswer && !isCorrect ? ' ❌ (Your answer)' : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Populate feedback
+                const feedbackEl = document.getElementById('historyDetailFeedback');
+                feedbackEl.className = `feedback ${historyItem.isCorrect ? 'correct' : 'incorrect'}`;
+                feedbackEl.innerHTML = `
+                    <strong>${historyItem.isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
+                    ${historyItem.explanation || challenge.explanation || ''}
+                `;
+                
+                // Populate answer details
+                document.getElementById('historyDetailUserAnswer').textContent = 
+                    String.fromCharCode(65 + historyItem.selectedOption) + '. ' + challenge.options[historyItem.selectedOption];
+                document.getElementById('historyDetailCorrectAnswer').textContent = 
+                    String.fromCharCode(65 + historyItem.correctOption) + '. ' + challenge.options[historyItem.correctOption];
+                
+                // Confidence
+                const confidence = historyItem.confidence || 3;
+                const confidenceEmojis = ['😰', '😕', '😐', '🙂', '😎'];
+                document.getElementById('historyDetailConfidence').textContent = `${confidence} ${confidenceEmojis[confidence - 1]}`;
+                
+                // Response time
+                const responseTime = historyItem.responseTime || 0;
+                const seconds = Math.round(responseTime / 1000);
+                document.getElementById('historyDetailResponseTime').textContent = `${seconds}s`;
+                
+                // User feedback
+                if (historyItem.userFeedback) {
+                    document.getElementById('historyDetailUserFeedbackSection').style.display = 'block';
+                    document.getElementById('historyDetailUserFeedback').textContent = historyItem.userFeedback;
+                } else {
+                    document.getElementById('historyDetailUserFeedbackSection').style.display = 'none';
+                }
+                
+                // Answered date
+                document.getElementById('historyDetailAnsweredAt').textContent = 
+                    new Date(historyItem.answeredAt).toLocaleString();
+                
+            } catch (error) {
+                showToast('Failed to load challenge details: ' + error.message, 'error');
+            }
+        }
+
+        function closeChallengeHistoryDetail() {
+            document.getElementById('challengeHistoryDetailModal').style.display = 'none';
+            document.getElementById('pendingChallengesSection').style.display = 'block';
+            document.getElementById('challengeHistorySection').style.display = 'block';
         }
 
         // Profile Page Functions
