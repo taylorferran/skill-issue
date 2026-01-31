@@ -3,29 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skill Issue - User App</title>
+    <title>Skill Issue</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+        }
         
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
+            /* Primary Colors */
+            --primary-main: #1e3648;
+            --primary-light: rgba(30, 54, 72, 0.1);
+            --primary-medium: rgba(30, 54, 72, 0.2);
+            --primary-border: rgba(30, 54, 72, 0.3);
+            
+            /* Background Colors */
+            --bg-primary: #f5f5f7;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #fbfbfd;
+            
+            /* Text Colors */
+            --text-primary: #1d1d1f;
+            --text-secondary: #6c777f;
+            --text-tertiary: #262626;
+            --text-inverse: #ffffff;
+            
+            /* Gray Scale */
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            
+            /* Semantic Colors */
             --success: #10b981;
-            --warning: #f59e0b;
+            --success-light: rgba(16, 185, 129, 0.1);
             --error: #ef4444;
-            --bg: #f3f4f6;
-            --card: #ffffff;
-            --text: #1f2937;
-            --text-light: #6b7280;
+            --error-light: rgba(239, 68, 68, 0.1);
+            --warning: #f59e0b;
+            --warning-light: rgba(245, 158, 11, 0.1);
+            
+            /* Shadows */
+            --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.03);
+            --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.1);
+            
+            /* Border Radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --radius-2xl: 20px;
+            --radius-full: 9999px;
+            
+            /* Spacing */
+            --space-xs: 4px;
+            --space-sm: 8px;
+            --space-md: 12px;
+            --space-lg: 16px;
+            --space-xl: 20px;
+            --space-2xl: 24px;
+            --space-3xl: 32px;
+            --space-4xl: 48px;
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
+        /* Typography */
+        .text-xs { font-size: 10px; }
+        .text-sm { font-size: 12px; }
+        .text-base { font-size: 14px; }
+        .text-lg { font-size: 18px; }
+        .text-xl { font-size: 24px; }
+        .text-2xl { font-size: 28px; }
+        .text-3xl { font-size: 30px; }
+        
+        .font-regular { font-weight: 400; }
+        .font-medium { font-weight: 500; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .font-black { font-weight: 900; }
+        
+        /* App Container */
         .app { display: none; }
         .app.active { display: block; }
         
@@ -35,103 +104,174 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
+            background: var(--bg-primary);
+            padding: var(--space-xl);
+            position: relative;
+        }
+        
+        .login-screen::before {
+            content: 'SI';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40vw;
+            font-weight: 900;
+            color: var(--primary-main);
+            opacity: 0.03;
+            pointer-events: none;
+            letter-spacing: -0.05em;
+            z-index: 0;
         }
         
         .login-card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-2xl);
+            padding: var(--space-3xl);
             width: 100%;
-            max-width: 420px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            max-width: 400px;
+            box-shadow: var(--shadow-card);
+            position: relative;
+            z-index: 1;
         }
         
         .login-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: var(--space-2xl);
         }
         
-        .logo {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px;
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--primary-light);
+            border-radius: var(--radius-lg);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 20px;
-            font-size: 32px;
+            margin: 0 auto var(--space-md);
+            font-size: 24px;
+        }
+        
+        .brand-title {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 3.2px;
+            text-transform: uppercase;
+            color: var(--text-primary);
+        }
+        
+        .login-subtitle {
+            color: var(--text-secondary);
+            font-size: var(--text-base);
+            margin-top: var(--space-sm);
         }
         
         .tabs {
             display: flex;
-            border-bottom: 2px solid #e5e7eb;
-            margin-bottom: 24px;
+            background: var(--gray-100);
+            border-radius: var(--radius-lg);
+            padding: 4px;
+            margin-bottom: var(--space-xl);
         }
         
         .tab {
             flex: 1;
-            padding: 12px;
+            padding: var(--space-md) var(--space-lg);
             text-align: center;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
-            margin-bottom: -2px;
+            border-radius: var(--radius-md);
             font-weight: 500;
-            transition: all 0.3s;
+            font-size: var(--text-base);
+            transition: all 0.2s ease;
+            color: var(--text-secondary);
+            border: none;
+            background: transparent;
         }
         
         .tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
+            background: var(--bg-secondary);
+            color: var(--primary-main);
+            box-shadow: var(--shadow-subtle);
         }
         
+        /* Form Elements */
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: var(--space-lg);
         }
         
-        label {
+        .form-label {
             display: block;
-            margin-bottom: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-light);
+            margin-bottom: var(--space-sm);
+            font-size: var(--text-sm);
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
-        input, select {
+        .form-input,
+        .form-select {
             width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            padding: var(--space-md) var(--space-lg);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            font-size: var(--text-base);
+            font-family: inherit;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.2s ease;
         }
         
-        input:focus, select:focus {
+        .form-input:focus,
+        .form-select:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: var(--primary-main);
+            box-shadow: 0 0 0 3px var(--primary-light);
         }
         
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--space-md);
+        }
+        
+        /* Buttons */
         .btn {
             width: 100%;
-            padding: 14px;
+            padding: var(--space-md) var(--space-xl);
             border: none;
-            border-radius: 10px;
-            font-size: 16px;
+            border-radius: var(--radius-lg);
+            font-size: var(--text-base);
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s ease;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-sm);
+            height: 56px;
         }
         
         .btn-primary {
-            background: var(--primary);
-            color: white;
+            background: var(--primary-main);
+            color: var(--text-inverse);
+            box-shadow: var(--shadow-subtle);
         }
         
         .btn-primary:hover {
-            background: var(--primary-dark);
+            background: rgba(30, 54, 72, 0.9);
             transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--gray-200);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--gray-50);
         }
         
         .btn:disabled {
@@ -148,10 +288,11 @@
             display: block;
         }
         
+        /* Navbar */
         .navbar {
-            background: white;
-            border-bottom: 1px solid #e5e7eb;
-            padding: 0 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 0 var(--space-xl);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -169,66 +310,87 @@
         .nav-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-size: 20px;
+            gap: var(--space-md);
+            font-size: 14px;
             font-weight: 700;
+            letter-spacing: 3.2px;
+            text-transform: uppercase;
+            color: var(--text-primary);
         }
         
         .nav-logo {
             width: 36px;
             height: 36px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 8px;
+            background: var(--primary-light);
+            border-radius: var(--radius-lg);
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 18px;
         }
         
         .nav-links {
             display: flex;
-            gap: 8px;
+            gap: var(--space-xs);
+            background: var(--gray-100);
+            padding: 4px;
+            border-radius: var(--radius-lg);
         }
         
         .nav-link {
-            padding: 8px 16px;
-            border-radius: 8px;
+            padding: var(--space-sm) var(--space-lg);
+            border-radius: var(--radius-md);
             text-decoration: none;
-            color: var(--text-light);
+            color: var(--text-secondary);
             font-weight: 500;
-            transition: all 0.3s;
+            font-size: var(--text-sm);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .nav-link:hover, .nav-link.active {
-            background: #f3f4f6;
-            color: var(--primary);
+            background: var(--bg-secondary);
+            color: var(--primary-main);
+            box-shadow: var(--shadow-subtle);
         }
         
         .nav-user {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: var(--space-lg);
         }
         
         .user-id {
-            font-size: 14px;
-            color: var(--text-light);
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+            font-weight: 500;
         }
         
         .logout-btn {
-            padding: 8px 16px;
+            padding: var(--space-sm) var(--space-lg);
             border: none;
-            background: #fee2e2;
+            background: var(--error-light);
             color: var(--error);
-            border-radius: 8px;
+            border-radius: var(--radius-lg);
             cursor: pointer;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: var(--text-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+        }
+        
+        .logout-btn:hover {
+            background: var(--error);
+            color: var(--text-inverse);
         }
         
         /* Content */
         .content {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 24px;
+            padding: var(--space-2xl);
         }
         
         .page {
@@ -247,290 +409,316 @@
         
         /* Cards */
         .card {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
+            margin-bottom: var(--space-xl);
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--gray-200);
         }
         
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: var(--space-xl);
         }
         
         .card-title {
-            font-size: 20px;
+            font-size: var(--text-lg);
             font-weight: 700;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .grid-2 {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: var(--space-xl);
         }
         
         /* Stats */
         .stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
+            gap: var(--space-lg);
+            margin-bottom: var(--space-xl);
         }
         
         .stat-card {
-            background: white;
-            border-radius: 16px;
-            padding: 24px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-xl);
             text-align: center;
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--gray-200);
         }
         
         .stat-value {
             font-size: 36px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+            color: var(--primary-main);
+            line-height: 1;
+            margin-bottom: var(--space-sm);
         }
         
         .stat-label {
-            color: var(--text-light);
-            font-size: 14px;
-            margin-top: 4px;
+            color: var(--text-secondary);
+            font-size: var(--text-sm);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         /* Lists */
         .list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: var(--space-md);
         }
         
         .list-item {
-            background: #f9fafb;
-            border: 2px solid transparent;
-            border-radius: 12px;
-            padding: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            padding: var(--space-lg);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-subtle);
         }
         
         .list-item:hover {
-            border-color: var(--primary);
-            background: white;
+            border-color: var(--primary-main);
+            box-shadow: var(--shadow-card);
+            transform: translateY(-2px);
         }
         
         .list-item-title {
-            font-weight: 600;
-            margin-bottom: 4px;
+            font-weight: 700;
+            font-size: var(--text-base);
+            color: var(--text-primary);
+            margin-bottom: var(--space-xs);
         }
         
         .list-item-desc {
-            font-size: 14px;
-            color: var(--text-light);
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
         
+        /* Badges */
         .badge {
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 9999px;
-            font-size: 12px;
-            font-weight: 600;
+            padding: var(--space-xs) var(--space-md);
+            border-radius: var(--radius-full);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .badge-warning {
-            background: #fef3c7;
+            background: var(--warning-light);
             color: #92400e;
         }
         
         .badge-success {
-            background: #d1fae5;
+            background: var(--success-light);
             color: #065f46;
         }
         
         .badge-primary {
-            background: #e0e7ff;
-            color: #3730a3;
+            background: var(--primary-light);
+            color: var(--primary-main);
         }
         
         /* Quiz */
         .quiz-container {
-            background: white;
-            border-radius: 20px;
-            padding: 32px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-xl);
+            padding: var(--space-2xl);
+            box-shadow: var(--shadow-card);
+            border: 1px solid var(--gray-200);
         }
         
         .quiz-progress {
-            margin-bottom: 32px;
+            margin-bottom: var(--space-2xl);
         }
         
         .progress-header {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: var(--text-light);
+            margin-bottom: var(--space-sm);
+            font-size: var(--text-sm);
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .progress-bar {
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 4px;
+            height: 6px;
+            background: var(--gray-200);
+            border-radius: var(--radius-full);
             overflow: hidden;
         }
         
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            border-radius: 4px;
-            transition: width 0.3s;
+            background: var(--primary-main);
+            border-radius: var(--radius-full);
+            transition: width 0.3s ease;
         }
         
         .quiz-difficulty {
             display: inline-block;
-            padding: 6px 16px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 9999px;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 16px;
+            padding: var(--space-sm) var(--space-lg);
+            background: var(--primary-main);
+            color: var(--text-inverse);
+            border-radius: var(--radius-full);
+            font-size: var(--text-sm);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--space-lg);
         }
         
         .quiz-question {
-            font-size: 20px;
-            font-weight: 600;
+            font-size: var(--text-lg);
+            font-weight: 700;
             line-height: 1.5;
-            margin-bottom: 24px;
+            margin-bottom: var(--space-xl);
+            color: var(--text-primary);
         }
         
         .quiz-options {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: var(--space-md);
         }
         
         .quiz-option {
-            padding: 16px 20px;
-            background: #f9fafb;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
+            padding: var(--space-lg) var(--space-xl);
+            background: var(--bg-tertiary);
+            border: 2px solid var(--gray-200);
+            border-radius: var(--radius-lg);
             cursor: pointer;
             text-align: left;
-            font-size: 16px;
-            transition: all 0.3s;
+            font-size: var(--text-base);
+            transition: all 0.2s ease;
+            font-family: inherit;
+            color: var(--text-primary);
+            font-weight: 500;
         }
         
         .quiz-option:hover {
-            border-color: var(--primary);
-            background: white;
+            border-color: var(--primary-main);
+            background: var(--bg-secondary);
         }
         
         .quiz-option.selected {
-            border-color: var(--primary);
-            background: #e0e7ff;
+            border-color: var(--primary-main);
+            background: var(--primary-light);
         }
         
         .quiz-option.correct {
             border-color: var(--success);
-            background: #d1fae5;
+            background: var(--success-light);
         }
         
         .quiz-option.incorrect {
             border-color: var(--error);
-            background: #fee2e2;
+            background: var(--error-light);
         }
         
         .feedback {
-            margin-top: 24px;
-            padding: 20px;
-            border-radius: 12px;
+            margin-top: var(--space-xl);
+            padding: var(--space-lg);
+            border-radius: var(--radius-lg);
+            font-weight: 500;
         }
         
         .feedback.correct {
-            background: #d1fae5;
+            background: var(--success-light);
             color: #065f46;
         }
         
         .feedback.incorrect {
-            background: #fee2e2;
+            background: var(--error-light);
             color: #991b1b;
         }
-
-        /* Confidence Buttons */
-        .confidence-btn {
-            flex: 1;
-            padding: 12px 8px;
-            border: 2px solid #e5e7eb;
-            border-radius: 8px;
-            background: white;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-
-        .confidence-btn:hover {
-            border-color: var(--primary);
-            background: #f5f7ff;
-        }
-
-        .confidence-btn.selected {
-            border-color: var(--primary);
-            background: var(--primary);
-            color: white;
-        }
-
-        /* Timer */
-        #answerTimer {
-            font-family: monospace;
-        }
-
+        
         /* Results */
         .results {
             text-align: center;
-            padding: 48px 24px;
+            padding: var(--space-3xl) var(--space-xl);
         }
         
         .results-score {
             font-size: 72px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 16px;
+            font-weight: 900;
+            color: var(--primary-main);
+            margin-bottom: var(--space-md);
+            line-height: 1;
         }
         
         .results-message {
-            font-size: 20px;
-            color: var(--text-light);
-            margin-bottom: 32px;
+            font-size: var(--text-lg);
+            color: var(--text-secondary);
+            margin-bottom: var(--space-2xl);
+            font-weight: 500;
+        }
+        
+        /* Confidence Buttons */
+        .confidence-btn {
+            flex: 1;
+            padding: var(--space-md) var(--space-sm);
+            border: 2px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            cursor: pointer;
+            font-size: var(--text-base);
+            transition: all 0.2s ease;
+            font-weight: 600;
+        }
+        
+        .confidence-btn:hover {
+            border-color: var(--primary-main);
+            background: var(--primary-light);
+        }
+        
+        .confidence-btn.selected {
+            border-color: var(--primary-main);
+            background: var(--primary-main);
+            color: var(--text-inverse);
         }
         
         /* Toast */
         .toast-container {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
+            bottom: var(--space-xl);
+            right: var(--space-xl);
             z-index: 1000;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: var(--space-md);
         }
         
         .toast {
-            padding: 16px 24px;
-            border-radius: 12px;
-            color: white;
-            font-weight: 500;
+            padding: var(--space-md) var(--space-xl);
+            border-radius: var(--radius-lg);
+            color: var(--text-inverse);
+            font-weight: 600;
             animation: slideIn 0.3s ease;
             max-width: 400px;
+            font-size: var(--text-sm);
+            box-shadow: var(--shadow-medium);
         }
         
         .toast.success { background: var(--success); }
         .toast.error { background: var(--error); }
-        .toast.info { background: var(--primary); }
+        .toast.info { background: var(--primary-main); }
         
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
@@ -542,16 +730,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
-            padding: 48px;
-            color: var(--text-light);
+            gap: var(--space-md);
+            padding: var(--space-3xl);
+            color: var(--text-secondary);
+            font-weight: 500;
         }
         
         .spinner {
             width: 24px;
             height: 24px;
-            border: 3px solid #e5e7eb;
-            border-top-color: var(--primary);
+            border: 3px solid var(--gray-200);
+            border-top-color: var(--primary-main);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -563,26 +752,94 @@
         /* Empty State */
         .empty-state {
             text-align: center;
-            padding: 64px 24px;
-            color: var(--text-light);
+            padding: var(--space-3xl) var(--space-xl);
+            color: var(--text-secondary);
         }
         
         .empty-state-icon {
-            font-size: 64px;
-            margin-bottom: 16px;
+            font-size: 48px;
+            margin-bottom: var(--space-md);
             opacity: 0.5;
         }
         
-        /* Mobile Nav */
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: var(--space-xl);
+        }
+        
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-2xl);
+            padding: var(--space-2xl);
+            max-width: 400px;
+            width: 100%;
+            box-shadow: var(--shadow-medium);
+        }
+        
+        .modal-title {
+            font-size: var(--text-xl);
+            font-weight: 700;
+            margin-bottom: var(--space-sm);
+            color: var(--text-primary);
+        }
+        
+        .modal-subtitle {
+            color: var(--text-secondary);
+            margin-bottom: var(--space-xl);
+            font-size: var(--text-base);
+        }
+        
+        /* Difficulty Buttons */
+        .difficulty-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--space-sm);
+            margin-bottom: var(--space-lg);
+        }
+        
+        .difficulty-btn {
+            aspect-ratio: 1;
+            border: 2px solid var(--gray-200);
+            border-radius: var(--radius-md);
+            background: var(--bg-secondary);
+            cursor: pointer;
+            font-weight: 700;
+            font-size: var(--text-base);
+            transition: all 0.2s ease;
+            color: var(--text-primary);
+        }
+        
+        .difficulty-btn:hover {
+            border-color: var(--primary-main);
+            background: var(--primary-light);
+        }
+        
+        .difficulty-btn.selected {
+            background: var(--primary-main);
+            border-color: var(--primary-main);
+            color: var(--text-inverse);
+        }
+        
+        /* Mobile Navigation */
         .mobile-nav {
             display: none;
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: white;
-            border-top: 1px solid #e5e7eb;
-            padding: 8px;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--gray-200);
+            padding: var(--space-sm);
             z-index: 100;
         }
         
@@ -595,21 +852,43 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 8px 16px;
+            padding: var(--space-sm) var(--space-lg);
             text-decoration: none;
-            color: var(--text-light);
-            font-size: 12px;
+            color: var(--text-secondary);
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .mobile-nav-link.active {
-            color: var(--primary);
+            color: var(--primary-main);
         }
         
+        /* Responsive */
         @media (max-width: 768px) {
             .nav-links { display: none; }
             .mobile-nav { display: block; }
-            .content { padding-bottom: 80px; }
-            .navbar-content { padding: 0 16px; }
+            .content { 
+                padding: var(--space-lg); 
+                padding-bottom: 80px;
+            }
+            .navbar-content { padding: 0 var(--space-lg); }
+            .grid-2 { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .login-screen::before { font-size: 60vw; }
+        }
+        
+        @media (max-width: 480px) {
+            .login-card {
+                padding: var(--space-xl);
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .difficulty-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
         }
     </style>
 </head>
@@ -618,25 +897,25 @@
     <div id="loginScreen" class="login-screen">
         <div class="login-card">
             <div class="login-header">
-                <div class="logo">🎯</div>
-                <h1>Skill Issue</h1>
-                <p style="color: #6b7280;">Master any skill with AI-powered learning</p>
+                <div class="brand-icon">💎</div>
+                <div class="brand-title">Skill Issue</div>
+                <p class="login-subtitle">Refine your craft.</p>
             </div>
             
             <div class="tabs">
-                <div class="tab active" onclick="switchTab('login')">Sign In</div>
-                <div class="tab" onclick="switchTab('create')">Create Account</div>
+                <button class="tab active" onclick="switchTab('login')">Sign In</button>
+                <button class="tab" onclick="switchTab('create')">Create Account</button>
             </div>
             
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="form-group">
-                    <label>User ID</label>
-                    <input type="text" id="loginUserId" placeholder="Enter your user ID" required>
+                    <label class="form-label">User ID</label>
+                    <input type="text" class="form-input" id="loginUserId" placeholder="Enter your user ID" required>
                 </div>
                 
                 <div class="form-group">
-                    <label>API Key</label>
-                    <input type="password" id="loginApiKey" placeholder="Enter your API key" required>
+                    <label class="form-label">API Key</label>
+                    <input type="password" class="form-input" id="loginApiKey" placeholder="Enter your API key" required>
                 </div>
                 
                 <button type="submit" class="btn btn-primary">Sign In</button>
@@ -644,13 +923,13 @@
             
             <form id="createForm" onsubmit="handleCreateAccount(event)" style="display: none;">
                 <div class="form-group">
-                    <label>API Key</label>
-                    <input type="password" id="createApiKey" placeholder="Enter your API key" required>
+                    <label class="form-label">API Key</label>
+                    <input type="password" class="form-input" id="createApiKey" placeholder="Enter your API key" required>
                 </div>
                 
                 <div class="form-group">
-                    <label>Timezone</label>
-                    <select id="createTimezone">
+                    <label class="form-label">Timezone</label>
+                    <select class="form-select" id="createTimezone">
                         <option value="UTC">UTC</option>
                         <option value="America/New_York">Eastern Time</option>
                         <option value="America/Chicago">Central Time</option>
@@ -663,21 +942,21 @@
                     </select>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="form-row">
                     <div class="form-group">
-                        <label>Quiet Hours Start (0-23)</label>
-                        <input type="number" id="createQuietStart" min="0" max="23" placeholder="22">
+                        <label class="form-label">Quiet Hours Start</label>
+                        <input type="number" class="form-input" id="createQuietStart" min="0" max="23" placeholder="22">
                     </div>
                     
                     <div class="form-group">
-                        <label>Quiet Hours End (0-23)</label>
-                        <input type="number" id="createQuietEnd" min="0" max="23" placeholder="8">
+                        <label class="form-label">Quiet Hours End</label>
+                        <input type="number" class="form-input" id="createQuietEnd" min="0" max="23" placeholder="8">
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label>Max Challenges Per Day</label>
-                    <input type="number" id="createMaxChallenges" value="5" min="1" max="20">
+                    <label class="form-label">Max Challenges/Day</label>
+                    <input type="number" class="form-input" id="createMaxChallenges" value="5" min="1" max="20">
                 </div>
                 
                 <button type="submit" class="btn btn-primary">Create Account</button>
@@ -690,15 +969,15 @@
         <nav class="navbar">
             <div class="navbar-content">
                 <div class="nav-brand">
-                    <div class="nav-logo">🎯</div>
+                    <div class="nav-logo">💎</div>
                     Skill Issue
                 </div>
                 
                 <div class="nav-links">
                     <a href="#" class="nav-link active" data-page="dashboard">Dashboard</a>
                     <a href="#" class="nav-link" data-page="skills">Skills</a>
-                    <a href="#" class="nav-link" data-page="calibration">Calibration</a>
-                    <a href="#" class="nav-link" data-page="challenges">Challenges</a>
+                    <a href="#" class="nav-link" data-page="calibration">Calibrate</a>
+                    <a href="#" class="nav-link" data-page="challenges">Practice</a>
                 </div>
                 
                 <div class="nav-user">
@@ -714,11 +993,11 @@
                 <div class="stats">
                     <div class="stat-card">
                         <div class="stat-value" id="statSkills">-</div>
-                        <div class="stat-label">Skills Enrolled</div>
+                        <div class="stat-label">Total Skills</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="statPending">-</div>
-                        <div class="stat-label">Pending Challenges</div>
+                        <div class="stat-label">Pending</div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-value" id="statCompleted">-</div>
@@ -733,7 +1012,7 @@
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">My Skills</div>
-                        <button class="btn btn-primary" onclick="showPage('skills')" style="width: auto; padding: 8px 16px;">Browse Skills</button>
+                        <button class="btn btn-primary" onclick="showPage('skills')" style="width: auto; height: 40px; padding: 0 20px;">Browse Skills</button>
                     </div>
                     <div id="dashboardSkillsList">
                         <div class="loading">
@@ -766,17 +1045,17 @@
                         
                         <form onsubmit="handleCreateSkill(event)">
                             <div class="form-group">
-                                <label>Skill Name</label>
-                                <input type="text" id="newSkillName" placeholder="e.g., Advanced Python" required>
+                                <label class="form-label">Skill Name</label>
+                                <input type="text" class="form-input" id="newSkillName" placeholder="e.g., Advanced Python" required>
                             </div>
                             
-                            <button type="button" class="btn btn-secondary" onclick="generateSkillDescription()" style="margin-bottom: 16px;">
+                            <button type="button" class="btn btn-secondary" onclick="generateSkillDescription()" style="margin-bottom: 16px; height: 44px;">
                                 🤖 Generate Description
                             </button>
                             
                             <div class="form-group">
-                                <label>Description</label>
-                                <textarea id="newSkillDescription" rows="4" placeholder="Enter description or generate above" required></textarea>
+                                <label class="form-label">Description</label>
+                                <textarea class="form-input" id="newSkillDescription" rows="4" placeholder="Enter description or generate above" required></textarea>
                             </div>
                             
                             <button type="submit" class="btn btn-primary">Create Skill</button>
@@ -793,8 +1072,8 @@
                             <div class="card-title">Skill Calibration</div>
                         </div>
                         
-                        <p style="color: #6b7280; margin-bottom: 20px;">
-                            Select a skill that needs calibration. You'll answer 10 questions to determine your starting difficulty level.
+                        <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: var(--text-base);">
+                            Select a skill that needs calibration. Complete a 10-question assessment to establish your baseline proficiency.
                         </p>
                         
                         <div id="calibrationSkillsList">
@@ -833,7 +1112,7 @@
                         <div class="results-score" id="resultsScore"></div>
                         <div class="results-message" id="resultsMessage"></div>
                         
-                        <div class="stats" style="margin-bottom: 32px;">
+                        <div class="stats" style="margin-bottom: 32px; max-width: 600px; margin-left: auto; margin-right: auto;">
                             <div class="stat-card">
                                 <div class="stat-value" id="resultCorrect">-</div>
                                 <div class="stat-label">Correct</div>
@@ -872,13 +1151,13 @@
                         </div>
 
                         <!-- Feedback Section (shown after answering) -->
-                        <div id="answerFeedbackSection" style="display: none; margin-top: 24px; padding-top: 24px; border-top: 2px solid #e5e7eb;">
+                        <div id="answerFeedbackSection" style="display: none; margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--gray-200);">
                             <div class="feedback" id="answerFeedbackResult">
                                 <!-- Feedback content -->
                             </div>
                             
                             <div style="margin-top: 16px;">
-                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">How confident were you? (1-5)</label>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.5px;">How confident were you? (1-5)</label>
                                 <div style="display: flex; gap: 8px; margin-bottom: 16px;">
                                     <button type="button" class="confidence-btn" data-value="1" onclick="selectConfidence(1)">1 😰</button>
                                     <button type="button" class="confidence-btn" data-value="2" onclick="selectConfidence(2)">2 😕</button>
@@ -889,8 +1168,8 @@
                             </div>
 
                             <div style="margin-bottom: 16px;">
-                                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Feedback (optional)</label>
-                                <textarea id="answerUserFeedback" rows="3" style="width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; resize: vertical;" placeholder="Was this question clear? Too easy or hard? Let us know!"></textarea>
+                                <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: var(--text-sm); text-transform: uppercase; letter-spacing: 0.5px;">Feedback (optional)</label>
+                                <textarea id="answerUserFeedback" rows="3" style="width: 100%; padding: 12px; border: 2px solid var(--gray-200); border-radius: 8px; resize: vertical; font-family: inherit; font-size: var(--text-base);" placeholder="Was this question clear? Too easy or hard? Let us know!"></textarea>
                             </div>
 
                             <button class="btn btn-primary" onclick="submitAnswerWithFeedback()" style="width: 100%;">
@@ -899,7 +1178,7 @@
                         </div>
 
                         <!-- Timer (optional) -->
-                        <div id="answerTimer" style="margin-top: 16px; text-align: center; color: #6b7280; font-size: 14px;">
+                        <div id="answerTimer" style="margin-top: 16px; text-align: center; color: var(--text-secondary); font-size: var(--text-sm); font-family: monospace;">
                             Time: <span id="timerDisplay">0:00</span>
                         </div>
                     </div>
@@ -910,7 +1189,7 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-title">Pending Challenges</div>
-                            <button class="btn btn-primary" onclick="loadPendingChallenges()" style="width: auto; padding: 8px 16px;">Refresh</button>
+                            <button class="btn btn-primary" onclick="loadPendingChallenges()" style="width: auto; height: 40px; padding: 0 20px;">Refresh</button>
                         </div>
                         
                         <div id="pendingChallengesList">
@@ -953,8 +1232,8 @@
                     Calibrate
                 </a>
                 <a href="#" class="mobile-nav-link" data-page="challenges">
-                    <span>🎮</span>
-                    Play
+                    <span>✏️</span>
+                    Practice
                 </a>
             </div>
         </nav>
@@ -979,6 +1258,20 @@
                 answers: []
             }
         };
+
+        // Skill Creation State
+        let lastSkillCheck = {
+            name: '',
+            isVague: false,
+            message: ''
+        };
+
+        // Challenge Answer State
+        let currentChallenge = null;
+        let selectedAnswer = null;
+        let answerStartTime = null;
+        let answerTimerInterval = null;
+        let selectedConfidence = null;
 
         const API_BASE = window.location.origin;
 
@@ -1226,54 +1519,37 @@
             // Create modal for enrollment options
             const modal = document.createElement('div');
             modal.id = 'enrollModal';
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 1000;
-                padding: 20px;
-            `;
+            modal.className = 'modal-overlay';
             
             modal.innerHTML = `
-                <div style="background: white; border-radius: 20px; padding: 32px; max-width: 400px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
-                    <h2 style="margin-bottom: 8px; font-size: 24px;">Enroll in ${skillName}</h2>
-                    <p style="color: #6b7280; margin-bottom: 24px;">Choose how you want to start learning</p>
+                <div class="modal-content">
+                    <h2 class="modal-title">Enroll in ${skillName}</h2>
+                    <p class="modal-subtitle">Choose how you want to start learning</p>
                     
                     <div style="margin-bottom: 24px;">
-                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Starting Difficulty (1-10)</label>
-                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-primary);">Starting Difficulty (1-10)</label>
+                        <div class="difficulty-grid">
                             ${[1,2,3,4,5,6,7,8,9,10].map(n => `
-                                <button type="button" class="difficulty-btn" data-value="${n}" onclick="selectEnrollDifficulty(${n})" 
-                                    style="width: 40px; height: 40px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; transition: all 0.3s;">
-                                    ${n}
-                                </button>
+                                <button type="button" class="difficulty-btn" data-value="${n}" onclick="selectEnrollDifficulty(${n})">${n}</button>
                             `).join('')}
                         </div>
-                        <p style="font-size: 14px; color: #6b7280;">
+                        <p style="font-size: 12px; color: var(--text-secondary); margin-top: 8px;">
                             <strong>1-3:</strong> Beginner &nbsp;|&nbsp; <strong>4-6:</strong> Intermediate &nbsp;|&nbsp; <strong>7-10:</strong> Advanced
                         </p>
                     </div>
                     
-                    <div style="display: flex; gap: 12px;">
-                        <button class="btn btn-secondary" onclick="closeEnrollModal()" style="flex: 1;">Cancel</button>
-                        <button class="btn btn-primary" id="enrollSubmitBtn" onclick="confirmEnroll('${skillId}')" style="flex: 1;" disabled>Enroll</button>
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                        <button class="btn btn-secondary" onclick="closeEnrollModal()" style="flex: 1; height: 48px;">Cancel</button>
+                        <button class="btn btn-primary" id="enrollSubmitBtn" onclick="confirmEnroll('${skillId}')" style="flex: 1; height: 48px;" disabled>Enroll</button>
                     </div>
                     
-                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center;">
-                            <button class="btn" onclick="enrollWithCalibration('${skillId}')" 
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 100%;"
-                        >
+                    <div style="padding-top: 16px; border-top: 1px solid var(--gray-200); text-align: center;">
+                        <button class="btn" onclick="enrollWithCalibration('${skillId}')" 
+                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 100%; height: 48px; margin-bottom: 8px;">
                             🎯 Calibrate Your Skill (Recommended)
                         </button>
                         
-                        <p style="font-size: 12px; color: #6b7280; margin-top: 8px;"
-                        >
+                        <p style="font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
                             Complete a 10-question assessment to establish your baseline proficiency
                         </p>
                     </div>
@@ -1293,13 +1569,9 @@
             document.querySelectorAll('.difficulty-btn').forEach(btn => {
                 const btnValue = parseInt(btn.dataset.value);
                 if (btnValue === value) {
-                    btn.style.background = '#6366f1';
-                    btn.style.color = 'white';
-                    btn.style.borderColor = '#6366f1';
+                    btn.classList.add('selected');
                 } else {
-                    btn.style.background = 'white';
-                    btn.style.color = 'black';
-                    btn.style.borderColor = '#e5e7eb';
+                    btn.classList.remove('selected');
                 }
             });
             
@@ -1669,20 +1941,6 @@
             }
         }
 
-        // Skill Creation State
-        let lastSkillCheck = {
-            name: '',
-            isVague: false,
-            message: ''
-        };
-
-        // Challenge Answer State
-        let currentChallenge = null;
-        let selectedAnswer = null;
-        let answerStartTime = null;
-        let answerTimerInterval = null;
-        let selectedConfidence = null;
-
         async function answerChallenge(challengeId) {
             try {
                 currentChallenge = await apiRequest(`/challenges/${challengeId}`);
@@ -1820,8 +2078,6 @@
                 }
             });
         }
-
-
 
         function closeAnswerModal() {
             document.getElementById('challengeAnswerModal').style.display = 'none';
