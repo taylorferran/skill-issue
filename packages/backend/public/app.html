@@ -663,6 +663,18 @@
                     </select>
                 </div>
                 
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Quiet Hours Start (0-23)</label>
+                        <input type="number" id="createQuietStart" min="0" max="23" placeholder="22">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Quiet Hours End (0-23)</label>
+                        <input type="number" id="createQuietEnd" min="0" max="23" placeholder="8">
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label>Max Challenges Per Day</label>
                     <input type="number" id="createMaxChallenges" value="5" min="1" max="20">
@@ -1058,14 +1070,26 @@
             const apiKey = document.getElementById('createApiKey').value;
             const timezone = document.getElementById('createTimezone').value;
             const maxChallenges = parseInt(document.getElementById('createMaxChallenges').value);
+            const quietStart = document.getElementById('createQuietStart').value;
+            const quietEnd = document.getElementById('createQuietEnd').value;
             
             // Set API key in state before making request
             state.apiKey = apiKey;
             
+            // Build user data object
+            const userData = {
+                timezone,
+                maxChallengesPerDay: maxChallenges
+            };
+            
+            // Add quiet hours if provided
+            if (quietStart) userData.quietHoursStart = parseInt(quietStart);
+            if (quietEnd) userData.quietHoursEnd = parseInt(quietEnd);
+            
             try {
                 const user = await apiRequest('/users', {
                     method: 'POST',
-                    body: JSON.stringify({ timezone, maxChallengesPerDay: maxChallenges })
+                    body: JSON.stringify(userData)
                 });
                 
                 state.user = user;
@@ -1187,7 +1211,7 @@
                 
                 container.innerHTML = `
                     <div class="list">${availableSkills.map(skill => `
-                        <div class="list-item" onclick="enrollInSkill('${skill.id}')">
+                        <div class="list-item" onclick="showEnrollOptions('${skill.id}', '${skill.name}')">
                             <div class="list-item-title">${skill.name}</div>
                             <div class="list-item-desc">${skill.description.substring(0, 100)}...</div>
                         </div>
@@ -1198,18 +1222,143 @@
             }
         }
 
-        async function enrollInSkill(skillId) {
+        function showEnrollOptions(skillId, skillName) {
+            // Create modal for enrollment options
+            const modal = document.createElement('div');
+            modal.id = 'enrollModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 1000;
+                padding: 20px;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; border-radius: 20px; padding: 32px; max-width: 400px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+                    <h2 style="margin-bottom: 8px; font-size: 24px;">Enroll in ${skillName}</h2>
+                    <p style="color: #6b7280; margin-bottom: 24px;">Choose how you want to start learning</p>
+                    
+                    <div style="margin-bottom: 24px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Starting Difficulty (1-10)</label>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+                            ${[1,2,3,4,5,6,7,8,9,10].map(n => `
+                                <button type="button" class="difficulty-btn" data-value="${n}" onclick="selectEnrollDifficulty(${n})" 
+                                    style="width: 40px; height: 40px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; cursor: pointer; font-weight: 600; transition: all 0.3s;">
+                                    ${n}
+                                </button>
+                            `).join('')}
+                        </div>
+                        <p style="font-size: 14px; color: #6b7280;">
+                            <strong>1-3:</strong> Beginner &nbsp;|&nbsp; <strong>4-6:</strong> Intermediate &nbsp;|&nbsp; <strong>7-10:</strong> Advanced
+                        </p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn btn-secondary" onclick="closeEnrollModal()" style="flex: 1;">Cancel</button>
+                        <button class="btn btn-primary" id="enrollSubmitBtn" onclick="confirmEnroll('${skillId}')" style="flex: 1;" disabled>Enroll</button>
+                    </div>
+                    
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb; text-align: center;">
+                            <button class="btn" onclick="enrollWithCalibration('${skillId}')" 
+                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; width: 100%;"
+                        >
+                            🎯 Calibrate Your Skill (Recommended)
+                        </button>
+                        
+                        <p style="font-size: 12px; color: #6b7280; margin-top: 8px;"
+                        >
+                            Complete a 10-question assessment to establish your baseline proficiency
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Store selected difficulty
+            window.selectedEnrollDifficulty = null;
+        }
+
+        function selectEnrollDifficulty(value) {
+            window.selectedEnrollDifficulty = value;
+            
+            // Update button styles
+            document.querySelectorAll('.difficulty-btn').forEach(btn => {
+                const btnValue = parseInt(btn.dataset.value);
+                if (btnValue === value) {
+                    btn.style.background = '#6366f1';
+                    btn.style.color = 'white';
+                    btn.style.borderColor = '#6366f1';
+                } else {
+                    btn.style.background = 'white';
+                    btn.style.color = 'black';
+                    btn.style.borderColor = '#e5e7eb';
+                }
+            });
+            
+            // Enable enroll button
+            document.getElementById('enrollSubmitBtn').disabled = false;
+        }
+
+        function closeEnrollModal() {
+            const modal = document.getElementById('enrollModal');
+            if (modal) modal.remove();
+            window.selectedEnrollDifficulty = null;
+        }
+
+        async function confirmEnroll(skillId) {
+            if (!window.selectedEnrollDifficulty) {
+                showToast('Please select a difficulty level', 'error');
+                return;
+            }
+            
+            try {
+                await apiRequest(`/users/${state.user.id}/skills`, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        skillId, 
+                        difficultyTarget: window.selectedEnrollDifficulty 
+                    })
+                });
+                
+                closeEnrollModal();
+                showToast(`Enrolled at difficulty ${window.selectedEnrollDifficulty}! You can start answering challenges.`, 'success');
+                loadSkills();
+            } catch (error) {
+                showToast(error.message, 'error');
+            }
+        }
+
+        async function enrollWithCalibration(skillId) {
             try {
                 await apiRequest(`/users/${state.user.id}/skills`, {
                     method: 'POST',
                     body: JSON.stringify({ skillId, difficultyTarget: 0 })
                 });
                 
-                showToast('Enrolled successfully! Start calibration to begin learning.', 'success');
+                closeEnrollModal();
+                showToast('Enrolled! Starting calibration...', 'success');
                 loadSkills();
+                
+                // Auto-start calibration
+                setTimeout(() => {
+                    showPage('calibration');
+                }, 500);
             } catch (error) {
                 showToast(error.message, 'error');
             }
+        }
+
+        async function enrollInSkill(skillId) {
+            // This function is now replaced by showEnrollOptions
+            showEnrollOptions(skillId, 'Skill');
         }
 
         async function generateSkillDescription() {
@@ -1225,8 +1374,20 @@
                     body: JSON.stringify({ skillName: name })
                 });
                 
+                // Store the check result
+                lastSkillCheck = {
+                    name: name,
+                    isVague: result.isVague,
+                    message: result.message
+                };
+                
                 document.getElementById('newSkillDescription').value = result.description;
-                showToast(result.isVague ? 'Description generated (skill name may be too vague)' : 'Description generated!', result.isVague ? 'warning' : 'success');
+                
+                if (result.isVague) {
+                    showToast(`⚠️ ${result.message}`, 'error');
+                } else {
+                    showToast('Description generated!', 'success');
+                }
             } catch (error) {
                 showToast(error.message, 'error');
             }
@@ -1237,6 +1398,18 @@
             const name = document.getElementById('newSkillName').value;
             const description = document.getElementById('newSkillDescription').value;
             
+            // Check if skill name was flagged as vague
+            if (lastSkillCheck.name === name && lastSkillCheck.isVague) {
+                showToast(`❌ Cannot create skill: ${lastSkillCheck.message}`, 'error');
+                return;
+            }
+            
+            // If they haven't generated a description yet, warn them
+            if (!lastSkillCheck.name || lastSkillCheck.name !== name) {
+                showToast('Please generate a description first to validate the skill name', 'error');
+                return;
+            }
+            
             try {
                 await apiRequest('/skills', {
                     method: 'POST',
@@ -1246,6 +1419,7 @@
                 showToast('Skill created successfully!', 'success');
                 document.getElementById('newSkillName').value = '';
                 document.getElementById('newSkillDescription').value = '';
+                lastSkillCheck = { name: '', isVague: false, message: '' };
                 loadSkills();
             } catch (error) {
                 showToast(error.message, 'error');
@@ -1495,6 +1669,13 @@
             }
         }
 
+        // Skill Creation State
+        let lastSkillCheck = {
+            name: '',
+            isVague: false,
+            message: ''
+        };
+
         // Challenge Answer State
         let currentChallenge = null;
         let selectedAnswer = null;
@@ -1569,31 +1750,36 @@
             // Highlight selected
             document.querySelector(`#answerOptions .quiz-option[data-index="${index}"]`).classList.add('selected');
             
-            // Submit answer immediately to check correctness
-            submitAnswer();
+            // Show the feedback section immediately (don't submit yet)
+            document.getElementById('answerFeedbackSection').style.display = 'block';
         }
 
-        async function submitAnswer() {
+        async function submitAnswerWithFeedback() {
+            const feedback = document.getElementById('answerUserFeedback').value;
+            
+            // If they haven't selected confidence, default to 3
+            const confidence = selectedConfidence || 3;
+            
             stopAnswerTimer();
             
             const responseTime = Date.now() - answerStartTime;
             
             try {
+                // Submit answer with confidence and feedback in ONE request
                 const result = await apiRequest('/answer', {
                     method: 'POST',
                     body: JSON.stringify({
                         challengeId: currentChallenge.id,
                         userId: state.user.id,
                         selectedOption: selectedAnswer,
-                        responseTime: responseTime
+                        responseTime: responseTime,
+                        confidence: confidence,
+                        userFeedback: feedback
                     })
                 });
                 
-                // Show feedback
-                const feedbackSection = document.getElementById('answerFeedbackSection');
+                // Show feedback result
                 const feedbackResult = document.getElementById('answerFeedbackResult');
-                
-                feedbackSection.style.display = 'block';
                 feedbackResult.className = `feedback ${result.isCorrect ? 'correct' : 'incorrect'}`;
                 feedbackResult.innerHTML = `
                     <strong>${result.isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
@@ -1608,6 +1794,17 @@
                         btn.classList.add('incorrect');
                     }
                 });
+                
+                showToast(result.isCorrect ? '✅ Correct!' : '❌ Incorrect', result.isCorrect ? 'success' : 'error');
+                
+                // Change button to "Continue" after submission
+                const submitBtn = document.querySelector('#answerFeedbackSection .btn-primary');
+                submitBtn.textContent = 'Continue →';
+                submitBtn.onclick = function() {
+                    closeAnswerModal();
+                    loadPendingChallenges();
+                    loadChallengeHistory();
+                };
                 
             } catch (error) {
                 showToast(error.message, 'error');
@@ -1624,37 +1821,7 @@
             });
         }
 
-        async function submitAnswerWithFeedback() {
-            const feedback = document.getElementById('answerUserFeedback').value;
-            
-            // If they haven't selected confidence, default to 3
-            const confidence = selectedConfidence || 3;
-            
-            try {
-                // Submit updated answer with feedback and confidence
-                await apiRequest('/answer', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        challengeId: currentChallenge.id,
-                        userId: state.user.id,
-                        selectedOption: selectedAnswer,
-                        responseTime: Date.now() - answerStartTime,
-                        confidence: confidence,
-                        userFeedback: feedback
-                    })
-                });
-                
-                showToast('Answer submitted with feedback!', 'success');
-                
-                // Reset and go back to list
-                closeAnswerModal();
-                loadPendingChallenges();
-                loadChallengeHistory();
-                
-            } catch (error) {
-                showToast(error.message, 'error');
-            }
-        }
+
 
         function closeAnswerModal() {
             document.getElementById('challengeAnswerModal').style.display = 'none';
