@@ -260,3 +260,22 @@ export interface EvaluationRequest {
   skillDescription: string;
   targetDifficulty: number;
 }
+
+// ============= Dataset Types =============
+export interface DatasetItem {
+  input: Record<string, unknown>;
+  expected_output: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ChallengeScenario {
+  scenario: string;
+  expected_concepts: string[];
+  difficulty: number;
+}
+
+export interface DatasetGenerationResult {
+  datasetName: string;
+  itemsCreated: number;
+  scenarios: ChallengeScenario[];
+}

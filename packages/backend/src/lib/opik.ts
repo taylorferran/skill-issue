@@ -968,6 +968,131 @@ class OpikService {
     await Promise.all(promises);
   }
 
+  // ============= Dataset Management =============
+
+  /**
+   * Find a dataset by name
+   */
+  async findDataset(name: string): Promise<{ id: string; name: string } | null> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Dataset lookup (local): ${name}`);
+      return null;
+    }
+
+    const response = await this.request('GET', `/datasets?name=${encodeURIComponent(name)}`);
+    if (response?.ok) {
+      const data = await response.json() as { content?: Array<{ id: string; name: string }> };
+      const datasets = data?.content || [];
+      return datasets.find((d) => d.name === name) || null;
+    }
+    return null;
+  }
+
+  /**
+   * Create a new dataset
+   */
+  async createDataset(params: {
+    name: string;
+    description?: string;
+  }): Promise<string | null> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Dataset created (local): ${params.name}`);
+      return 'local-dataset-id';
+    }
+
+    const id = generateUUIDv7();
+    const response = await this.request('POST', '/datasets', {
+      id,
+      name: params.name,
+      description: params.description,
+    });
+
+    if (response?.ok) {
+      console.log(`[Opik] Dataset created: ${params.name}`);
+      return id;
+    }
+
+    // Handle 409 - dataset already exists
+    if (response?.status === 409) {
+      console.log(`[Opik] Dataset already exists: ${params.name}`);
+      const existing = await this.findDataset(params.name);
+      return existing?.id || null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Add items to a dataset
+   */
+  async addDatasetItems(
+    datasetName: string,
+    items: Array<{
+      input: Record<string, unknown>;
+      expected_output: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    }>
+  ): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Added ${items.length} items to dataset (local): ${datasetName}`);
+      return;
+    }
+
+    // Format items according to Opik API spec:
+    // - Use PUT method (not POST)
+    // - Wrap input/expected_output in a 'data' field
+    // - 'source' field is required
+    const formattedItems = items.map(item => ({
+      id: generateUUIDv7(),
+      source: 'sdk',
+      data: {
+        input: item.input,
+        expected_output: item.expected_output,
+        metadata: item.metadata,
+      },
+    }));
+
+    // Batch in groups of 50
+    for (let i = 0; i < formattedItems.length; i += 50) {
+      const batch = formattedItems.slice(i, i + 50);
+      const response = await this.request('PUT', '/datasets/items', {
+        dataset_name: datasetName,
+        items: batch,
+      });
+
+      if (!response?.ok) {
+        console.error(`[Opik] Failed to add batch ${i / 50 + 1} to dataset ${datasetName}`);
+      }
+    }
+
+    console.log(`[Opik] Added ${formattedItems.length} items to dataset ${datasetName}`);
+  }
+
+  /**
+   * Get items from a dataset
+   */
+  async getDatasetItems(datasetName: string): Promise<Array<Record<string, unknown>>> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Get dataset items (local): ${datasetName}`);
+      return [];
+    }
+
+    // First get the dataset ID from the name
+    const dataset = await this.findDataset(datasetName);
+    if (!dataset) {
+      console.warn(`[Opik] Dataset not found: ${datasetName}`);
+      return [];
+    }
+
+    // Use dataset_id query parameter
+    const response = await this.request('GET', `/datasets/items?dataset_id=${dataset.id}`);
+    if (response?.ok) {
+      const data = await response.json() as { content?: Array<Record<string, unknown>> };
+      return data?.content || [];
+    }
+    return [];
+  }
+
   // ============= Utilities =============
 
   private getProviderFromModel(model: string): string {
@@ -1025,3 +1150,6 @@ export function initOpik(): void {
 
 // Export for advanced usage
 export { OpikService };
+
+// Export UUID generator for dataset operations
+export { generateUUIDv7 };

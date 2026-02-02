@@ -17,6 +17,7 @@ import {
 } from '@shared/schemas';
 import { calibrationService } from '@/services/calibration.service';
 import { createLLMProvider } from '@/lib/llm-provider';
+import { datasetGenerator } from '@/lib/dataset-generator';
 const router = express.Router();
 
 // Log all incoming requests for debugging
@@ -1060,12 +1061,23 @@ router.post('/skills', async (req: Request, res: Response) => {
     }
 
     const skillData = skill as any;
+
+    // Auto-generate dataset in background (don't wait for it)
+    datasetGenerator.generateDatasetForSkill({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      skillDescription: skillData.description,
+    }).catch(err => {
+      console.error('[Skill Creation] Dataset generation failed:', err);
+    });
+
     res.status(201).json({
       id: skillData.id,
       name: skillData.name,
       description: skillData.description,
       active: skillData.active,
       createdAt: skillData.created_at,
+      message: 'Skill created. Dataset generation started in background.',
     });
   } catch (error) {
     console.error('Create skill error:', error);
@@ -1303,6 +1315,91 @@ router.get('/users/:userId/skills/:skillId/calibration/status', async (req: Requ
   } catch (error) {
     console.error('Get calibration status error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================================================
+// DATASET GENERATION ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/datasets/generate
+ * Generate dataset for a specific skill or all skills without datasets
+ */
+router.post('/datasets/generate', async (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.body;
+    const supabase = getSupabase();
+
+    if (skillId) {
+      // Generate for specific skill
+      const { data: skill, error } = await supabase
+        .from('skills')
+        .select('id, name, description')
+        .eq('id', skillId)
+        .single();
+
+      if (error || !skill) {
+        return res.status(404).json({ error: 'Skill not found' });
+      }
+
+      const skillData = skill as any;
+      const result = await datasetGenerator.generateDatasetForSkill({
+        skillId: skillData.id,
+        skillName: skillData.name,
+        skillDescription: skillData.description,
+      });
+
+      return res.json(result);
+    }
+
+    // Generate for all skills without datasets
+    const { data: skills, error } = await supabase
+      .from('skills')
+      .select('id, name, description')
+      .eq('active', true);
+
+    if (error || !skills) {
+      return res.status(500).json({ error: 'Failed to fetch skills' });
+    }
+
+    const result = await datasetGenerator.ensureAllSkillsHaveDatasets(skills as any[]);
+    res.json(result);
+  } catch (error) {
+    console.error('Dataset generation error:', error);
+    res.status(500).json({ error: 'Failed to generate dataset' });
+  }
+});
+
+/**
+ * GET /api/datasets/:skillId/status
+ * Get dataset status for a skill
+ */
+router.get('/datasets/:skillId/status', async (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.params;
+    const datasetName = `skill_${skillId}_scenarios`;
+
+    const dataset = await opikService.findDataset(datasetName);
+    if (!dataset) {
+      return res.json({ exists: false, itemCount: 0 });
+    }
+
+    const items = await opikService.getDatasetItems(datasetName);
+    const syntheticCount = items.filter((i: any) => i.metadata?.source === 'synthetic').length;
+    const realWorldCount = items.filter((i: any) => i.metadata?.source === 'real_world').length;
+
+    res.json({
+      exists: true,
+      datasetName,
+      itemCount: items.length,
+      syntheticCount,
+      realWorldCount,
+      realWorldPercentage: items.length > 0 ? (realWorldCount / items.length * 100).toFixed(1) : '0',
+    });
+  } catch (error) {
+    console.error('Dataset status error:', error);
+    res.status(500).json({ error: 'Failed to get dataset status' });
   }
 });
 

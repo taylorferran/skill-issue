@@ -290,11 +290,36 @@ Generate the response now:`;
       };
     }
   }
+
+  /**
+   * Generate raw text from LLM (for dataset generation, etc.)
+   */
+  async generateRaw(
+    prompt: string,
+    options: { maxTokens?: number; temperature?: number } = {}
+  ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
+    const message = await this.client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: options.maxTokens || 1000,
+      temperature: options.temperature ?? 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = message.content[0].type === 'text' ? message.content[0].text : '';
+
+    return {
+      text,
+      usage: {
+        inputTokens: message.usage.input_tokens,
+        outputTokens: message.usage.output_tokens,
+      },
+    };
+  }
 }
 
 // Factory function to create provider
 // Todo: Allow switching between multiple providers in future
-export function createLLMProvider(): LLMProvider {
+export function createLLMProvider(): AnthropicProvider {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
