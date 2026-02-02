@@ -158,7 +158,9 @@ Generate the challenge now:`;
   private parseChallengeResponse(response: string, targetDifficulty: number): GeneratedChallenge {
     try {
       // Extract JSON from response (handle markdown code blocks)
-      const jsonMatch = response.match(/```json\n?(.*?)\n?```/s) || response.match(/\{[\s\S]*\}/);
+      // Use greedy match ([\s\S]*) to handle nested code blocks inside JSON strings
+      // The $ anchor ensures we match the LAST ``` in the response
+      const jsonMatch = response.match(/```json\n?([\s\S]*)\n?```\s*$/) || response.match(/\{[\s\S]*\}/);
       const jsonStr = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : response;
 
       const parsed = JSON.parse(jsonStr.trim());

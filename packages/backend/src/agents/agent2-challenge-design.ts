@@ -125,6 +125,20 @@ export class ChallengeDesignAgent {
       const llmDuration = Date.now() - llmStartTime;
       const { challenge: generatedChallenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
 
+      // Create LLM generation span immediately after the call
+      await opikService.createSpan({
+        traceId,
+        name: 'llm_generation',
+        type: 'llm',
+        model: 'claude-haiku-4-5-20251001',
+        provider: 'anthropic',
+        input: { prompt: actualPrompt },
+        output: { response: rawResponse },
+        promptTokens: usage.inputTokens,
+        completionTokens: usage.outputTokens,
+        durationMs: llmDuration,
+      });
+
       // Register prompt with Opik
       const promptVersion = await opikService.createOrGetPrompt({
         name: selectedVariant
@@ -281,20 +295,6 @@ export class ChallengeDesignAgent {
         })
         .eq('user_id', decision.userId)
         .eq('skill_id', decision.skillId);
-
-      // Create LLM generation span
-      await opikService.createSpan({
-        traceId,
-        name: 'llm_generation',
-        type: 'llm',
-        model: 'claude-haiku-4-5-20251001',
-        provider: 'anthropic',
-        input: { prompt: actualPrompt },
-        output: { response: rawResponse },
-        promptTokens: usage.inputTokens,
-        completionTokens: usage.outputTokens,
-        durationMs: llmDuration,
-      });
 
       // End trace with success
       await opikService.endTrace({
