@@ -173,6 +173,8 @@ export const GetChallengeResponseSchema = z.object({
   difficulty: z.number().min(1).max(10),
   question: z.string(),
   options: z.array(z.string()).length(4),
+  correctOption: z.number().min(0).max(3),
+  explanation: z.string(),
   createdAt: z.string(),
 });
 
