@@ -2999,17 +2999,31 @@
             if (selectedAnswer !== null) return; // Already answered
             
             selectedAnswer = index;
+            const isCorrect = index === currentChallenge.correctOption;
             
             // Disable all options
             document.querySelectorAll('#answerOptions .quiz-option').forEach(btn => {
                 btn.disabled = true;
             });
             
-            // Highlight selected
-            document.querySelector(`#answerOptions .quiz-option[data-index="${index}"]`).classList.add('selected');
+            // Highlight selected and correct answer
+            document.querySelector(`#answerOptions .quiz-option[data-index="${index}"]`).classList.add(isCorrect ? 'correct' : 'incorrect');
+            if (!isCorrect) {
+                document.querySelector(`#answerOptions .quiz-option[data-index="${currentChallenge.correctOption}"]`).classList.add('correct');
+            }
             
-            // Show the feedback section immediately (don't submit yet)
+            // Show feedback immediately using challenge data
+            const feedbackResult = document.getElementById('answerFeedbackResult');
+            feedbackResult.className = `feedback ${isCorrect ? 'correct' : 'incorrect'}`;
+            feedbackResult.innerHTML = `
+                <strong>${isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
+                ${currentChallenge.explanation || ''}
+            `;
+            
+            // Show the feedback section immediately
             document.getElementById('answerFeedbackSection').style.display = 'block';
+            
+            showToast(isCorrect ? '✅ Correct!' : '❌ Incorrect', isCorrect ? 'success' : 'error');
         }
 
         async function submitAnswerWithFeedback() {
@@ -3024,7 +3038,8 @@
             
             try {
                 // Submit answer with confidence and feedback in ONE request
-                const result = await apiRequest('/answer', {
+                // Note: Answer result is already shown from selectAnswer()
+                await apiRequest('/answer', {
                     method: 'POST',
                     body: JSON.stringify({
                         challengeId: currentChallenge.id,
@@ -3035,25 +3050,6 @@
                         userFeedback: feedback
                     })
                 });
-                
-                // Show feedback result
-                const feedbackResult = document.getElementById('answerFeedbackResult');
-                feedbackResult.className = `feedback ${result.isCorrect ? 'correct' : 'incorrect'}`;
-                feedbackResult.innerHTML = `
-                    <strong>${result.isCorrect ? '✅ Correct!' : '❌ Incorrect'}</strong><br>
-                    ${result.explanation || ''}
-                `;
-                
-                // Highlight correct/incorrect options
-                document.querySelectorAll('#answerOptions .quiz-option').forEach((btn, idx) => {
-                    if (idx === result.correctOption) {
-                        btn.classList.add('correct');
-                    } else if (idx === selectedAnswer && !result.isCorrect) {
-                        btn.classList.add('incorrect');
-                    }
-                });
-                
-                showToast(result.isCorrect ? '✅ Correct!' : '❌ Incorrect', result.isCorrect ? 'success' : 'error');
                 
                 // Change button to "Continue" after submission
                 const submitBtn = document.querySelector('#answerFeedbackSection .btn-primary');

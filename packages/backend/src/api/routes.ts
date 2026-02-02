@@ -294,7 +294,7 @@ router.post('/answer', async (req: Request, res: Response) => {
 
 /**
  * GET /api/challenges/:challengeId
- * Get a specific challenge (without correct answer)
+ * Get a specific challenge (with correct answer and explanation)
  */
 router.get('/challenges/:challengeId', async (req: Request, res: Response) => {
   try {
@@ -310,6 +310,8 @@ router.get('/challenges/:challengeId', async (req: Request, res: Response) => {
         difficulty,
         question,
         options_json,
+        correct_option,
+        explanation,
         created_at,
         skills!inner(name)
       `)
@@ -330,6 +332,8 @@ router.get('/challenges/:challengeId', async (req: Request, res: Response) => {
       difficulty: challenge.difficulty,
       question: challenge.question,
       options: challenge.options_json,
+      correctOption: challenge.correct_option,
+      explanation: challenge.explanation,
       createdAt: challenge.created_at,
     });
   } catch (error) {
