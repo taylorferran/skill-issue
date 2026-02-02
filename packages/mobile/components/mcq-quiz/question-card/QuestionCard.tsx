@@ -10,7 +10,6 @@ type QuestionCardProps = {
   selectedAnswerId: number | null;
   onAnswerSelect: (answerId: number) => void;
   hasAnswered: boolean;
-  isTimeUp: boolean;
   questionNumber: number;
   totalQuestions: number;
 };
@@ -20,7 +19,6 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   selectedAnswerId,
   onAnswerSelect,
   hasAnswered,
-  isTimeUp,
   questionNumber,
   totalQuestions,
 }) => {
@@ -100,7 +98,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             key={answer.id}
             style={[styles.answerOption, getAnswerStyle(answer.id)]}
             onPress={() => onAnswerSelect(answer.id)}
-            disabled={hasAnswered || isTimeUp}
+            disabled={hasAnswered}
           >
             <Text style={[styles.answerText, getAnswerTextStyle(answer.id)]}>
               {answer.text}

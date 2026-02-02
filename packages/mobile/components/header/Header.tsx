@@ -91,11 +91,7 @@ export function CustomHeader({
       {/* Right Actions */}
       <View style={styles.actionsContainer}>
         {isQuizRoute && quizState ? (
-          <QuizTimer
-            timeLeft={quizState.timeLeft}
-            totalTime={quizState.totalTime}
-            isTimeUp={quizState.isTimeUp}
-          />
+          <QuizTimer elapsedTime={quizState.elapsedTime} />
         ) : !isQuizRoute ? (
           <Pressable
             style={({ pressed }) => [

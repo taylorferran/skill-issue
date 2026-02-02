@@ -12,7 +12,7 @@ const GetPendingChallengesPathSchema = z.object({
  * GET /users/:userId/challenges/pending
  * 
  * @example
- * const { execute, data, isLoading, error } = useGetPendingChallenges();
+ * const { execute, data, isLoading, isFetching, error } = useGetPendingChallenges();
  * 
  * // Call with userId as path parameter
  * const challenges = await execute({ userId: "uuid-here" });

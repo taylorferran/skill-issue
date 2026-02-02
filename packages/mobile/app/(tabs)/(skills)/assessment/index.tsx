@@ -14,7 +14,7 @@ import { useGetChallengeHistory } from "@/api-routes/getChallengeHistory";
 import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useUser } from "@/contexts/UserContext";
 import { useSkillsStore } from "@/stores/skillsStore";
-import type { GetUserSkillsResponse, GetChallengeHistoryResponse } from "@learning-platform/shared";
+import type { GetChallengeHistoryResponse } from "@learning-platform/shared";
 import { hasAssessedSkill, markSkillAssessed } from "@/utils/assessmentStorage";
 import { ChallengeHistoryCard } from "@/components/challenge-history-card/ChallengeHistoryCard";
 
@@ -24,233 +24,182 @@ const ReviewHistoryScreen = () => {
   const [selectedSegment, setSelectedSegment] = useState<"overview" | "review">(
     "overview",
   );
-  
+
   // Get route params
   const { skill, skillId } = useRouteParams('assessment');
   const params = useLocalSearchParams();
-  
-  // Context & API hooks
+
+  // Context & store
   const { userId } = useUser();
-  const { execute: fetchUserSkills } = useGetUserSkills();
-  const { execute: fetchPendingChallenges, isLoading: isFetchingChallenges } = useGetPendingChallenges();
-  const { execute: fetchChallengeHistory, isLoading: isFetchingHistory } = useGetChallengeHistory();
-  const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
   const { setUserSkills } = useSkillsStore();
-  
-  // Local state for this skill's data
-  const [skillData, setSkillData] = useState<GetUserSkillsResponse[number] | null>(null);
-  const [isLoadingSkill, setIsLoadingSkill] = useState(true);
+
+  // API hooks with clearDataOnCall: false - keeps data between calls, only shows loading on first call
+  const { execute: fetchUserSkills, data: userSkillsData } = useGetUserSkills();
+  const { 
+    execute: fetchPendingChallenges, 
+    data: pendingChallengesData, 
+    isLoading: isLoadingChallenges 
+  } = useGetPendingChallenges({ clearDataOnCall: false });
+  const { 
+    execute: fetchChallengeHistory, 
+    data: challengeHistoryData, 
+    isFetching: isFetchingHistory 
+  } = useGetChallengeHistory({ clearDataOnCall: false });
+  const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
+
+  // UI state
   const [hasLocalAssessment, setHasLocalAssessment] = useState(false);
-  
-  // State for pending challenges
-  const [pendingChallenges, setPendingChallenges] = useState<Challenge[]>([]);
-  
-  // State for challenge history
-  const [challengeHistory, setChallengeHistory] = useState<GetChallengeHistoryResponse>([]);
   const [historyOffset, setHistoryOffset] = useState(0);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
   const [recentlyAnswered, setRecentlyAnswered] = useState<GetChallengeHistoryResponse>([]);
-  
-  // Determine if user needs to set difficulty level
+
+  // Derived data
+  const skillData = userSkillsData?.find(s => s.skillName === skill) || null;
+  const pendingChallenges = (pendingChallengesData || []).filter(c => c.skillId === skillId);
+  const challengeHistory = (challengeHistoryData || [])
+    .filter(h => h.skillId === skillId)
+    .sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime());
   const needsRating = !hasLocalAssessment && (!skillData || !skillData.difficultyTarget);
-  
+
+  // Combined display history with optimistic updates
+  const displayHistory = [
+    ...recentlyAnswered,
+    ...challengeHistory.filter(h => !recentlyAnswered.some(r => r.answerId === h.answerId))
+  ];
+
   // Check for recently answered challenge from navigation params
   useEffect(() => {
     if (params.answeredChallenge) {
       try {
         const answeredChallenge = JSON.parse(params.answeredChallenge as string);
         if (answeredChallenge.skillId === skillId) {
-          // Add to recently answered list (optimistic update)
           setRecentlyAnswered(prev => [answeredChallenge, ...prev]);
-          // Clear the param to avoid re-adding on re-renders
-          // Note: We can't actually clear router params, but the effect only runs once
         }
       } catch (e) {
         console.error('[Assessment] Failed to parse answered challenge:', e);
       }
     }
   }, [params.answeredChallenge, skillId]);
-  
-  // Fetch skill data and pending challenges from backend on mount
+
+  // Initial load - fetch all data in parallel
   useEffect(() => {
-    loadSkillData();
-  }, [userId, skill]);
-  
-  // Refetch when screen comes into focus (after navigation back)
-  useFocusEffect(
-    useCallback(() => {
-      loadSkillData();
-      // Also refresh challenge history when coming back from quiz
-      if (selectedSegment === "review") {
-        loadChallengeHistory(true);
-      }
-    }, [userId, skill, selectedSegment])
-  );
-  
-  const loadSkillData = async () => {
     if (!userId || !skillId) return;
-    
-    setIsLoadingSkill(true);
-    try {
-      console.log('[Assessment] 🔄 Loading skill data...');
-      
+
+    const loadInitialData = async () => {
+      console.log('[Assessment] 🔄 Initial load - fetching all data...');
+
       // Check local storage first (fast)
       const localAssessment = await hasAssessedSkill(skillId);
       setHasLocalAssessment(localAssessment);
-      
-      console.log('[Assessment] 💾 Local assessment status:', localAssessment);
-      
-      // Fetch from backend (source of truth)
-      const userSkills = await fetchUserSkills({ userId });
-      const currentSkill = userSkills.find(s => s.skillName === skill);
-      
-      setSkillData(currentSkill || null);
-      
-      if (currentSkill) {
-        console.log('[Assessment] ✅ Skill data loaded:', {
-          skillName: currentSkill.skillName,
-          difficultyTarget: currentSkill.difficultyTarget,
-          accuracy: currentSkill.accuracy,
-          attempts: currentSkill.attemptsTotal
-        });
-        
-        // If backend has data but local doesn't, sync local storage
-        if (currentSkill.difficultyTarget && !localAssessment) {
-          console.log('[Assessment] 🔄 Syncing local assessment from backend...');
-          await markSkillAssessed(skillId, currentSkill.difficultyTarget);
-          setHasLocalAssessment(true);
-        }
-        
-        // Fetch pending challenges for this skill
-        console.log('[Assessment] 🔄 Loading pending challenges...');
-        const challenges = await fetchPendingChallenges({ userId });
-        // Filter challenges for this skill only
-        const skillChallenges = challenges.filter(c => c.skillId === skillId);
-        setPendingChallenges(skillChallenges);
-        console.log('[Assessment] ✅ Pending challenges loaded:', skillChallenges.length);
-        
-        // Fetch challenge history for this skill
-        await loadChallengeHistory(true);
-      } else {
-        console.log('[Assessment] ℹ️ No backend record for this skill (new enrollment)');
-        setPendingChallenges([]);
-        setChallengeHistory([]);
+
+      // Fetch all data in parallel
+      await Promise.all([
+        fetchUserSkills({ userId }),
+        fetchPendingChallenges({ userId }),
+        fetchChallengeHistory({ userId, limit: CHALLENGES_PER_PAGE, offset: 0 })
+      ]);
+
+      setHistoryOffset(CHALLENGES_PER_PAGE);
+      setHasMoreHistory((challengeHistoryData?.length || 0) === CHALLENGES_PER_PAGE);
+
+      // Sync local assessment if needed
+      const currentSkill = userSkillsData?.find(s => s.skillName === skill);
+      if (currentSkill?.difficultyTarget && !localAssessment) {
+        await markSkillAssessed(skillId, currentSkill.difficultyTarget);
+        setHasLocalAssessment(true);
       }
-      
-    } catch (error) {
-      console.error('[Assessment] ❌ Failed to load skill data:', error);
-      Alert.alert('Error', 'Could not load skill data. Please try again.');
-    } finally {
-      setIsLoadingSkill(false);
-    }
-  };
-  
-  const loadChallengeHistory = async (reset = false) => {
-    if (!userId || !skillId) return;
-    
+    };
+
+    loadInitialData();
+  }, [userId, skill, skillId]);
+
+  // Background refresh when screen comes into focus (silent - no loading UI)
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId || !skillId) return;
+
+      console.log('[Assessment] 🔄 Background refresh...');
+
+      // Refresh all data silently (hooks keep existing data visible)
+      Promise.all([
+        fetchUserSkills({ userId }),
+        fetchPendingChallenges({ userId }),
+        fetchChallengeHistory({ userId, limit: CHALLENGES_PER_PAGE, offset: 0 })
+      ]).then(() => {
+        setHistoryOffset(CHALLENGES_PER_PAGE);
+        setHasMoreHistory((challengeHistoryData?.length || 0) === CHALLENGES_PER_PAGE);
+        setRecentlyAnswered([]);
+      }).catch(error => {
+        console.error('[Assessment] ❌ Background refresh failed:', error);
+      });
+    }, [userId, skill, skillId])
+  );
+
+  const loadMoreHistory = async () => {
+    if (!userId || !skillId || isFetchingHistory) return;
+
     try {
-      const offset = reset ? 0 : historyOffset;
-      console.log('[Assessment] 🔄 Loading challenge history...', { offset, limit: CHALLENGES_PER_PAGE });
-      
       const history = await fetchChallengeHistory({ 
         userId,
         limit: CHALLENGES_PER_PAGE,
-        offset 
+        offset: historyOffset 
       });
-      
-      // Filter by current skill and sort by answeredAt descending
-      const skillHistory = history
-        .filter(h => h.skillId === skillId)
-        .sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime());
-      
-      if (reset) {
-        setChallengeHistory(skillHistory);
-        setHistoryOffset(CHALLENGES_PER_PAGE);
-        // Clear recently answered when doing a fresh load
-        setRecentlyAnswered([]);
-      } else {
-        // Merge and deduplicate
-        const existingIds = new Set(challengeHistory.map(h => h.answerId));
-        const newItems = skillHistory.filter(h => !existingIds.has(h.answerId));
-        setChallengeHistory(prev => [...prev, ...newItems]);
-        setHistoryOffset(prev => prev + CHALLENGES_PER_PAGE);
-      }
-      
-      // Check if there might be more (if we got a full page)
+
+      setHistoryOffset(prev => prev + CHALLENGES_PER_PAGE);
       setHasMoreHistory(history.length === CHALLENGES_PER_PAGE);
-      
-      console.log('[Assessment] ✅ Challenge history loaded:', skillHistory.length);
     } catch (error) {
-      console.error('[Assessment] ❌ Failed to load challenge history:', error);
+      console.error('[Assessment] ❌ Failed to load more history:', error);
     }
   };
-  
+
   const handleLoadMore = () => {
     if (!isFetchingHistory && hasMoreHistory) {
-      loadChallengeHistory(false);
+      loadMoreHistory();
     }
   };
-  
+
   const handleToggleExpand = (answerId: string) => {
     setExpandedChallengeId(prev => prev === answerId ? null : answerId);
   };
-  
+
   // Handler when user submits difficulty rating
   const handleRatingSubmit = async (rating: number) => {
     if (!userId || !skillId) {
       Alert.alert('Error', 'Missing user or skill information');
       return;
     }
-    
+
     try {
       console.log('[Assessment] 📝 Enrolling in skill with difficulty:', rating);
-      
-      // STEP 1: Mark as assessed locally IMMEDIATELY (optimistic update)
+
+      // Mark as assessed locally (optimistic update)
       await markSkillAssessed(skillId, rating);
       setHasLocalAssessment(true);
-      console.log('[Assessment] ✅ Local assessment saved');
-      
-      // STEP 2: Call backend API to enroll
-      const enrollmentResult = await enrollSkill({
-        userId,
-        skillId,
-        difficultyTarget: rating,
-      });
-      
-      console.log('[Assessment] ✅ Enrollment successful:', enrollmentResult);
-      
-      // STEP 3: Refetch ALL user skills to update cache
-      const updatedSkills = await fetchUserSkills({ userId });
+
+      // Enroll in skill
+      await enrollSkill({ userId, skillId, difficultyTarget: rating });
+
+      // Refetch all data
+      const [updatedSkills] = await Promise.all([
+        fetchUserSkills({ userId }),
+        fetchPendingChallenges({ userId })
+      ]);
+
       setUserSkills(updatedSkills);
-      
-      // Update local state with the newly enrolled skill
-      const newSkillData = updatedSkills.find(s => s.skillId === skillId);
-      setSkillData(newSkillData || null);
-      
-      // STEP 4: Fetch pending challenges for this skill
-      console.log('[Assessment] 🔄 Loading pending challenges after enrollment...');
-      const challenges = await fetchPendingChallenges({ userId });
-      const skillChallenges = challenges.filter(c => c.skillId === skillId);
-      setPendingChallenges(skillChallenges);
-      
-      // Show success message and switch to Overview tab
+
       Alert.alert(
         'Enrollment Complete!',
         `You're now learning ${skill} at level ${rating}. View your progress in the Overview tab.`,
         [
           { 
             text: 'View Overview',
-            onPress: () => {
-              setSelectedSegment('overview');
-            }
+            onPress: () => setSelectedSegment('overview')
           }
         ]
       );
-      
     } catch (error) {
       console.error('[Assessment] ❌ Enrollment failed:', error);
-      
       Alert.alert(
         'Enrollment Failed',
         'Your assessment was saved locally, but we could not sync with the server. Your progress will sync when connection is restored.',
@@ -258,15 +207,12 @@ const ReviewHistoryScreen = () => {
       );
     }
   };
-  
+
   // Handler when user selects a challenge
   const handleChallengeSelect = (challenge: Challenge) => {
     console.log('[Assessment] 📝 Challenge selected:', challenge.challengeId);
-    
-    // Convert challenge to MCQQuestion format
+
     const mcqQuestion = challengeToMCQQuestion(challenge);
-    
-    // Navigate to quiz with this challenge
     navigateTo('quiz', { 
       skill: skill,
       data: mcqQuestion,
@@ -274,11 +220,8 @@ const ReviewHistoryScreen = () => {
     });
   };
 
-  // Combine recently answered with fetched history (for optimistic updates)
-  const displayHistory = [
-    ...recentlyAnswered,
-    ...challengeHistory.filter(h => !recentlyAnswered.some(r => r.answerId === h.answerId))
-  ];
+  // Show loading only on initial load (when data is null and loading)
+  const showLoading = isLoadingChallenges && !pendingChallengesData;
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -324,8 +267,8 @@ const ReviewHistoryScreen = () => {
         </View>
       </View>
 
-      {/* Show loading state while fetching skill data */}
-      {isLoadingSkill || isFetchingChallenges ? (
+      {/* Show loading state only on initial load */}
+      {showLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Theme.colors.primary.main} />
           <Text style={styles.loadingText}>Loading skill data...</Text>

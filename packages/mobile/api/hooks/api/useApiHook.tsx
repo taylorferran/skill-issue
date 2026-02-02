@@ -11,6 +11,7 @@ export type ApiHookReturnType<TResponse extends z.Schema | null> = TResponse ext
 export type ApiHookReturn<TRequest extends z.Schema | null, TResponse extends z.Schema | null> = {
   data: ApiHookReturnType<TResponse>;
   isLoading: boolean;
+  isFetching: boolean;
   error: Error | null;
   execute: ExecuteFunction<TRequest, TResponse>;
   reset: () => void;
@@ -36,6 +37,7 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
 ): {
   data: ApiHookReturnType<TResponse>;
   isLoading: boolean;
+  isFetching: boolean;
   error: Error | null;
   execute: ExecuteFunction<TRequest, TResponse>;
   reset: () => void;
@@ -45,6 +47,7 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
     isLoading: false,
     error: null,
   });
+  const [isFetching, setIsFetching] = useState(false);
 
   const apiInstances = use(ApiContext);
 
@@ -55,10 +58,17 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
       console.log('[useApiHook] 🚀 API Request:', {
         method: config.method,
         url: config.url,
-        apiInstance: config.apiInstance
+        apiInstance: config.apiInstance,
+        clearDataOnCall: options?.clearDataOnCall
       });
 
-      setState((prev) => ({ ...prev, isLoading: true, error: null }));
+      const shouldClearData = options?.clearDataOnCall !== false;
+      setIsFetching(true);
+
+      if (shouldClearData) {
+        // First call - clear data and show loading
+        setState((prev) => ({ ...prev, data: null, isLoading: true, error: null }));
+      }
 
       try {
         const response = await SendRequest(
@@ -77,12 +87,14 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
           status: 'success'
         });
 
-        // Store only the raw response
+        // Always update data and clear loading/fetching states
         setState((prev) => ({
           ...prev,
           data: response,
           isLoading: false,
+          error: null,
         }));
+        setIsFetching(false);
 
         return response;
       } catch (error) {
@@ -96,15 +108,14 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
             data: error.response?.data
           });
           setState((prev) => ({ ...prev, error: error, isLoading: false }));
-          throw error;
         } else {
           console.error('[useApiHook] ❌ Non-Axios Error:', error);
-          //setState((prev) => ({ ...prev, error: error, isLoading: false }));
-          throw error;
         }
+        setIsFetching(false);
+        throw error;
       }
     },
-    [config, apiInstances],
+    [config, apiInstances, options?.clearDataOnCall],
   );
 
   const reset = useCallback(() => {
@@ -120,6 +131,7 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
   return {
     data: state.data as ApiHookReturnType<TResponse>,
     isLoading: state.isLoading,
+    isFetching,
     error: state.error,
     execute: execute as ExecuteFunction<TRequest, TResponse>,
     reset,

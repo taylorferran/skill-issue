@@ -173,4 +173,133 @@ export const styles = StyleSheet.create({
   bottomPadding: {
     height: Theme.spacing["4xl"],
   },
+
+  // Quiet Hours
+  quietHoursHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: Theme.spacing.sm,
+    marginBottom: Theme.spacing.md,
+  },
+  quietHoursContainer: {
+    gap: Theme.spacing.md,
+  },
+
+  quietHoursDisabledText: {
+    ...createTextStyle("sm", "medium", "secondary"),
+    flex: 1,
+    flexWrap: "wrap",
+  },
+  sliderContainer: {
+    gap: Theme.spacing.sm,
+  },
+  sliderLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sliderLabel: {
+    ...createTextStyle("sm", "medium", "primary"),
+  },
+  sliderValue: {
+    ...createTextStyle("sm", "bold", "primary"),
+    color: Theme.colors.primary.main,
+  },
+  slider: {
+    width: "100%",
+    height: 40,
+  },
+  sliderDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.primary.light,
+    marginVertical: Theme.spacing.md,
+  },
+  quietHoursInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.sm,
+    paddingHorizontal: Theme.spacing.sm,
+  },
+  quietHoursInfoText: {
+    ...createTextStyle("xs", "medium", "secondary"),
+    flex: 1,
+  },
+  // Unified Quiet Hours Card
+  quietHoursCard: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
+    overflow: "hidden",
+    ...Theme.shadows.card,
+  },
+  quietHoursCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.lg,
+  },
+  quietHoursCardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.lg,
+    flex: 1,
+    flexShrink: 1,
+  },
+  quietHoursIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  quietHoursCardHeaderText: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  quietHoursCardTitle: {
+    ...createTextStyle("base", "bold", "primary"),
+  },
+  quietHoursCardSubtitle: {
+    ...createTextStyle("xs", "regular", "secondary"),
+    marginTop: Theme.spacing.xs / 2,
+  },
+  switchContainer: {
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  quietHoursCardDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.primary.light,
+    marginHorizontal: Theme.spacing.lg,
+  },
+  quietHoursDisabledContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.md,
+    padding: Theme.spacing.lg,
+  },
+  quietHoursEnabledContent: {
+    padding: Theme.spacing.lg,
+  },
+  sliderLabelWithIcon: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.xs,
+  },
+  sliderIcon: {
+    marginRight: Theme.spacing.xs,
+  },
+  timeBadge: {
+    backgroundColor: Theme.colors.primary.medium,
+    paddingHorizontal: Theme.spacing.md,
+    paddingVertical: Theme.spacing.xs / 2,
+    borderRadius: Theme.borderRadius.lg,
+  },
+  timeBadgeText: {
+    ...createTextStyle("xs", "bold", "primary"),
+    color: Theme.colors.primary.main,
+  },
 });

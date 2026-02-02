@@ -1,0 +1,66 @@
+name: Mobile CI - EAS Build
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
+          - both
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mobile
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      
+      - name: Build Android
+        if: ${{ github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' }}
+        run: |
+          eas build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
+      
+      - name: Build iOS
+        if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
+        run: |
+          eas build --platform ios --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
+      
+      - name: Build Summary
+        run: |
+          echo "Build triggered successfully!"
+          echo "Profile: ${{ github.event.inputs.profile }}"
+          echo "Platform: ${{ github.event.inputs.platform }}"
+          echo "Monitor builds at: https://expo.dev/accounts/${{ github.repository_owner }}/projects/skill-issue/builds"

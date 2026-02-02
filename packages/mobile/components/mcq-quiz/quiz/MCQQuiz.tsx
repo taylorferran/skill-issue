@@ -11,7 +11,6 @@ import { useQuiz } from "@/contexts/QuizContext";
 type MCQQuizProps = {
   data: QuizState;
   onFinish: () => void;
-  timePerQuestion?: number;
   challengeId?: string;
   userId?: string;
   onSubmitAnswer?: (answerData: {
@@ -29,8 +28,7 @@ interface QuizSessionState {
   selectedAnswerId: number | null;
   hasAnswered: boolean;
   isCorrect: boolean;
-  timeLeft: number;
-  isTimeUp: boolean;
+  elapsedTime: number;
   confidenceRating: number | null;
   usefulRating: number | null;
 }
@@ -38,7 +36,6 @@ interface QuizSessionState {
 export const MCQQuiz: React.FC<MCQQuizProps> = ({
   data,
   onFinish,
-  timePerQuestion = 30,
   challengeId,
   userId,
   onSubmitAnswer,
@@ -53,8 +50,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     selectedAnswerId: null,
     hasAnswered: false,
     isCorrect: false,
-    timeLeft: timePerQuestion,
-    isTimeUp: false,
+    elapsedTime: 0,
     confidenceRating: null,
     usefulRating: null
   });
@@ -68,17 +64,13 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
       currentQuestion: quizSession.currentQuestionIndex + 1,
       totalQuestions: questions.length,
       isSingleQuestion,
-      timeLeft: quizSession.timeLeft,
-      totalTime: timePerQuestion,
-      isTimeUp: quizSession.isTimeUp,
+      elapsedTime: quizSession.elapsedTime,
     });
   }, [
     quizSession.currentQuestionIndex,
-    quizSession.timeLeft,
-    quizSession.isTimeUp,
+    quizSession.elapsedTime,
     questions.length,
     isSingleQuestion,
-    timePerQuestion,
     setQuizState,
   ]);
 
@@ -96,63 +88,36 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
       selectedAnswerId: null,
       hasAnswered: false,
       isCorrect: false,
-      timeLeft: timePerQuestion,
-      isTimeUp: false,
+      elapsedTime: 0,
       usefulRating: null,
       confidenceRating: null
     });
-  }, [data, timePerQuestion]);
+  }, [data]);
 
   // Reset timer when question changes
   useEffect(() => {
     setQuizSession((prev) => ({
       ...prev,
-      timeLeft: timePerQuestion,
-      isTimeUp: false,
+      elapsedTime: 0,
     }));
-  }, [quizSession.currentQuestionIndex, timePerQuestion]);
+  }, [quizSession.currentQuestionIndex]);
 
-  // Timer countdown with auto-submit
+  // Timer that counts up until user answers
   useEffect(() => {
-    if (quizSession.hasAnswered || quizSession.timeLeft === 0) return;
+    if (quizSession.hasAnswered) return;
 
     const timer = setInterval(() => {
-      setQuizSession((prev) => {
-        if (prev.timeLeft <= 1) {
-          // Time's up!
-          if (prev.selectedAnswerId !== null) {
-            // Answer was selected but not confirmed - auto confirm it
-            const correct = prev.selectedAnswerId === currentQuestion.correctAnswerId;
-            return {
-              ...prev,
-              timeLeft: 0,
-              isTimeUp: true,
-              hasAnswered: true,
-              isCorrect: correct,
-            };
-          } else {
-            // No answer selected - mark as failed
-            return {
-              ...prev,
-              timeLeft: 0,
-              isTimeUp: true,
-              hasAnswered: true,
-              isCorrect: false,
-            };
-          }
-        }
-        return {
-          ...prev,
-          timeLeft: prev.timeLeft - 1,
-        };
-      });
+      setQuizSession((prev) => ({
+        ...prev,
+        elapsedTime: prev.elapsedTime + 1,
+      }));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [quizSession.hasAnswered, quizSession.timeLeft, quizSession.selectedAnswerId, currentQuestion.correctAnswerId]);
+  }, [quizSession.hasAnswered]);
 
   const handleAnswerSelect = (answerId: number) => {
-    if (quizSession.hasAnswered || quizSession.isTimeUp) return;
+    if (quizSession.hasAnswered) return;
     setQuizSession((prev) => ({ ...prev, selectedAnswerId: answerId }));
   };
 
@@ -177,16 +142,11 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
         selectedAnswerId: null,
         hasAnswered: false,
         isCorrect: false,
-        rating: null,
-        timeLeft: timePerQuestion,
-        isTimeUp: false,
+        usefulRating: null,
+        confidenceRating: null,
+        elapsedTime: 0,
       }));
     }
-  };
-
-  const handleRatingSelect = (selectedRating: number) => {
-    setQuizSession((prev) => ({ ...prev, rating: selectedRating }));
-    console.log(`User rated question ${currentQuestion.id} with ${selectedRating} stars`);
   };
 
   const handleFinish = async () => {
@@ -194,7 +154,8 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
       return;
     }
 
-    const responseTime = (timePerQuestion - quizSession.timeLeft) * 1000;
+    // Response time is the elapsed time in milliseconds
+    const responseTime = quizSession.elapsedTime * 1000;
     const userFeedback = `User rated usefulness ${quizSession.usefulRating} out of 5`;
 
     if (onSubmitAnswer && challengeId && userId) {
@@ -219,15 +180,13 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
           selectedAnswerId={quizSession.selectedAnswerId}
           onAnswerSelect={handleAnswerSelect}
           hasAnswered={quizSession.hasAnswered}
-          isTimeUp={quizSession.isTimeUp}
           questionNumber={quizSession.currentQuestionIndex + 1}
           totalQuestions={questions.length}
         />
 
         {/* Confirm Answer Button */}
         {quizSession.selectedAnswerId !== null && 
-         !quizSession.hasAnswered && 
-         !quizSession.isTimeUp && (
+         !quizSession.hasAnswered && (
           <View style={styles.buttonContainer}>
             <Pressable style={styles.confirmButton} onPress={handleConfirmAnswer}>
               <Text style={styles.confirmButtonText}>Confirm Answer</Text>

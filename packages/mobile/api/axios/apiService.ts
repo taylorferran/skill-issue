@@ -4,13 +4,13 @@ import axios, {
   AxiosResponse,
   AxiosError,
   CreateAxiosDefaults,
-} from 'axios';
-import { AuthHandlers } from '../types/apiTypes';
+} from "axios";
+import { AuthHandlers } from "../types/apiTypes";
 
 const defaultConfig: CreateAxiosDefaults = {
   headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
+    "Content-Type": "application/json",
+    Accept: "application/json",
   },
 };
 
@@ -24,19 +24,14 @@ export function createAuthenticatedApiClient(
   });
 
   axiosInstance.interceptors.request.use(async (config) => {
-    // try {
-    //   const token = await authHandlers.getAccessToken();
-    //   if (token) {
-    //     config.headers = config.headers || {};
-    //     config.headers['Authorization'] = `Bearer ${token}`;
-    //     console.log('[apiService] ✅ Authorization header added');
-    //   } else {
-    //     console.log('[apiService] ℹ️ No token available (user not authenticated)');
-    //   }
-    // } catch (error) {
-    //   console.error('[apiService] ❌ Error getting access token:', error);
-    // }
-    
+    try {
+      config.headers = config.headers || {};
+      config.headers["Authorization"] = `Bearer whiteclaw`;
+      console.log("[apiService] ✅ Authorization header added");
+    } catch (error) {
+      console.error("[apiService] ❌ Error getting access token:", error);
+    }
+
     // CRITICAL: Must return config, otherwise axios receives undefined
     return config;
   });
