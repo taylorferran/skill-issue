@@ -5,6 +5,33 @@
 
 export interface Database {
   public: {
+    Functions: {
+      find_available_pool_questions: {
+        Args: {
+          p_user_id: string;
+          p_skill_id: string;
+          p_difficulty: number;
+          p_min_rating?: number;
+          p_limit?: number;
+        };
+        Returns: {
+          pool_question_id: string;
+          question: string;
+          options_json: any;
+          correct_option: number;
+          explanation: string | null;
+          avg_rating: number | null;
+          times_used: number;
+        }[];
+      };
+      update_question_pool_rating: {
+        Args: {
+          p_question_pool_id: string;
+          p_rating: number;
+        };
+        Returns: void;
+      };
+    };
     Tables: {
       users: {
         Row: {
@@ -219,6 +246,8 @@ export interface Database {
           llm: string;
           prompt_version: string;
           question: string;
+          question_hash: string | null;
+          question_pool_id: string | null;
           options_json: any; // JSONB (array of 4 strings)
           correct_option: number;
           explanation: string | null;
@@ -232,6 +261,8 @@ export interface Database {
           llm?: string;
           prompt_version?: string;
           question: string;
+          question_hash?: string | null;
+          question_pool_id?: string | null;
           options_json: any;
           correct_option: number;
           explanation?: string | null;
@@ -245,10 +276,69 @@ export interface Database {
           llm?: string;
           prompt_version?: string;
           question?: string;
+          question_hash?: string | null;
+          question_pool_id?: string | null;
           options_json?: any;
           correct_option?: number;
           explanation?: string | null;
           created_at?: string;
+        };
+      };
+      question_pool: {
+        Row: {
+          id: string;
+          skill_id: string;
+          difficulty: number;
+          question: string;
+          question_hash: string;
+          options_json: any; // JSONB (array of 4 strings)
+          correct_option: number;
+          explanation: string | null;
+          llm: string;
+          prompt_version: string;
+          times_used: number;
+          total_ratings: number;
+          sum_ratings: number;
+          avg_rating: number | null; // Computed column
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          skill_id: string;
+          difficulty: number;
+          question: string;
+          question_hash: string;
+          options_json: any;
+          correct_option: number;
+          explanation?: string | null;
+          llm?: string;
+          prompt_version?: string;
+          times_used?: number;
+          total_ratings?: number;
+          sum_ratings?: number;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          skill_id?: string;
+          difficulty?: number;
+          question?: string;
+          question_hash?: string;
+          options_json?: any;
+          correct_option?: number;
+          explanation?: string | null;
+          llm?: string;
+          prompt_version?: string;
+          times_used?: number;
+          total_ratings?: number;
+          sum_ratings?: number;
+          active?: boolean;
+          created_at?: string;
+          updated_at?: string;
         };
       };
       push_events: {
@@ -346,7 +436,6 @@ export interface Database {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
     Enums: Record<string, never>;
   };
 }
