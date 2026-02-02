@@ -28,8 +28,8 @@ export class AnthropicProvider implements LLMProvider {
 
     const message = await this.client.messages.create({
       model: 'claude-haiku-4-5-20251001', // Todo: This model is a little dumb honestly, will need to experiment
-      max_tokens: 1500,
-      temperature: 0.7,
+      max_tokens: parseInt(process.env.LLM_MAX_TOKENS || '1500'),
+      temperature: parseFloat(process.env.LLM_TEMPERATURE || '0.7'),
       messages: [
         {
           role: 'user',
@@ -78,6 +78,21 @@ RULES:
 - Distractors should be plausible but clearly wrong to someone who knows the subject
 - Include a brief explanation of why the answer is correct
 - Tailor the question specifically to the skill described above
+- Make sure the correct answer is not ambiguous or debatable
+
+BREVITY REQUIREMENTS (CRITICAL):
+- Question: 15-25 words maximum, no unnecessary words
+- Options: 3-8 words each, direct answers only
+- Explanation: 20-30 words maximum, concise reasoning
+- Avoid: storytelling, excessive context, verbose setups, filler words
+- Focus: Test the concept directly and efficiently
+
+Examples of good brevity:
+✓ "Which sorting algorithm has O(n log n) average time complexity?"
+✗ "When implementing a search on a large dataset, which algorithm would be best?"
+
+✓ "What is the capital of France?"
+✗ "If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?"
 
 OUTPUT FORMAT (strict JSON):
 {
@@ -125,6 +140,21 @@ RULES:
 - Distractors should be plausible but clearly wrong to someone who knows the subject
 - Include a brief explanation of why the answer is correct
 - Tailor the question specifically to the skill described above
+- Make sure the correct answer is not ambiguous or debatable
+
+BREVITY REQUIREMENTS (CRITICAL):
+- Question: 15-25 words maximum, no unnecessary words
+- Options: 3-8 words each, direct answers only
+- Explanation: 20-30 words maximum, concise reasoning
+- Avoid: storytelling, excessive context, verbose setups, filler words
+- Focus: Test the concept directly and efficiently
+
+Examples of good brevity:
+✓ "Which sorting algorithm has O(n log n) average time complexity?"
+✗ "When implementing a search on a large dataset, which algorithm would be best?"
+
+✓ "What is the capital of France?"
+✗ "If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?"
 
 OUTPUT FORMAT (strict JSON):
 {
