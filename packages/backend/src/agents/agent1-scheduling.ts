@@ -192,6 +192,17 @@ export class SchedulingAgent {
       };
     }
 
+    // Check if user needs calibration (difficulty_target = 0)
+    if (userSkill.difficulty_target === 0) {
+      return {
+        shouldChallenge: false,
+        userId,
+        skillId,
+        difficultyTarget: userSkill.difficulty_target,
+        reason: 'User needs to complete calibration first',
+      };
+    }
+
     // Check quiet hours
     if (this.isInQuietHours(user.quiet_hours_start, user.quiet_hours_end, user.timezone)) {
       return {

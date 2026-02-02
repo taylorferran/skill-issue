@@ -48,7 +48,60 @@ export const UpdateUserRequestSchema = z.object({
  */
 export const EnrollSkillRequestSchema = z.object({
   skillId: z.string().uuid(),
-  difficultyTarget: z.number().min(1).max(10).default(2),
+  difficultyTarget: z.number().min(0).max(10).default(0),
+});
+
+/**
+ * Request schema for generating skill description from name
+ * POST /api/skills/generate-description
+ */
+export const GenerateSkillDescriptionRequestSchema = z.object({
+  skillName: z.string().min(1).max(200),
+});
+
+/**
+ * Request schema for creating a new skill
+ * POST /api/skills
+ */
+export const CreateSkillRequestSchema = z.object({
+  name: z.string().min(1).max(200),
+  description: z.string().min(10).max(2000),
+});
+
+/**
+ * Request schema for generating calibration questions
+ * POST /api/skills/:skillId/calibration/generate
+ */
+export const GenerateCalibrationRequestSchema = z.object({
+  skillId: z.string().uuid(),
+});
+
+/**
+ * Request schema for starting calibration
+ * POST /api/users/:userId/skills/:skillId/calibration/start
+ */
+export const StartCalibrationRequestSchema = z.object({
+  userId: z.string().uuid(),
+  skillId: z.string().uuid(),
+});
+
+/**
+ * Request schema for submitting calibration answer
+ * POST /api/users/:userId/skills/:skillId/calibration/answer
+ */
+export const SubmitCalibrationAnswerRequestSchema = z.object({
+  difficulty: z.number().min(1).max(10),
+  selectedOption: z.number().min(0).max(3),
+  responseTime: z.number().positive().optional(),
+});
+
+/**
+ * Request schema for completing calibration
+ * POST /api/users/:userId/skills/:skillId/calibration/complete
+ */
+export const CompleteCalibrationRequestSchema = z.object({
+  userId: z.string().uuid(),
+  skillId: z.string().uuid(),
 });
 
 /**
@@ -120,6 +173,8 @@ export const GetChallengeResponseSchema = z.object({
   difficulty: z.number().min(1).max(10),
   question: z.string(),
   options: z.array(z.string()).length(4),
+  correctOption: z.number().min(0).max(3),
+  explanation: z.string(),
   createdAt: z.string(),
 });
 
@@ -132,7 +187,7 @@ export const GetUserSkillsResponseSchema = z.array(
     skillId: z.string().uuid(),
     skillName: z.string(),
     skillDescription: z.string(),
-    difficultyTarget: z.number().min(1).max(10),
+    difficultyTarget: z.number().min(0).max(10),
     attemptsTotal: z.number().min(0),
     correctTotal: z.number().min(0),
     accuracy: z.number().min(0).max(1),
@@ -140,6 +195,7 @@ export const GetUserSkillsResponseSchema = z.array(
     streakIncorrect: z.number().min(0),
     lastChallengedAt: z.string().nullable(),
     lastResult: z.enum(['correct', 'incorrect', 'ignored']).nullable(),
+    needsCalibration: z.boolean(),
   })
 );
 
@@ -263,7 +319,7 @@ export const EnrollSkillResponseSchema = z.object({
   userId: z.string().uuid(),
   skillId: z.string().uuid(),
   skillName: z.string(),
-  difficultyTarget: z.number().min(1).max(10),
+  difficultyTarget: z.number().min(0).max(10),
   attemptsTotal: z.number().min(0),
   correctTotal: z.number().min(0),
   streakCorrect: z.number().min(0),
@@ -282,7 +338,7 @@ export const UpdateUserSkillResponseSchema = z.object({
   userId: z.string().uuid(),
   skillId: z.string().uuid(),
   skillName: z.string(),
-  difficultyTarget: z.number().min(1).max(10),
+  difficultyTarget: z.number().min(0).max(10),
   attemptsTotal: z.number().min(0),
   correctTotal: z.number().min(0),
   streakCorrect: z.number().min(0),
@@ -290,6 +346,95 @@ export const UpdateUserSkillResponseSchema = z.object({
   lastChallengedAt: z.string().nullable(),
   lastResult: z.enum(['correct', 'incorrect', 'ignored']).nullable(),
   updatedAt: z.string(),
+});
+
+/**
+ * Response schema for generating skill description
+ * POST /api/skills/generate-description
+ */
+export const GenerateSkillDescriptionResponseSchema = z.object({
+  skillName: z.string(),
+  description: z.string(),
+  isVague: z.boolean(),
+  message: z.string(),
+});
+
+/**
+ * Response schema for creating a skill
+ * POST /api/skills
+ */
+export const CreateSkillResponseSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string(),
+  active: z.boolean(),
+  createdAt: z.string(),
+});
+
+/**
+ * Response schema for generating calibration questions
+ * POST /api/skills/:skillId/calibration/generate
+ */
+export const GenerateCalibrationResponseSchema = z.object({
+  skillId: z.string().uuid(),
+  skillName: z.string(),
+  status: z.enum(['generated', 'already_exists']),
+  questionsCount: z.number(),
+  message: z.string(),
+});
+
+/**
+ * Response schema for calibration question
+ */
+export const CalibrationQuestionSchema = z.object({
+  difficulty: z.number().min(1).max(10),
+  question: z.string(),
+  options: z.array(z.string()).length(4),
+});
+
+/**
+ * Response schema for starting calibration
+ * POST /api/users/:userId/skills/:skillId/calibration/start
+ */
+export const StartCalibrationResponseSchema = z.object({
+  userId: z.string().uuid(),
+  skillId: z.string().uuid(),
+  skillName: z.string(),
+  status: z.enum(['ready', 'generating', 'completed']),
+  questions: z.array(CalibrationQuestionSchema),
+  message: z.string(),
+});
+
+/**
+ * Response schema for submitting calibration answer
+ * POST /api/users/:userId/skills/:skillId/calibration/answer
+ */
+export const SubmitCalibrationAnswerResponseSchema = z.object({
+  isCorrect: z.boolean(),
+  correctOption: z.number().min(0).max(3),
+  explanation: z.string().nullable(),
+  progress: z.object({
+    answered: z.number(),
+    total: z.number(),
+  }),
+});
+
+/**
+ * Response schema for completing calibration
+ * POST /api/users/:userId/skills/:skillId/calibration/complete
+ */
+export const CompleteCalibrationResponseSchema = z.object({
+  userId: z.string().uuid(),
+  skillId: z.string().uuid(),
+  skillName: z.string(),
+  difficultyTarget: z.number().min(1).max(10),
+  calibrationResults: z.object({
+    totalAnswered: z.number(),
+    totalCorrect: z.number(),
+    accuracy: z.number(),
+    averageCorrectDifficulty: z.number(),
+  }),
+  message: z.string(),
 });
 
 /**
@@ -336,6 +481,12 @@ export type EnrollSkillRequest = z.infer<typeof EnrollSkillRequestSchema>;
 export type UpdateUserSkillRequest = z.infer<typeof UpdateUserSkillRequestSchema>;
 export type SendPushNotificationRequest = z.infer<typeof SendPushNotificationRequestSchema>;
 export type DeleteSkillRequest = z.infer<typeof DeleteSkillRequestSchema>;
+export type GenerateSkillDescriptionRequest = z.infer<typeof GenerateSkillDescriptionRequestSchema>;
+export type CreateSkillRequest = z.infer<typeof CreateSkillRequestSchema>;
+export type GenerateCalibrationRequest = z.infer<typeof GenerateCalibrationRequestSchema>;
+export type StartCalibrationRequest = z.infer<typeof StartCalibrationRequestSchema>;
+export type SubmitCalibrationAnswerRequest = z.infer<typeof SubmitCalibrationAnswerRequestSchema>;
+export type CompleteCalibrationRequest = z.infer<typeof CompleteCalibrationRequestSchema>;
 
 // Response types
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
@@ -355,3 +506,10 @@ export type DeleteSkillResponse = z.infer<typeof DeleteSkillResponseSchema>;
 export type SchedulerTickResponse = z.infer<typeof SchedulerTickResponseSchema>;
 export type SendPushNotificationResponse = z.infer<typeof SendPushNotificationResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
+export type GenerateSkillDescriptionResponse = z.infer<typeof GenerateSkillDescriptionResponseSchema>;
+export type CreateSkillResponse = z.infer<typeof CreateSkillResponseSchema>;
+export type GenerateCalibrationResponse = z.infer<typeof GenerateCalibrationResponseSchema>;
+export type StartCalibrationResponse = z.infer<typeof StartCalibrationResponseSchema>;
+export type SubmitCalibrationAnswerResponse = z.infer<typeof SubmitCalibrationAnswerResponseSchema>;
+export type CompleteCalibrationResponse = z.infer<typeof CompleteCalibrationResponseSchema>;
+export type CalibrationQuestion = z.infer<typeof CalibrationQuestionSchema>;

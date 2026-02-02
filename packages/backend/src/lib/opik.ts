@@ -931,6 +931,43 @@ class OpikService {
     this.pendingRequests.push(promise);
   }
 
+  /**
+   * Add multiple feedback scores to a trace at once.
+   * Convenience method for LLM-as-Judge evaluations that produce multiple metrics.
+   */
+  async addFeedbackScores(
+    traceId: string,
+    scores: Array<{
+      name: string;
+      value: number;
+      reason?: string;
+    }>,
+    source: 'ui' | 'sdk' | 'online_scoring' = 'online_scoring'
+  ): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(
+        `[Opik] Batch feedback: ${scores.length} scores for trace ${traceId}`
+      );
+      for (const score of scores) {
+        console.log(`  - ${score.name}=${score.value.toFixed(2)}`);
+      }
+      return;
+    }
+
+    // Add all scores in parallel
+    const promises = scores.map((score) =>
+      this.addFeedbackScore({
+        traceId,
+        name: score.name,
+        value: score.value,
+        source,
+        reason: score.reason,
+      })
+    );
+
+    await Promise.all(promises);
+  }
+
   // ============= Utilities =============
 
   private getProviderFromModel(model: string): string {

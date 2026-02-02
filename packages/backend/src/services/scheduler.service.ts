@@ -50,58 +50,76 @@ class SchedulerService {
   async runSchedulingTick(): Promise<void> {
     console.log('[Scheduler] Tick started at', new Date().toISOString());
 
-    // Create a single root trace for the entire scheduling tick
-    const traceId = await opikService.startTrace({
+    // Create a lightweight trace for the scheduling tick (orchestration only)
+    const tickTraceId = await opikService.startTrace({
       name: 'scheduling_tick',
       input: { timestamp: new Date().toISOString() },
-      tags: ['scheduler'],
+      tags: ['scheduler', 'orchestration'],
     });
+
+    const challengeTraceIds: string[] = [];
 
     try {
       // Agent 1: Make scheduling decisions (may return multiple)
-      const decisions = await schedulingAgent.makeSchedulingDecisions(traceId);
+      const decisions = await schedulingAgent.makeSchedulingDecisions(tickTraceId);
 
       if (decisions.length === 0) {
         console.log('[Scheduler] No challenges scheduled this tick');
-        await opikService.endTrace({ traceId, output: { decisionsCount: 0 } });
+        await opikService.endTrace({
+          traceId: tickTraceId,
+          output: { decisionsCount: 0, challengeTraceIds: [] },
+        });
         return;
       }
 
       console.log(`[Scheduler] Processing ${decisions.length} challenge(s) this tick`);
 
-      // Process each decision
+      // Process each decision - each creates its own trace
       for (const decision of decisions) {
-        await this.processChallenge(decision, traceId);
+        const result = await this.processChallenge(decision, tickTraceId);
+        if (result?.traceId) {
+          challengeTraceIds.push(result.traceId);
+        }
       }
 
       console.log('[Scheduler] Tick completed successfully');
       await opikService.endTrace({
-        traceId,
+        traceId: tickTraceId,
         output: {
           decisionsCount: decisions.length,
+          challengesCreated: challengeTraceIds.length,
+          challengeTraceIds, // Links to individual challenge traces
           users: decisions.map(d => d.userId),
         },
       });
     } catch (error) {
       console.error('[Scheduler] Tick error:', error);
-      await opikService.endTrace({ traceId, error: error as Error });
+      await opikService.endTrace({ traceId: tickTraceId, error: error as Error });
     }
   }
 
   /**
-   * Process a single challenge decision
+   * Process a single challenge decision.
+   * Agent 2 creates its own trace for the challenge generation.
+   *
+   * @returns The challenge result with trace ID, or null if failed
    */
-  private async processChallenge(decision: SchedulingDecision, traceId: string): Promise<void> {
+  private async processChallenge(
+    decision: SchedulingDecision,
+    tickTraceId: string
+  ): Promise<{ challengeId: string; traceId: string } | null> {
     try {
       console.log(`[Scheduler] Processing challenge for user ${decision.userId}, skill ${decision.skillId}`);
 
-      // Agent 2: Design challenge
-      const challenge = await challengeDesignAgent.designChallenge(decision, traceId);
+      // Agent 2: Design challenge (creates its own trace, linked to tick)
+      const result = await challengeDesignAgent.designChallenge(decision, tickTraceId);
 
-      if (!challenge) {
+      if (!result) {
         console.error(`[Scheduler] Failed to design challenge for user ${decision.userId}`);
-        return;
+        return null;
       }
+
+      const { challenge, traceId } = result;
 
       // Get skill info for logging
       const supabase = getSupabase();
@@ -113,19 +131,22 @@ class SchedulerService {
 
       if (skillError || !skill) {
         console.error('[Scheduler] Skill not found');
-        return;
+        return { challengeId: challenge.id, traceId };
       }
 
       // For now, log that we would send a push notification
       // TODO: Implement actual push token retrieval and sending
       const skillData = skill as any;
-      console.log(`[Scheduler] Challenge ${challenge.id} created`);
+      console.log(`[Scheduler] Challenge ${challenge.id} created (trace: ${traceId})`);
       console.log(`[Scheduler]   User: ${decision.userId}`);
       console.log(`[Scheduler]   Skill: ${skillData.name}`);
       console.log(`[Scheduler]   Difficulty: ${decision.difficultyTarget}`);
       console.log(`[Scheduler]   Would send push notification`);
+
+      return { challengeId: challenge.id, traceId };
     } catch (error) {
       console.error(`[Scheduler] Error processing challenge for user ${decision.userId}:`, error);
+      return null;
     }
   }
 }

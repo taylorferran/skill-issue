@@ -11,404 +11,1219 @@
       box-sizing: border-box;
     }
 
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --primary-light: #818cf8;
+      --secondary: #ec4899;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --bg-hover: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --border: #334155;
+      --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
       min-height: 100vh;
-      padding: 20px;
+      line-height: 1.6;
     }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
+    /* Header */
     .header {
-      background: white;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.5rem;
+      font-weight: 700;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--gradient-1);
       border-radius: 12px;
-      padding: 30px;
-      margin-bottom: 20px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      -webkit-text-fill-color: white;
     }
 
-    .header h1 {
-      color: #667eea;
-      font-size: 2.5em;
-      margin-bottom: 10px;
+    .api-config {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
 
-    .header p {
-      color: #666;
-      font-size: 1.1em;
+    .api-input {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      min-width: 250px;
     }
 
-    .status {
-      display: inline-block;
-      padding: 6px 12px;
-      background: #10b981;
-      color: white;
-      border-radius: 6px;
-      font-size: 0.9em;
-      margin-top: 10px;
+    .api-input:focus {
+      outline: none;
+      border-color: var(--primary);
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-      gap: 20px;
-      margin-bottom: 20px;
-    }
-
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 25px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    }
-
-    .card h2 {
-      color: #333;
-      margin-bottom: 15px;
-      font-size: 1.5em;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 10px;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 5px;
-      color: #555;
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
       font-weight: 500;
     }
 
-    input, select, textarea {
-      width: 100%;
-      padding: 10px;
-      border: 2px solid #e5e7eb;
-      border-radius: 6px;
-      font-size: 1em;
-      transition: border-color 0.3s;
+    .status-badge.connected {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
     }
 
-    input:focus, select:focus, textarea:focus {
-      outline: none;
-      border-color: #667eea;
+    .status-badge.disconnected {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
     }
 
-    button {
-      background: #667eea;
-      color: white;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 1em;
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-badge.connected .status-dot {
+      background: var(--success);
+    }
+
+    .status-badge.disconnected .status-dot {
+      background: var(--error);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Main Layout */
+    .main-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Navigation Tabs */
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    .nav-tab {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+      color: var(--text-secondary);
       cursor: pointer;
       transition: all 0.3s;
-      font-weight: 600;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 500;
     }
 
-    button:hover {
-      background: #5568d3;
-      transform: translateY(-2px);
-      box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+    .nav-tab:hover {
+      background: var(--bg-hover);
+      color: var(--text-primary);
     }
 
-    button:disabled {
-      background: #9ca3af;
-      cursor: not-allowed;
-      transform: none;
+    .nav-tab.active {
+      background: var(--gradient-1);
+      border-color: transparent;
+      color: white;
     }
 
-    .response {
-      margin-top: 15px;
-      padding: 15px;
-      border-radius: 6px;
-      font-family: 'Courier New', monospace;
-      font-size: 0.9em;
-      max-height: 300px;
-      overflow-y: auto;
+    /* Tab Content */
+    .tab-content {
       display: none;
     }
 
-    .response.success {
-      background: #d1fae5;
-      color: #065f46;
-      border: 2px solid #10b981;
+    .tab-content.active {
       display: block;
+      animation: fadeIn 0.3s ease;
     }
 
-    .response.error {
-      background: #fee2e2;
-      color: #991b1b;
-      border: 2px solid #ef4444;
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-label {
       display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      font-weight: 500;
     }
 
-    .info {
-      background: #e0e7ff;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      font-size: 0.9em;
-      color: #4338ca;
+    .form-input,
+    .form-select,
+    .form-textarea {
+      width: 100%;
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.875rem 1rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+      transition: all 0.3s;
     }
 
-    .api-key-info {
-      background: #fef3c7;
-      padding: 12px;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      font-size: 0.9em;
-      color: #92400e;
+    .form-input:focus,
+    .form-select:focus,
+    .form-textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
 
-    pre {
-      white-space: pre-wrap;
-      word-wrap: break-word;
+    .form-textarea {
+      min-height: 100px;
+      resize: vertical;
     }
 
-    .full-width {
-      grid-column: 1 / -1;
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
     }
 
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.875rem 1.5rem;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--gradient-1);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-secondary {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--border);
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-danger {
+      background: var(--error);
+      color: white;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    /* Response Display */
+    .response-container {
+      margin-top: 1.5rem;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .response-header {
+      padding: 0.75rem 1rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .response-body {
+      padding: 1rem;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .response-success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid var(--success);
+    }
+
+    .response-success .response-header {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+
+    .response-error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--error);
+    }
+
+    .response-error .response-header {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    /* Stats */
     .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
-      margin-bottom: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
     }
 
     .stat-card {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 20px;
-      border-radius: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
       text-align: center;
+      transition: transform 0.3s;
     }
 
-    .stat-card h3 {
-      font-size: 2em;
-      margin-bottom: 5px;
+    .stat-card:hover {
+      transform: translateY(-4px);
     }
 
-    .stat-card p {
-      font-size: 0.9em;
-      opacity: 0.9;
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Lists */
+    .data-list {
+      list-style: none;
+    }
+
+    .data-list-item {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: all 0.3s;
+    }
+
+    .data-list-item:hover {
+      border-color: var(--primary);
+      background: var(--bg-hover);
+    }
+
+    .data-list-item.selected {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.1);
+    }
+
+    /* Calibration Quiz */
+    .quiz-container {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .quiz-progress {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 8px;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      margin: 0 1rem;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--gradient-1);
+      border-radius: 4px;
+      transition: width 0.3s;
+    }
+
+    .quiz-question {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      line-height: 1.6;
+    }
+
+    .quiz-difficulty {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: var(--gradient-1);
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .quiz-options {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .quiz-option {
+      background: var(--bg-dark);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-align: left;
+      font-size: 1rem;
+      color: var(--text-primary);
+    }
+
+    .quiz-option:hover {
+      border-color: var(--primary);
+      background: var(--bg-hover);
+    }
+
+    .quiz-option.selected {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.2);
+    }
+
+    .quiz-option.correct {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.2);
+    }
+
+    .quiz-option.incorrect {
+      border-color: var(--error);
+      background: rgba(239, 68, 68, 0.2);
+    }
+
+    /* Results */
+    .results-container {
+      text-align: center;
+      padding: 3rem 2rem;
+    }
+
+    .results-score {
+      font-size: 4rem;
+      font-weight: 700;
+      background: var(--gradient-1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+
+    .results-message {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 2rem;
+    }
+
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Empty State */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.5;
+    }
+
+    /* Info Box */
+    .info-box {
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid var(--primary);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .info-box-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+
+    .info-box-content {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    /* JSON Display */
+    .json-display {
+      background: var(--bg-dark);
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 0.875rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .json-key {
+      color: #93c5fd;
+    }
+
+    .json-string {
+      color: #86efac;
+    }
+
+    .json-number {
+      color: #fca5a5;
+    }
+
+    .json-boolean {
+      color: #fcd34d;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .api-config {
+        flex-direction: column;
+      }
+
+      .api-input {
+        min-width: unset;
+      }
+
+      .main-container {
+        padding: 1rem;
+      }
+
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>Skill Issue Admin Dashboard</h1>
-      <p>Backend API Management Interface</p>
-      <span class="status" id="status">Connected</span>
-    </div>
-
-    <div class="card full-width">
-      <h2>API Configuration</h2>
-      <div class="form-group">
-        <label for="apiKey">API Key (if required)</label>
-        <input type="text" id="apiKey" placeholder="Enter API key if API_AUTH_ENABLED=true">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <div class="logo">
+        <div class="logo-icon">🎯</div>
+        Skill Issue
+        <span style="background: white; color: var(--error); padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-left: 12px; border: 2px solid var(--error);">Admin</span>
       </div>
-      <div class="api-key-info">
-        <strong>Authentication Options:</strong><br>
-        • Leave blank if <code>API_AUTH_ENABLED=false</code><br>
-        • Enter your API key if authentication is enabled (set via <code>API_KEY</code> env variable)<br>
-        • The key will be sent as <code>Authorization: Bearer &lt;key&gt;</code> header
+      <div class="api-config">
+        <input type="password" class="api-input" id="apiKey" placeholder="Enter Bearer Token (e.g., whiteclaw)">
+        <span class="status-badge disconnected" id="statusBadge">
+          <span class="status-dot"></span>
+          <span id="statusText">Disconnected</span>
+        </span>
       </div>
     </div>
+  </header>
 
-    <div class="grid">
-      <!-- Health Check -->
-      <div class="card">
-        <h2>Health Check</h2>
-        <button onclick="checkHealth()">Check Health</button>
-        <div class="response" id="health-response"></div>
+  <!-- Main Content -->
+  <main class="main-container">
+    <!-- Navigation -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="showTab('dashboard')">
+        📊 Dashboard
+      </button>
+      <button class="nav-tab" onclick="showTab('users')">
+        👥 Users
+      </button>
+      <button class="nav-tab" onclick="showTab('skills')">
+        📚 Skills
+      </button>
+      <button class="nav-tab" onclick="showTab('calibration')">
+        🎯 Calibration
+      </button>
+      <button class="nav-tab" onclick="showTab('challenges')">
+        🎮 Challenges
+      </button>
+      <button class="nav-tab" onclick="showTab('admin')">
+        ⚙️ Admin
+      </button>
+    </nav>
+
+    <!-- Dashboard Tab -->
+    <div id="dashboard" class="tab-content active">
+      <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="stat-card">
+          <div class="stat-value" id="totalUsers">-</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalSkills">-</div>
+          <div class="stat-label">Total Skills</div>
+        </div>
       </div>
 
-      <!-- Create User -->
       <div class="card">
-        <h2>Create User</h2>
-        <div class="form-group">
-          <label for="userId">User ID (UUID, optional)</label>
-          <input type="text" id="userId" placeholder="Leave blank for auto-generate">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">🚀</div>
+            Quick Start Guide
+          </div>
         </div>
-        <div class="form-group">
-          <label for="deviceId">Device ID (optional)</label>
-          <input type="text" id="deviceId" placeholder="e.g., expo-push-token or device identifier">
+        <div class="info-box">
+          <span class="info-box-icon">💡</span>
+          <div class="info-box-content">
+            <strong>Welcome to Skill Issue!</strong> This interactive dashboard lets you test all API endpoints. 
+            Start by entering your Bearer token above, then explore the tabs to create users, manage skills, 
+            run calibration, and test challenges.
+          </div>
         </div>
-        <div class="form-group">
-          <label for="timezone">Timezone</label>
-          <input type="text" id="timezone" value="UTC" placeholder="e.g., America/New_York">
+        <div style="display: grid; gap: 1rem;">
+          <div class="data-list-item" style="cursor: pointer;" onclick="showTab('users')">
+            <div>
+              <strong>1. Create a User</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">Start by creating a new user account</div>
+            </div>
+            <span>→</span>
+          </div>
+          <div class="data-list-item" style="cursor: pointer;" onclick="showTab('skills')">
+            <div>
+              <strong>2. Create or Select a Skill</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">Browse existing skills or create a new one</div>
+            </div>
+            <span>→</span>
+          </div>
+          <div class="data-list-item" style="cursor: pointer;" onclick="showTab('calibration')">
+            <div>
+              <strong>3. Run Calibration</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">Complete the 10-question calibration quiz</div>
+            </div>
+            <span>→</span>
+          </div>
+          <div class="data-list-item" style="cursor: pointer;" onclick="showTab('challenges')">
+            <div>
+              <strong>4. Answer Challenges</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">Test your knowledge with AI-generated challenges</div>
+            </div>
+            <span>→</span>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="quietStart">Quiet Hours Start (0-23)</label>
-          <input type="number" id="quietStart" min="0" max="23" placeholder="e.g., 22">
-        </div>
-        <div class="form-group">
-          <label for="quietEnd">Quiet Hours End (0-23)</label>
-          <input type="number" id="quietEnd" min="0" max="23" placeholder="e.g., 8">
-        </div>
-        <div class="form-group">
-          <label for="maxChallenges">Max Challenges Per Day</label>
-          <input type="number" id="maxChallenges" value="5" min="1" max="100">
-        </div>
-        <button onclick="createUser()">Create User</button>
-        <div class="response" id="create-user-response"></div>
-      </div>
 
-      <!-- Get Skills -->
-      <div class="card">
-        <h2>Available Skills</h2>
-        <button onclick="getSkills()">Load Skills</button>
-        <div class="response" id="skills-response"></div>
-      </div>
-
-      <!-- Get All Users -->
-      <div class="card">
-        <h2>All Users</h2>
-        <div class="info">
-          View all users in the system.
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border);">
+          <div class="info-box" style="margin-bottom: 1rem;">
+            <span class="info-box-icon">⚡</span>
+            <div class="info-box-content">
+              <strong>Run Scheduler</strong> Manually trigger the scheduling agent to create challenges for eligible users. 
+              This runs automatically every 30 minutes via cron job. Response may take a few seconds.
+            </div>
+          </div>
+          <button class="btn btn-primary" id="dashboardSchedulerBtn" onclick="triggerSchedulerFromDashboard()" style="width: 100%;">
+            <span id="dashboardSchedulerText">🚀 Run Scheduler Tick</span>
+            <span id="dashboardSchedulerSpinner" class="loading-spinner" style="display: none; margin-left: 8px; width: 16px; height: 16px; border-width: 2px;"></span>
+          </button>
+          <div id="dashboardSchedulerResponse"></div>
         </div>
-        <button onclick="getAllUsers()">Get All Users</button>
-        <div class="response" id="all-users-response"></div>
-      </div>
-
-      <!-- Get User -->
-      <div class="card">
-        <h2>Get User</h2>
-        <div class="form-group">
-          <label for="getUserId">User ID</label>
-          <input type="text" id="getUserId" placeholder="Enter user UUID">
-        </div>
-        <button onclick="getUser()">Get User</button>
-        <div class="response" id="get-user-response"></div>
-      </div>
-
-      <!-- Enroll User in Skill -->
-      <div class="card">
-        <h2>Enroll User in Skill</h2>
-        <div class="form-group">
-          <label for="enrollUserId">User ID</label>
-          <input type="text" id="enrollUserId" placeholder="Enter user UUID">
-        </div>
-        <div class="form-group">
-          <label for="enrollSkillId">Skill ID</label>
-          <input type="text" id="enrollSkillId" placeholder="Enter skill UUID">
-        </div>
-        <div class="form-group">
-          <label for="difficultyTarget">Difficulty Target (1-10)</label>
-          <input type="number" id="difficultyTarget" value="2" min="1" max="10">
-        </div>
-        <button onclick="enrollSkill()">Enroll User</button>
-        <div class="response" id="enroll-response"></div>
-      </div>
-
-      <!-- Get User Skills -->
-      <div class="card">
-        <h2>Get User Skills</h2>
-        <div class="form-group">
-          <label for="userSkillsId">User ID</label>
-          <input type="text" id="userSkillsId" placeholder="Enter user UUID">
-        </div>
-        <button onclick="getUserSkills()">Get User Skills</button>
-        <div class="response" id="user-skills-response"></div>
-      </div>
-
-      <!-- Manual Scheduler Tick -->
-      <div class="card">
-        <h2>Manual Scheduler Tick</h2>
-        <div class="info">
-          Manually trigger the scheduling agent to create challenges for eligible users.
-        </div>
-        <button onclick="triggerScheduler()">Trigger Scheduler</button>
-        <div class="response" id="scheduler-response"></div>
-      </div>
-
-      <!-- Get Pending Challenges -->
-      <div class="card">
-        <h2>Pending Challenges</h2>
-        <div class="info">
-          View all unanswered challenges for a user. These are challenges that have been created but not yet answered.
-        </div>
-        <div class="form-group">
-          <label for="pendingUserId">User ID</label>
-          <input type="text" id="pendingUserId" placeholder="Enter user UUID">
-        </div>
-        <button onclick="getPendingChallenges()">Get Pending Challenges</button>
-        <div class="response" id="pending-response"></div>
-      </div>
-
-      <!-- Get Challenge History -->
-      <div class="card">
-        <h2>Challenge History</h2>
-        <div class="form-group">
-          <label for="historyUserId">User ID</label>
-          <input type="text" id="historyUserId" placeholder="Enter user UUID">
-        </div>
-        <div class="form-group">
-          <label for="historyLimit">Limit</label>
-          <input type="number" id="historyLimit" value="10" min="1" max="100">
-        </div>
-        <button onclick="getChallengeHistory()">Get History</button>
-        <div class="response" id="history-response"></div>
-      </div>
-
-      <!-- Get Challenge -->
-      <div class="card">
-        <h2>Get Challenge</h2>
-        <div class="info">
-          View a specific challenge by ID (without seeing the correct answer).
-        </div>
-        <div class="form-group">
-          <label for="challengeId">Challenge ID</label>
-          <input type="text" id="challengeId" placeholder="Enter challenge UUID">
-        </div>
-        <button onclick="getChallenge()">Get Challenge</button>
-        <div class="response" id="challenge-response"></div>
-      </div>
-
-      <!-- Answer Challenge -->
-      <div class="card">
-        <h2>Answer Challenge</h2>
-        <div class="form-group">
-          <label for="answerChallengeId">Challenge ID</label>
-          <input type="text" id="answerChallengeId" placeholder="Enter challenge UUID">
-        </div>
-        <div class="form-group">
-          <label for="answerUserId">User ID</label>
-          <input type="text" id="answerUserId" placeholder="Enter user UUID">
-        </div>
-        <div class="form-group">
-          <label for="selectedOption">Selected Option (0-3)</label>
-          <input type="number" id="selectedOption" min="0" max="3" placeholder="0, 1, 2, or 3">
-        </div>
-        <div class="form-group">
-          <label for="responseTime">Response Time (ms, optional)</label>
-          <input type="number" id="responseTime" placeholder="e.g., 5000">
-        </div>
-        <div class="form-group">
-          <label for="confidence">Confidence (1-5, optional)</label>
-          <input type="number" id="confidence" min="1" max="5" placeholder="1-5">
-        </div>
-        <div class="form-group">
-          <label for="userFeedback">Feedback (optional)</label>
-          <textarea id="userFeedback" rows="2" placeholder="Optional feedback about the challenge"></textarea>
-        </div>
-        <button onclick="answerChallenge()">Submit Answer</button>
-        <div class="response" id="answer-response"></div>
       </div>
     </div>
-  </div>
+
+    <!-- Users Tab -->
+    <div id="users" class="tab-content">
+      <div class="grid-2">
+        <!-- Create User -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-2);">➕</div>
+              Create New User
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Timezone</label>
+            <select class="form-select" id="userTimezone">
+              <option value="UTC">UTC</option>
+              <option value="America/New_York">America/New_York</option>
+              <option value="America/Los_Angeles">America/Los_Angeles</option>
+              <option value="Europe/London">Europe/London</option>
+              <option value="Europe/Paris">Europe/Paris</option>
+              <option value="Asia/Tokyo">Asia/Tokyo</option>
+              <option value="Australia/Sydney">Australia/Sydney</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Quiet Hours Start</label>
+              <input type="number" class="form-input" id="userQuietStart" min="0" max="23" placeholder="22">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Quiet Hours End</label>
+              <input type="number" class="form-input" id="userQuietEnd" min="0" max="23" placeholder="8">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Max Challenges Per Day</label>
+            <input type="number" class="form-input" id="userMaxChallenges" value="5" min="1" max="20">
+          </div>
+          <button class="btn btn-primary" onclick="createUser()">
+            Create User
+          </button>
+          <div id="createUserResponse"></div>
+        </div>
+
+        <!-- User List -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-3);">👥</div>
+              All Users
+            </div>
+            <button class="btn btn-secondary" onclick="loadUsers()">Refresh</button>
+          </div>
+          <div id="usersList">
+            <div class="empty-state">
+              <div class="empty-state-icon">👤</div>
+              <p>Click Refresh to load users</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Details -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">🔍</div>
+            User Details & Skills
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Select User</label>
+          <select class="form-select" id="selectedUserId" onchange="loadUserDetails()">
+            <option value="">-- Select a user --</option>
+          </select>
+        </div>
+        <div id="userDetailsContent">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>Select a user to view their details and enrolled skills</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skills Tab -->
+    <div id="skills" class="tab-content">
+      <div class="grid-2">
+        <!-- Create Skill -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-2);">✨</div>
+              Create New Skill
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Skill Name</label>
+            <input type="text" class="form-input" id="skillName" placeholder="e.g., Advanced Python">
+          </div>
+          <button class="btn btn-secondary" onclick="generateSkillDescription()">
+            🤖 Generate Description
+          </button>
+          <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label">Description</label>
+            <textarea class="form-textarea" id="skillDescription" placeholder="Enter skill description or generate one above"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="createSkill()">
+            Create Skill
+          </button>
+          <div id="createSkillResponse"></div>
+        </div>
+
+        <!-- Skills List -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-3);">📚</div>
+              Available Skills
+            </div>
+            <button class="btn btn-secondary" onclick="loadSkills()">Refresh</button>
+          </div>
+          <div id="skillsList">
+            <div class="empty-state">
+              <div class="empty-state-icon">📖</div>
+              <p>Click Refresh to load skills</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Enroll User -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">📝</div>
+            Enroll User in Skill
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Select User</label>
+            <select class="form-select" id="enrollUserId">
+              <option value="">-- Select user --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Select Skill</label>
+            <select class="form-select" id="enrollSkillId">
+              <option value="">-- Select skill --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Starting Difficulty (0 = needs calibration)</label>
+            <input type="number" class="form-input" id="enrollDifficulty" value="0" min="0" max="10">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="enrollUser()">
+          Enroll User
+        </button>
+        <div id="enrollResponse"></div>
+      </div>
+    </div>
+
+    <!-- Calibration Tab -->
+    <div id="calibration" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">🎯</div>
+            Skill Calibration
+          </div>
+        </div>
+        
+        <div id="calibrationSetup">
+          <div class="info-box">
+            <span class="info-box-icon">ℹ️</span>
+            <div class="info-box-content">
+              Calibration determines your starting difficulty level. You'll answer 10 questions 
+              (one for each difficulty level 1-10), and we'll calculate your personalized starting point.
+            </div>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Select User</label>
+              <select class="form-select" id="calibrationUserId" onchange="checkCalibrationStatus()">
+                <option value="">-- Select user --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Select Skill</label>
+              <select class="form-select" id="calibrationSkillId" onchange="checkCalibrationStatus()">
+                <option value="">-- Select skill --</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="calibrationStatus"></div>
+          
+          <div id="calibrationActions" style="margin-top: 1.5rem;">
+            <button class="btn btn-primary" id="generateQuestionsBtn" onclick="generateCalibrationQuestions()" style="display: none;">
+              Generate Calibration Questions
+            </button>
+            <button class="btn btn-success" id="startCalibrationBtn" onclick="startCalibration()" style="display: none;">
+              Start Calibration Quiz
+            </button>
+          </div>
+        </div>
+
+        <div id="calibrationQuiz" style="display: none;">
+          <div class="quiz-container">
+            <div class="quiz-progress">
+              <span>Question <span id="currentQuestion">1</span> of <span id="totalQuestions">10</span></span>
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 10%"></div>
+              </div>
+              <span id="progressPercent">10%</span>
+            </div>
+            <div class="quiz-difficulty" id="questionDifficulty">Difficulty: 1</div>
+            <div class="quiz-question" id="questionText"></div>
+            <div class="quiz-options" id="questionOptions"></div>
+          </div>
+          <div id="answerFeedback" style="margin-top: 1rem;"></div>
+        </div>
+
+        <div id="calibrationResults" style="display: none;">
+          <div class="results-container">
+            <div class="results-score" id="finalScore"></div>
+            <div class="results-message" id="resultsMessage"></div>
+            <div class="stats-grid" style="max-width: 600px; margin: 0 auto 2rem;">
+              <div class="stat-card">
+                <div class="stat-value" id="resultCorrect">-</div>
+                <div class="stat-label">Correct</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="resultAccuracy">-</div>
+                <div class="stat-label">Accuracy</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="resultDifficulty">-</div>
+                <div class="stat-label">Starting Level</div>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="resetCalibration()">
+              Start New Calibration
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Challenges Tab -->
+    <div id="challenges" class="tab-content">
+      <div class="grid-2">
+        <!-- Pending Challenges -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-2);">📬</div>
+              Pending Challenges
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Select User</label>
+            <select class="form-select" id="pendingUserId" onchange="loadPendingChallenges()">
+              <option value="">-- Select user --</option>
+            </select>
+          </div>
+          <div id="pendingChallengesList">
+            <div class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <p>Select a user to view pending challenges</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Answer Challenge -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-3);">✏️</div>
+              Answer Challenge
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Challenge ID</label>
+            <input type="text" class="form-input" id="answerChallengeId" placeholder="Enter challenge UUID">
+          </div>
+          <div class="form-group">
+            <label class="form-label">User ID</label>
+            <input type="text" class="form-input" id="answerUserId" placeholder="Enter user UUID">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Your Answer (0-3)</label>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+              <button class="btn btn-secondary" onclick="setAnswer(0)">A (0)</button>
+              <button class="btn btn-secondary" onclick="setAnswer(1)">B (1)</button>
+              <button class="btn btn-secondary" onclick="setAnswer(2)">C (2)</button>
+              <button class="btn btn-secondary" onclick="setAnswer(3)">D (3)</button>
+            </div>
+            <input type="hidden" id="selectedAnswer" value="">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Response Time (ms)</label>
+              <input type="number" class="form-input" id="responseTime" placeholder="e.g., 5000">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Confidence (1-5)</label>
+              <input type="number" class="form-input" id="confidenceLevel" min="1" max="5" placeholder="1-5">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="submitAnswer()">
+            Submit Answer
+          </button>
+          <div id="submitAnswerResponse"></div>
+        </div>
+      </div>
+
+      <!-- Challenge History -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">📜</div>
+            Challenge History
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Select User</label>
+            <select class="form-select" id="historyUserId" onchange="loadChallengeHistory()">
+              <option value="">-- Select user --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Limit</label>
+            <input type="number" class="form-input" id="historyLimit" value="10" min="1" max="50">
+          </div>
+        </div>
+        <div id="challengeHistoryList">
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <p>Select a user to view their challenge history</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Tab -->
+    <div id="admin" class="tab-content">
+      <div class="grid-2">
+        <!-- Scheduler -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-2);">⏰</div>
+              Scheduler Control
+            </div>
+          </div>
+          <div class="info-box">
+            <span class="info-box-icon">⚡</span>
+            <div class="info-box-content">
+              Manually trigger the scheduling agent to create challenges for eligible users. 
+              This runs automatically every 30 minutes via cron job.
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="triggerScheduler()">
+            Run Scheduler Tick
+          </button>
+          <div id="schedulerResponse"></div>
+        </div>
+
+        <!-- API Test -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <div class="card-icon" style="background: var(--gradient-3);">🔧</div>
+              API Test
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Endpoint</label>
+            <input type="text" class="form-input" id="testEndpoint" value="/api/health" placeholder="/api/endpoint">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Method</label>
+            <select class="form-select" id="testMethod">
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary" onclick="testEndpoint()">
+            Send Request
+          </button>
+          <div id="apiTestResponse"></div>
+        </div>
+      </div>
+
+      <!-- Raw Response Viewer -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">📄</div>
+            Last API Response
+          </div>
+        </div>
+        <div class="json-display" id="lastResponse">
+          No API calls made yet. Use the tabs above to interact with the API.
+        </div>
+      </div>
+    </div>
+  </main>
 
   <script>
+    // Global state
     const API_BASE = window.location.origin;
+    let currentUser = null;
+    let currentSkill = null;
+    let calibrationQuestions = [];
+    let currentQuestionIndex = 0;
+    let calibrationAnswers = [];
 
+    // Utility functions
     function getHeaders() {
       const headers = {
         'Content-Type': 'application/json'
@@ -422,248 +1237,895 @@
 
     function showResponse(elementId, data, isError = false) {
       const element = document.getElementById(elementId);
-      element.className = 'response ' + (isError ? 'error' : 'success');
-      element.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+      if (!element) return;
+      
+      const type = isError ? 'error' : 'success';
+      const title = isError ? '❌ Error' : '✅ Success';
+      
+      element.innerHTML = `
+        <div class="response-container response-${type}">
+          <div class="response-header">${title}</div>
+          <div class="response-body">${JSON.stringify(data, null, 2)}</div>
+        </div>
+      `;
+      
+      // Also update last response viewer
+      document.getElementById('lastResponse').innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
     }
 
+    function syntaxHighlight(json) {
+      json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            cls = 'json-key';
+          } else {
+            cls = 'json-string';
+          }
+        } else if (/true|false/.test(match)) {
+          cls = 'json-boolean';
+        } else if (/null/.test(match)) {
+          cls = 'json-null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+      });
+    }
+
+    function showLoading(elementId) {
+      const element = document.getElementById(elementId);
+      if (element) {
+        element.innerHTML = '<div class="loading"><div class="loading-spinner"></div>Loading...</div>';
+      }
+    }
+
+    // Tab navigation
+    function showTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+      
+      document.getElementById(tabId).classList.add('active');
+      event.target.classList.add('active');
+      
+      // Load data for specific tabs
+      if (tabId === 'users') loadUsers();
+      if (tabId === 'skills') loadSkills();
+      if (tabId === 'calibration') {
+        loadUsersIntoSelect('calibrationUserId');
+        loadSkillsIntoSelect('calibrationSkillId');
+      }
+      if (tabId === 'challenges') {
+        loadUsersIntoSelect('pendingUserId');
+        loadUsersIntoSelect('historyUserId');
+      }
+    }
+
+    // Health check
     async function checkHealth() {
       try {
         const response = await fetch(`${API_BASE}/api/health`);
         const data = await response.json();
-        showResponse('health-response', data);
-        document.getElementById('status').textContent = 'Connected';
-        document.getElementById('status').style.background = '#10b981';
+        
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        
+        if (response.ok) {
+          statusBadge.className = 'status-badge connected';
+          statusText.textContent = 'Connected';
+          loadDashboardStats();
+        } else {
+          statusBadge.className = 'status-badge disconnected';
+          statusText.textContent = 'Disconnected';
+        }
       } catch (error) {
-        showResponse('health-response', { error: error.message }, true);
-        document.getElementById('status').textContent = 'Disconnected';
-        document.getElementById('status').style.background = '#ef4444';
+        const statusBadge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        statusBadge.className = 'status-badge disconnected';
+        statusText.textContent = 'Disconnected';
       }
     }
 
-    async function createUser() {
-      const userId = document.getElementById('userId').value || undefined;
-      const deviceId = document.getElementById('deviceId').value || undefined;
-      const timezone = document.getElementById('timezone').value;
-      const quietStart = parseInt(document.getElementById('quietStart').value) || undefined;
-      const quietEnd = parseInt(document.getElementById('quietEnd').value) || undefined;
-      const maxChallenges = parseInt(document.getElementById('maxChallenges').value);
+    // Dashboard stats
+    async function loadDashboardStats() {
+      try {
+        const [usersRes, skillsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/users`, { headers: getHeaders() }),
+          fetch(`${API_BASE}/api/skills`, { headers: getHeaders() })
+        ]);
+        
+        const users = await usersRes.json();
+        const skills = await skillsRes.json();
+        
+        document.getElementById('totalUsers').textContent = Array.isArray(users) ? users.length : '-';
+        document.getElementById('totalSkills').textContent = Array.isArray(skills) ? skills.length : '-';
+      } catch (error) {
+        console.error('Failed to load dashboard stats:', error);
+      }
+    }
 
+    // User management
+    async function createUser() {
+      const timezone = document.getElementById('userTimezone').value;
+      const quietStart = document.getElementById('userQuietStart').value;
+      const quietEnd = document.getElementById('userQuietEnd').value;
+      const maxChallenges = parseInt(document.getElementById('userMaxChallenges').value);
+      
+      const body = {
+        timezone,
+        maxChallengesPerDay: maxChallenges
+      };
+      
+      if (quietStart) body.quietHoursStart = parseInt(quietStart);
+      if (quietEnd) body.quietHoursEnd = parseInt(quietEnd);
+      
       try {
         const response = await fetch(`${API_BASE}/api/users`, {
           method: 'POST',
           headers: getHeaders(),
-          body: JSON.stringify({
-            id: userId,
-            deviceId,
-            timezone,
-            quietHoursStart: quietStart,
-            quietHoursEnd: quietEnd,
-            maxChallengesPerDay: maxChallenges
-          })
+          body: JSON.stringify(body)
         });
+        
         const data = await response.json();
-        showResponse('create-user-response', data, !response.ok);
+        showResponse('createUserResponse', data, !response.ok);
+        
+        if (response.ok) {
+          loadUsers();
+        }
       } catch (error) {
-        showResponse('create-user-response', { error: error.message }, true);
+        showResponse('createUserResponse', { error: error.message }, true);
       }
     }
 
-    async function getSkills() {
+    async function loadUsers() {
+      showLoading('usersList');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/users`, { headers: getHeaders() });
+        const users = await response.json();
+        
+        if (!Array.isArray(users)) {
+          document.getElementById('usersList').innerHTML = '<div class="empty-state"><p>Error loading users</p></div>';
+          return;
+        }
+        
+        if (users.length === 0) {
+          document.getElementById('usersList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">👤</div><p>No users found</p></div>';
+          return;
+        }
+        
+        const html = users.map(user => `
+          <div class="data-list-item" onclick="selectUser('${user.id}')" data-user-id="${user.id}">
+            <div>
+              <strong>${user.id.substring(0, 8)}...</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                ${user.timezone} • Max ${user.maxChallengesPerDay}/day
+              </div>
+            </div>
+            <span style="color: var(--text-secondary);">→</span>
+          </div>
+        `).join('');
+        
+        document.getElementById('usersList').innerHTML = `<div class="data-list">${html}</div>`;
+        
+        // Update all user selects
+        updateUserSelects(users);
+      } catch (error) {
+        document.getElementById('usersList').innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
+      }
+    }
+
+    function updateUserSelects(users) {
+      const options = users.map(u => `<option value="${u.id}">${u.id.substring(0, 8)}... (${u.timezone})</option>`).join('');
+      
+      ['selectedUserId', 'enrollUserId', 'calibrationUserId', 'pendingUserId', 'historyUserId'].forEach(id => {
+        const select = document.getElementById(id);
+        if (select) {
+          select.innerHTML = '<option value="">-- Select user --</option>' + options;
+        }
+      });
+    }
+
+    function loadUsersIntoSelect(selectId) {
+      fetch(`${API_BASE}/api/users`, { headers: getHeaders() })
+        .then(res => res.json())
+        .then(users => {
+          if (Array.isArray(users)) {
+            const options = users.map(u => `<option value="${u.id}">${u.id.substring(0, 8)}... (${u.timezone})</option>`).join('');
+            const select = document.getElementById(selectId);
+            if (select) {
+              select.innerHTML = '<option value="">-- Select user --</option>' + options;
+            }
+          }
+        });
+    }
+
+    async function loadUserDetails() {
+      const userId = document.getElementById('selectedUserId').value;
+      if (!userId) {
+        document.getElementById('userDetailsContent').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <p>Select a user to view their details and enrolled skills</p>
+          </div>
+        `;
+        return;
+      }
+      
+      try {
+        const [userRes, skillsRes] = await Promise.all([
+          fetch(`${API_BASE}/api/users/${userId}`, { headers: getHeaders() }),
+          fetch(`${API_BASE}/api/users/${userId}/skills`, { headers: getHeaders() })
+        ]);
+        
+        const user = await userRes.json();
+        const skills = await skillsRes.json();
+        
+        let skillsHtml = '';
+        if (Array.isArray(skills) && skills.length > 0) {
+          skillsHtml = skills.map(s => `
+            <div class="data-list-item">
+              <div>
+                <strong>${s.skillName}</strong>
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                  Difficulty: ${s.difficultyTarget}/10 • Accuracy: ${(s.accuracy * 100).toFixed(0)}%
+                  ${s.needsCalibration ? ' • ⚠️ Needs Calibration' : ''}
+                </div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          skillsHtml = '<p style="color: var(--text-secondary);">Not enrolled in any skills</p>';
+        }
+        
+        document.getElementById('userDetailsContent').innerHTML = `
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.5rem;">User Info</h3>
+            <div class="json-display">${JSON.stringify(user, null, 2)}</div>
+          </div>
+          <div>
+            <h3 style="margin-bottom: 0.5rem;">Enrolled Skills</h3>
+            <div class="data-list">${skillsHtml}</div>
+          </div>
+        `;
+      } catch (error) {
+        document.getElementById('userDetailsContent').innerHTML = `<p style="color: var(--error);">Error: ${error.message}</p>`;
+      }
+    }
+
+    function selectUser(userId) {
+      document.getElementById('selectedUserId').value = userId;
+      document.querySelectorAll('.data-list-item').forEach(item => item.classList.remove('selected'));
+      document.querySelector(`[data-user-id="${userId}"]`)?.classList.add('selected');
+      loadUserDetails();
+    }
+
+    // Skill management
+    async function generateSkillDescription() {
+      const name = document.getElementById('skillName').value;
+      if (!name) {
+        showResponse('createSkillResponse', { error: 'Please enter a skill name first' }, true);
+        return;
+      }
+      
+      showLoading('createSkillResponse');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/skills/generate-description`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ skillName: name })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('skillDescription').value = data.description;
+          showResponse('createSkillResponse', {
+            message: data.message,
+            isVague: data.isVague,
+            description: data.description.substring(0, 100) + '...'
+          }, data.isVague);
+        } else {
+          showResponse('createSkillResponse', data, true);
+        }
+      } catch (error) {
+        showResponse('createSkillResponse', { error: error.message }, true);
+      }
+    }
+
+    async function createSkill() {
+      const name = document.getElementById('skillName').value;
+      const description = document.getElementById('skillDescription').value;
+      
+      if (!name || !description) {
+        showResponse('createSkillResponse', { error: 'Name and description are required' }, true);
+        return;
+      }
+      
       try {
         const response = await fetch(`${API_BASE}/api/skills`, {
-          headers: getHeaders()
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ name, description })
         });
+        
         const data = await response.json();
-        showResponse('skills-response', data, !response.ok);
+        showResponse('createSkillResponse', data, !response.ok);
+        
+        if (response.ok) {
+          loadSkills();
+          document.getElementById('skillName').value = '';
+          document.getElementById('skillDescription').value = '';
+        }
       } catch (error) {
-        showResponse('skills-response', { error: error.message }, true);
+        showResponse('createSkillResponse', { error: error.message }, true);
       }
     }
 
-    async function getAllUsers() {
+    async function loadSkills() {
+      showLoading('skillsList');
+      
       try {
-        const response = await fetch(`${API_BASE}/api/users`, {
-          headers: getHeaders()
-        });
-        const data = await response.json();
-        showResponse('all-users-response', data, !response.ok);
+        const response = await fetch(`${API_BASE}/api/skills`, { headers: getHeaders() });
+        const skills = await response.json();
+        
+        if (!Array.isArray(skills)) {
+          document.getElementById('skillsList').innerHTML = '<div class="empty-state"><p>Error loading skills</p></div>';
+          return;
+        }
+        
+        if (skills.length === 0) {
+          document.getElementById('skillsList').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📖</div><p>No skills found</p></div>';
+          return;
+        }
+        
+        const html = skills.map(skill => `
+          <div class="data-list-item" onclick="selectSkill('${skill.id}')" data-skill-id="${skill.id}">
+            <div>
+              <strong>${skill.name}</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                ${skill.description.substring(0, 60)}...
+              </div>
+            </div>
+            <span style="color: var(--text-secondary);">→</span>
+          </div>
+        `).join('');
+        
+        document.getElementById('skillsList').innerHTML = `<div class="data-list">${html}</div>`;
+        
+        // Update skill selects
+        updateSkillSelects(skills);
       } catch (error) {
-        showResponse('all-users-response', { error: error.message }, true);
+        document.getElementById('skillsList').innerHTML = `<div class="empty-state"><p>Error: ${error.message}</p></div>`;
       }
     }
 
-    async function getUser() {
-      const userId = document.getElementById('getUserId').value;
-      if (!userId) {
-        showResponse('get-user-response', { error: 'User ID is required' }, true);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/api/users/${userId}`, {
-          headers: getHeaders()
-        });
-        const data = await response.json();
-        showResponse('get-user-response', data, !response.ok);
-      } catch (error) {
-        showResponse('get-user-response', { error: error.message }, true);
-      }
+    function updateSkillSelects(skills) {
+      const options = skills.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+      
+      ['enrollSkillId', 'calibrationSkillId'].forEach(id => {
+        const select = document.getElementById(id);
+        if (select) {
+          select.innerHTML = '<option value="">-- Select skill --</option>' + options;
+        }
+      });
     }
 
-    async function enrollSkill() {
+    function loadSkillsIntoSelect(selectId) {
+      fetch(`${API_BASE}/api/skills`, { headers: getHeaders() })
+        .then(res => res.json())
+        .then(skills => {
+          if (Array.isArray(skills)) {
+            const options = skills.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+            const select = document.getElementById(selectId);
+            if (select) {
+              select.innerHTML = '<option value="">-- Select skill --</option>' + options;
+            }
+          }
+        });
+    }
+
+    function selectSkill(skillId) {
+      document.getElementById('enrollSkillId').value = skillId;
+      document.querySelectorAll('[data-skill-id]').forEach(item => item.classList.remove('selected'));
+      document.querySelector(`[data-skill-id="${skillId}"]`)?.classList.add('selected');
+    }
+
+    async function enrollUser() {
       const userId = document.getElementById('enrollUserId').value;
       const skillId = document.getElementById('enrollSkillId').value;
-      const difficultyTarget = parseInt(document.getElementById('difficultyTarget').value);
-
+      const difficulty = parseInt(document.getElementById('enrollDifficulty').value);
+      
       if (!userId || !skillId) {
-        showResponse('enroll-response', { error: 'User ID and Skill ID are required' }, true);
+        showResponse('enrollResponse', { error: 'Please select both user and skill' }, true);
         return;
       }
-
+      
       try {
         const response = await fetch(`${API_BASE}/api/users/${userId}/skills`, {
           method: 'POST',
           headers: getHeaders(),
-          body: JSON.stringify({
-            skillId,
-            difficultyTarget
-          })
+          body: JSON.stringify({ skillId, difficultyTarget: difficulty })
         });
+        
         const data = await response.json();
-        showResponse('enroll-response', data, !response.ok);
+        showResponse('enrollResponse', data, !response.ok);
       } catch (error) {
-        showResponse('enroll-response', { error: error.message }, true);
+        showResponse('enrollResponse', { error: error.message }, true);
       }
     }
 
-    async function getUserSkills() {
-      const userId = document.getElementById('userSkillsId').value;
-      if (!userId) {
-        showResponse('user-skills-response', { error: 'User ID is required' }, true);
+    // Calibration
+    async function checkCalibrationStatus() {
+      const userId = document.getElementById('calibrationUserId').value;
+      const skillId = document.getElementById('calibrationSkillId').value;
+      
+      if (!userId || !skillId) {
+        document.getElementById('calibrationStatus').innerHTML = '';
+        document.getElementById('generateQuestionsBtn').style.display = 'none';
+        document.getElementById('startCalibrationBtn').style.display = 'none';
         return;
       }
-
+      
       try {
-        const response = await fetch(`${API_BASE}/api/users/${userId}/skills`, {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/skills/${skillId}/calibration/status`, {
           headers: getHeaders()
         });
+        
         const data = await response.json();
-        showResponse('user-skills-response', data, !response.ok);
+        
+        if (data.status === 'completed') {
+          document.getElementById('calibrationStatus').innerHTML = `
+            <div class="info-box" style="background: rgba(16, 185, 129, 0.1); border-color: var(--success);">
+              <span class="info-box-icon">✅</span>
+              <div class="info-box-content">
+                <strong>Calibration Complete!</strong><br>
+                Starting difficulty: ${data.calculatedDifficultyTarget}/10
+              </div>
+            </div>
+          `;
+          document.getElementById('generateQuestionsBtn').style.display = 'none';
+          document.getElementById('startCalibrationBtn').style.display = 'none';
+        } else if (data.status === 'in_progress') {
+          document.getElementById('calibrationStatus').innerHTML = `
+            <div class="info-box" style="background: rgba(245, 158, 11, 0.1); border-color: var(--warning);">
+              <span class="info-box-icon">⏳</span>
+              <div class="info-box-content">
+                <strong>Calibration In Progress</strong><br>
+                Progress: ${data.progress?.answered || 0}/10 questions answered
+              </div>
+            </div>
+          `;
+          document.getElementById('generateQuestionsBtn').style.display = 'none';
+          document.getElementById('startCalibrationBtn').style.display = 'inline-flex';
+          document.getElementById('startCalibrationBtn').textContent = 'Continue Calibration';
+        } else {
+          document.getElementById('calibrationStatus').innerHTML = `
+            <div class="info-box">
+              <span class="info-box-icon">🎯</span>
+              <div class="info-box-content">
+                <strong>Ready to Start</strong><br>
+                Generate calibration questions to begin the assessment.
+              </div>
+            </div>
+          `;
+          document.getElementById('generateQuestionsBtn').style.display = 'inline-flex';
+          document.getElementById('startCalibrationBtn').style.display = 'none';
+        }
       } catch (error) {
-        showResponse('user-skills-response', { error: error.message }, true);
+        document.getElementById('calibrationStatus').innerHTML = `
+          <div class="info-box" style="background: rgba(239, 68, 68, 0.1); border-color: var(--error);">
+            <span class="info-box-icon">❌</span>
+            <div class="info-box-content">Error checking status: ${error.message}</div>
+          </div>
+        `;
       }
     }
 
+    async function generateCalibrationQuestions() {
+      const skillId = document.getElementById('calibrationSkillId').value;
+      
+      showLoading('calibrationStatus');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/skills/${skillId}/calibration/generate`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('calibrationStatus').innerHTML = `
+            <div class="info-box" style="background: rgba(16, 185, 129, 0.1); border-color: var(--success);">
+              <span class="info-box-icon">✅</span>
+              <div class="info-box-content">
+                <strong>Questions Generated!</strong><br>
+                ${data.questionsCount} calibration questions ready.
+              </div>
+            </div>
+          `;
+          document.getElementById('generateQuestionsBtn').style.display = 'none';
+          document.getElementById('startCalibrationBtn').style.display = 'inline-flex';
+        } else {
+          showResponse('calibrationStatus', data, true);
+        }
+      } catch (error) {
+        showResponse('calibrationStatus', { error: error.message }, true);
+      }
+    }
+
+    async function startCalibration() {
+      const userId = document.getElementById('calibrationUserId').value;
+      const skillId = document.getElementById('calibrationSkillId').value;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/skills/${skillId}/calibration/start`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === 'ready') {
+          calibrationQuestions = data.questions;
+          currentQuestionIndex = 0;
+          calibrationAnswers = [];
+          
+          document.getElementById('calibrationSetup').style.display = 'none';
+          document.getElementById('calibrationQuiz').style.display = 'block';
+          
+          showQuestion();
+        } else {
+          showResponse('calibrationStatus', data, true);
+        }
+      } catch (error) {
+        showResponse('calibrationStatus', { error: error.message }, true);
+      }
+    }
+
+    function showQuestion() {
+      const question = calibrationQuestions[currentQuestionIndex];
+      const progress = ((currentQuestionIndex + 1) / calibrationQuestions.length) * 100;
+      
+      document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+      document.getElementById('totalQuestions').textContent = calibrationQuestions.length;
+      document.getElementById('progressFill').style.width = `${progress}%`;
+      document.getElementById('progressPercent').textContent = `${Math.round(progress)}%`;
+      document.getElementById('questionDifficulty').textContent = `Difficulty: ${question.difficulty}`;
+      document.getElementById('questionText').textContent = question.question;
+      
+      const optionsHtml = question.options.map((option, index) => `
+        <button class="quiz-option" onclick="submitCalibrationAnswer(${index})">
+          <strong>${String.fromCharCode(65 + index)}.</strong> ${option}
+        </button>
+      `).join('');
+      
+      document.getElementById('questionOptions').innerHTML = optionsHtml;
+      document.getElementById('answerFeedback').innerHTML = '';
+    }
+
+    async function submitCalibrationAnswer(selectedOption) {
+      const userId = document.getElementById('calibrationUserId').value;
+      const skillId = document.getElementById('calibrationSkillId').value;
+      const question = calibrationQuestions[currentQuestionIndex];
+      
+      // Disable all options
+      document.querySelectorAll('.quiz-option').forEach(btn => btn.disabled = true);
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/skills/${skillId}/calibration/answer`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({
+            difficulty: question.difficulty,
+            selectedOption
+          })
+        });
+        
+        const data = await response.json();
+        
+        // Show feedback
+        const options = document.querySelectorAll('.quiz-option');
+        options[selectedOption].classList.add(data.isCorrect ? 'correct' : 'incorrect');
+        options[data.correctOption].classList.add('correct');
+        
+        document.getElementById('answerFeedback').innerHTML = `
+          <div class="info-box" style="${data.isCorrect ? 'background: rgba(16, 185, 129, 0.1); border-color: var(--success);' : 'background: rgba(239, 68, 68, 0.1); border-color: var(--error);'}">
+            <span class="info-box-icon">${data.isCorrect ? '✅' : '❌'}</span>
+            <div class="info-box-content">
+              <strong>${data.isCorrect ? 'Correct!' : 'Incorrect'}</strong><br>
+              ${data.explanation || ''}
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="nextQuestion()" style="margin-top: 1rem;">
+            ${currentQuestionIndex < calibrationQuestions.length - 1 ? 'Next Question →' : 'Complete Calibration'}
+          </button>
+        `;
+        
+        calibrationAnswers.push(data);
+      } catch (error) {
+        document.getElementById('answerFeedback').innerHTML = `
+          <div class="info-box" style="background: rgba(239, 68, 68, 0.1); border-color: var(--error);">
+            <span class="info-box-icon">❌</span>
+            <div class="info-box-content">Error: ${error.message}</div>
+          </div>
+        `;
+      }
+    }
+
+    function nextQuestion() {
+      currentQuestionIndex++;
+      
+      if (currentQuestionIndex < calibrationQuestions.length) {
+        showQuestion();
+      } else {
+        completeCalibration();
+      }
+    }
+
+    async function completeCalibration() {
+      const userId = document.getElementById('calibrationUserId').value;
+      const skillId = document.getElementById('calibrationSkillId').value;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/skills/${skillId}/calibration/complete`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          document.getElementById('calibrationQuiz').style.display = 'none';
+          document.getElementById('calibrationResults').style.display = 'block';
+          
+          const correct = calibrationAnswers.filter(a => a.isCorrect).length;
+          const accuracy = Math.round((correct / calibrationAnswers.length) * 100);
+          
+          document.getElementById('finalScore').textContent = `${accuracy}%`;
+          document.getElementById('resultsMessage').textContent = data.message;
+          document.getElementById('resultCorrect').textContent = `${correct}/${calibrationAnswers.length}`;
+          document.getElementById('resultAccuracy').textContent = `${accuracy}%`;
+          document.getElementById('resultDifficulty').textContent = data.difficultyTarget;
+        } else {
+          showResponse('answerFeedback', data, true);
+        }
+      } catch (error) {
+        showResponse('answerFeedback', { error: error.message }, true);
+      }
+    }
+
+    function resetCalibration() {
+      document.getElementById('calibrationResults').style.display = 'none';
+      document.getElementById('calibrationSetup').style.display = 'block';
+      document.getElementById('calibrationUserId').value = '';
+      document.getElementById('calibrationSkillId').value = '';
+      checkCalibrationStatus();
+    }
+
+    // Challenges
+    async function loadPendingChallenges() {
+      const userId = document.getElementById('pendingUserId').value;
+      if (!userId) {
+        document.getElementById('pendingChallengesList').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <p>Select a user to view pending challenges</p>
+          </div>
+        `;
+        return;
+      }
+      
+      showLoading('pendingChallengesList');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/challenges/pending`, {
+          headers: getHeaders()
+        });
+        
+        const challenges = await response.json();
+        
+        if (!Array.isArray(challenges) || challenges.length === 0) {
+          document.getElementById('pendingChallengesList').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">🎉</div>
+              <p>No pending challenges! You're all caught up.</p>
+            </div>
+          `;
+          return;
+        }
+        
+        const html = challenges.map(c => `
+          <div class="data-list-item" onclick="fillAnswerForm('${c.challengeId}', '${userId}')" style="cursor: pointer;">
+            <div>
+              <strong>${c.skillName}</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                Difficulty: ${c.difficulty}/10 • ${c.question.substring(0, 50)}...
+              </div>
+            </div>
+            <span style="color: var(--primary);">Answer →</span>
+          </div>
+        `).join('');
+        
+        document.getElementById('pendingChallengesList').innerHTML = `<div class="data-list">${html}</div>`;
+      } catch (error) {
+        document.getElementById('pendingChallengesList').innerHTML = `<p style="color: var(--error);">Error: ${error.message}</p>`;
+      }
+    }
+
+    function fillAnswerForm(challengeId, userId) {
+      document.getElementById('answerChallengeId').value = challengeId;
+      document.getElementById('answerUserId').value = userId;
+      showTab('challenges');
+      document.querySelectorAll('.nav-tab')[3].classList.add('active');
+    }
+
+    function setAnswer(option) {
+      document.getElementById('selectedAnswer').value = option;
+      document.querySelectorAll('.btn-secondary').forEach((btn, index) => {
+        if (index < 4) {
+          btn.style.background = index === option ? 'var(--primary)' : '';
+          btn.style.color = index === option ? 'white' : '';
+        }
+      });
+    }
+
+    async function submitAnswer() {
+      const challengeId = document.getElementById('answerChallengeId').value;
+      const userId = document.getElementById('answerUserId').value;
+      const selectedOption = document.getElementById('selectedAnswer').value;
+      const responseTime = document.getElementById('responseTime').value;
+      const confidence = document.getElementById('confidenceLevel').value;
+      
+      if (!challengeId || !userId || selectedOption === '') {
+        showResponse('submitAnswerResponse', { error: 'Please fill in all required fields and select an answer' }, true);
+        return;
+      }
+      
+      const body = {
+        challengeId,
+        userId,
+        selectedOption: parseInt(selectedOption)
+      };
+      
+      if (responseTime) body.responseTime = parseInt(responseTime);
+      if (confidence) body.confidence = parseInt(confidence);
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/answer`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify(body)
+        });
+        
+        const data = await response.json();
+        showResponse('submitAnswerResponse', data, !response.ok);
+        
+        if (response.ok) {
+          document.getElementById('answerChallengeId').value = '';
+          document.getElementById('selectedAnswer').value = '';
+          document.querySelectorAll('.btn-secondary').forEach(btn => {
+            btn.style.background = '';
+            btn.style.color = '';
+          });
+        }
+      } catch (error) {
+        showResponse('submitAnswerResponse', { error: error.message }, true);
+      }
+    }
+
+    async function loadChallengeHistory() {
+      const userId = document.getElementById('historyUserId').value;
+      const limit = document.getElementById('historyLimit').value;
+      
+      if (!userId) {
+        document.getElementById('challengeHistoryList').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <p>Select a user to view their challenge history</p>
+          </div>
+        `;
+        return;
+      }
+      
+      showLoading('challengeHistoryList');
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/users/${userId}/challenges/history?limit=${limit}`, {
+          headers: getHeaders()
+        });
+        
+        const history = await response.json();
+        
+        if (!Array.isArray(history) || history.length === 0) {
+          document.getElementById('challengeHistoryList').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📝</div>
+              <p>No challenge history yet. Start answering challenges!</p>
+            </div>
+          `;
+          return;
+        }
+        
+        const html = history.map(h => `
+          <div class="data-list-item">
+            <div>
+              <strong>${h.skillName}</strong>
+              <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                ${h.isCorrect ? '✅' : '❌'} Difficulty ${h.difficulty} • ${new Date(h.answeredAt).toLocaleDateString()}
+              </div>
+            </div>
+          </div>
+        `).join('');
+        
+        document.getElementById('challengeHistoryList').innerHTML = `<div class="data-list">${html}</div>`;
+      } catch (error) {
+        document.getElementById('challengeHistoryList').innerHTML = `<p style="color: var(--error);">Error: ${error.message}</p>`;
+      }
+    }
+
+    // Admin
     async function triggerScheduler() {
       try {
         const response = await fetch(`${API_BASE}/api/scheduler/tick`, {
           method: 'POST',
           headers: getHeaders()
         });
+        
         const data = await response.json();
-        showResponse('scheduler-response', data, !response.ok);
+        showResponse('schedulerResponse', data, !response.ok);
       } catch (error) {
-        showResponse('scheduler-response', { error: error.message }, true);
+        showResponse('schedulerResponse', { error: error.message }, true);
       }
     }
 
-    async function getChallengeHistory() {
-      const userId = document.getElementById('historyUserId').value;
-      const limit = document.getElementById('historyLimit').value;
-
-      if (!userId) {
-        showResponse('history-response', { error: 'User ID is required' }, true);
-        return;
-      }
-
+    async function triggerSchedulerFromDashboard() {
+      const btn = document.getElementById('dashboardSchedulerBtn');
+      const text = document.getElementById('dashboardSchedulerText');
+      const spinner = document.getElementById('dashboardSchedulerSpinner');
+      
+      // Disable button and show spinner
+      btn.disabled = true;
+      text.textContent = 'Running Scheduler...';
+      spinner.style.display = 'inline-block';
+      
       try {
-        const response = await fetch(`${API_BASE}/api/users/${userId}/challenges/history?limit=${limit}`, {
-          headers: getHeaders()
-        });
-        const data = await response.json();
-        showResponse('history-response', data, !response.ok);
-      } catch (error) {
-        showResponse('history-response', { error: error.message }, true);
-      }
-    }
-
-    async function getChallenge() {
-      const challengeId = document.getElementById('challengeId').value;
-
-      if (!challengeId) {
-        showResponse('challenge-response', { error: 'Challenge ID is required' }, true);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/api/challenges/${challengeId}`, {
-          headers: getHeaders()
-        });
-        const data = await response.json();
-        showResponse('challenge-response', data, !response.ok);
-      } catch (error) {
-        showResponse('challenge-response', { error: error.message }, true);
-      }
-    }
-
-    async function getPendingChallenges() {
-      const userId = document.getElementById('pendingUserId').value;
-
-      if (!userId) {
-        showResponse('pending-response', { error: 'User ID is required' }, true);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/api/users/${userId}/challenges/pending`, {
-          headers: getHeaders()
-        });
-        const data = await response.json();
-        showResponse('pending-response', data, !response.ok);
-      } catch (error) {
-        showResponse('pending-response', { error: error.message }, true);
-      }
-    }
-
-    async function answerChallenge() {
-      const challengeId = document.getElementById('answerChallengeId').value;
-      const userId = document.getElementById('answerUserId').value;
-      const selectedOption = parseInt(document.getElementById('selectedOption').value);
-      const responseTime = parseInt(document.getElementById('responseTime').value) || undefined;
-      const confidence = parseInt(document.getElementById('confidence').value) || undefined;
-      const userFeedback = document.getElementById('userFeedback').value || undefined;
-
-      if (!challengeId || !userId || isNaN(selectedOption)) {
-        showResponse('answer-response', { error: 'Challenge ID, User ID, and Selected Option are required' }, true);
-        return;
-      }
-
-      if (selectedOption < 0 || selectedOption > 3) {
-        showResponse('answer-response', { error: 'Selected Option must be between 0 and 3' }, true);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE}/api/answer`, {
+        const response = await fetch(`${API_BASE}/api/scheduler/tick`, {
           method: 'POST',
-          headers: getHeaders(),
-          body: JSON.stringify({
-            challengeId,
-            userId,
-            selectedOption,
-            responseTime,
-            confidence,
-            userFeedback
-          })
+          headers: getHeaders()
         });
+        
         const data = await response.json();
-        showResponse('answer-response', data, !response.ok);
+        showResponse('dashboardSchedulerResponse', data, !response.ok);
       } catch (error) {
-        showResponse('answer-response', { error: error.message }, true);
+        showResponse('dashboardSchedulerResponse', { error: error.message }, true);
+      } finally {
+        // Re-enable button and hide spinner
+        btn.disabled = false;
+        text.textContent = '🚀 Run Scheduler Tick';
+        spinner.style.display = 'none';
       }
     }
 
-    // Check health on page load
+    async function testEndpoint() {
+      const endpoint = document.getElementById('testEndpoint').value;
+      const method = document.getElementById('testMethod').value;
+      
+      try {
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          method,
+          headers: getHeaders()
+        });
+        
+        const data = await response.json();
+        showResponse('apiTestResponse', data, !response.ok);
+      } catch (error) {
+        showResponse('apiTestResponse', { error: error.message }, true);
+      }
+    }
+
+    // Initialize
     window.onload = () => {
       checkHealth();
     };
