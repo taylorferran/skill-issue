@@ -968,6 +968,265 @@ class OpikService {
     await Promise.all(promises);
   }
 
+  // ============= Dataset Management =============
+
+  /**
+   * Find a dataset by name
+   */
+  async findDataset(name: string): Promise<{ id: string; name: string } | null> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Dataset lookup (local): ${name}`);
+      return null;
+    }
+
+    const response = await this.request('GET', `/datasets?name=${encodeURIComponent(name)}`);
+    if (response?.ok) {
+      const data = await response.json() as { content?: Array<{ id: string; name: string }> };
+      const datasets = data?.content || [];
+      return datasets.find((d) => d.name === name) || null;
+    }
+    return null;
+  }
+
+  /**
+   * Create a new dataset
+   */
+  async createDataset(params: {
+    name: string;
+    description?: string;
+  }): Promise<string | null> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Dataset created (local): ${params.name}`);
+      return 'local-dataset-id';
+    }
+
+    const id = generateUUIDv7();
+    const response = await this.request('POST', '/datasets', {
+      id,
+      name: params.name,
+      description: params.description,
+    });
+
+    if (response?.ok) {
+      console.log(`[Opik] Dataset created: ${params.name}`);
+      return id;
+    }
+
+    // Handle 409 - dataset already exists
+    if (response?.status === 409) {
+      console.log(`[Opik] Dataset already exists: ${params.name}`);
+      const existing = await this.findDataset(params.name);
+      return existing?.id || null;
+    }
+
+    return null;
+  }
+
+  /**
+   * Add items to a dataset
+   */
+  async addDatasetItems(
+    datasetName: string,
+    items: Array<{
+      input: Record<string, unknown>;
+      expected_output: Record<string, unknown>;
+      metadata?: Record<string, unknown>;
+    }>
+  ): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Added ${items.length} items to dataset (local): ${datasetName}`);
+      return;
+    }
+
+    // Format items according to Opik API spec:
+    // - Use PUT method (not POST)
+    // - All fields must be inside a 'data' object
+    // - Flatten nested objects so Opik displays clean columns
+    // - 'source' field is required
+    const formattedItems = items.map(item => {
+      const input = item.input as Record<string, unknown>;
+      const expectedOutput = item.expected_output as Record<string, unknown>;
+      const metadata = item.metadata as Record<string, unknown> | undefined;
+      const difficultyRange = expectedOutput.difficulty_range as [number, number] | undefined;
+
+      return {
+        id: generateUUIDv7(),
+        source: 'sdk',
+        data: {
+          // Flattened input fields (skill_id omitted - same for all items in dataset)
+          skill_name: input.skill_name,
+          skill_description: input.skill_description,
+          difficulty: input.difficulty,
+          scenario: input.scenario,
+          expected_concepts: input.expected_concepts,
+          // Flattened expected_output fields
+          difficulty_range_min: difficultyRange?.[0],
+          difficulty_range_max: difficultyRange?.[1],
+          required_concepts: expectedOutput.required_concepts,
+          // Flattened metadata fields (created_at omitted - not useful for analysis)
+          source_type: metadata?.source,
+          item_id: metadata?.item_id,
+        },
+      };
+    });
+
+    // Batch in groups of 50
+    for (let i = 0; i < formattedItems.length; i += 50) {
+      const batch = formattedItems.slice(i, i + 50);
+      const response = await this.request('PUT', '/datasets/items', {
+        dataset_name: datasetName,
+        items: batch,
+      });
+
+      if (!response?.ok) {
+        console.error(`[Opik] Failed to add batch ${i / 50 + 1} to dataset ${datasetName}`);
+      }
+    }
+
+    console.log(`[Opik] Added ${formattedItems.length} items to dataset ${datasetName}`);
+  }
+
+  /**
+   * Get items from a dataset
+   */
+  async getDatasetItems(datasetName: string): Promise<Array<Record<string, unknown>>> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Get dataset items (local): ${datasetName}`);
+      return [];
+    }
+
+    // First get the dataset ID from the name
+    const dataset = await this.findDataset(datasetName);
+    if (!dataset) {
+      console.warn(`[Opik] Dataset not found: ${datasetName}`);
+      return [];
+    }
+
+    console.log(`[Opik] Fetching items for dataset: ${datasetName} (id: ${dataset.id})`);
+
+    // Endpoint is GET /datasets/{id}/items with ID in path
+    const response = await this.request('GET', `/datasets/${dataset.id}/items?size=100`);
+    if (response?.ok) {
+      const data = await response.json() as { content?: Array<Record<string, unknown>>; total?: number };
+      console.log(`[Opik] Found ${data?.content?.length || 0} items (total: ${data?.total || 'unknown'})`);
+      return data?.content || [];
+    } else {
+      console.error(`[Opik] Failed to fetch dataset items, status: ${response?.status}`);
+    }
+    return [];
+  }
+
+  // ============= Experiment Management =============
+
+  /**
+   * Log experiment items in bulk.
+   * Creates the experiment automatically if it doesn't exist.
+   * Uses trace/spans format to populate Opik's built-in usage columns.
+   */
+  async logExperimentItems(params: {
+    experimentName: string;
+    datasetName: string;
+    items: Array<{
+      datasetItemId: string;
+      output: Record<string, unknown>;
+      trace?: {
+        name: string;
+        input: Record<string, unknown>;
+        output: Record<string, unknown>;
+        startTime: string;
+        endTime: string;
+      };
+      spans?: Array<{
+        name: string;
+        type: 'llm' | 'general';
+        model?: string;
+        provider?: string;
+        startTime: string;
+        endTime: string;
+        input?: Record<string, unknown>;
+        output?: Record<string, unknown>;
+        usage?: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+        };
+        totalEstimatedCost?: number;
+      }>;
+      feedbackScores?: Array<{
+        name: string;
+        value: number;
+        reason?: string;
+      }>;
+    }>;
+  }): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(`[Opik] Experiment logged (local): ${params.experimentName} with ${params.items.length} items`);
+      return;
+    }
+
+    const formattedItems = params.items.map(item => {
+      // If trace/spans provided, use that format for proper usage tracking
+      if (item.trace && item.spans) {
+        return {
+          dataset_item_id: item.datasetItemId,
+          trace: {
+            name: item.trace.name,
+            input: item.trace.input,
+            output: item.trace.output,
+            start_time: item.trace.startTime,
+            end_time: item.trace.endTime,
+          },
+          spans: item.spans.map(span => ({
+            name: span.name,
+            type: span.type,
+            model: span.model,
+            provider: span.provider,
+            start_time: span.startTime,
+            end_time: span.endTime,
+            input: span.input,
+            output: span.output,
+            usage: span.usage,
+            total_estimated_cost: span.totalEstimatedCost,
+          })),
+          feedback_scores: item.feedbackScores?.map(score => ({
+            name: score.name,
+            value: score.value,
+            source: 'sdk',
+            reason: score.reason,
+          })),
+        };
+      }
+
+      // Fallback to simple evaluate_task_result format
+      return {
+        dataset_item_id: item.datasetItemId,
+        evaluate_task_result: item.output,
+        feedback_scores: item.feedbackScores?.map(score => ({
+          name: score.name,
+          value: score.value,
+          source: 'sdk',
+          reason: score.reason,
+        })),
+      };
+    });
+
+    // Batch in groups of 50 to avoid payload limits
+    for (let i = 0; i < formattedItems.length; i += 50) {
+      const batch = formattedItems.slice(i, i + 50);
+      const response = await this.request('PUT', '/experiments/items/bulk', {
+        experiment_name: params.experimentName,
+        dataset_name: params.datasetName,
+        items: batch,
+      });
+
+      if (!response?.ok) {
+        console.error(`[Opik] Failed to log experiment batch ${i / 50 + 1}`);
+      }
+    }
+
+    console.log(`[Opik] Experiment '${params.experimentName}' logged with ${params.items.length} items`);
+  }
+
   // ============= Utilities =============
 
   private getProviderFromModel(model: string): string {
@@ -1025,3 +1284,6 @@ export function initOpik(): void {
 
 // Export for advanced usage
 export { OpikService };
+
+// Export UUID generator for dataset operations
+export { generateUUIDv7 };

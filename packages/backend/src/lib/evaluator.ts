@@ -32,16 +32,43 @@ export class ChallengeEvaluator {
 
   /**
    * Evaluate a generated challenge using LLM-as-Judge
+   * Includes retry mechanism if scores are missing from the response
    */
   async evaluate(request: EvaluationRequest): Promise<ChallengeEvaluation> {
-    const startTime = Date.now();
+    let lastEvaluation: ChallengeEvaluation | null = null;
 
+    for (let attempt = 0; attempt <= EVALUATION_CONFIG.maxRetries; attempt++) {
+      const evaluation = await this.evaluateOnce(request, attempt);
+      lastEvaluation = evaluation;
+
+      // Check if any scores are missing (0 due to parse failure, not legitimate 0)
+      const missingScores = this.getMissingScores(evaluation);
+
+      if (missingScores.length === 0) {
+        // All scores present, return result
+        return evaluation;
+      }
+
+      if (attempt < EVALUATION_CONFIG.maxRetries) {
+        console.warn(`[Evaluator] Retry ${attempt + 1}/${EVALUATION_CONFIG.maxRetries}: Missing scores [${missingScores.join(', ')}], retrying...`);
+      }
+    }
+
+    console.warn('[Evaluator] Max retries reached, returning best evaluation');
+    return lastEvaluation!;
+  }
+
+  /**
+   * Single evaluation attempt
+   */
+  private async evaluateOnce(request: EvaluationRequest, attempt: number): Promise<ChallengeEvaluation> {
+    const startTime = Date.now();
     const prompt = this.buildEvaluationPrompt(request);
 
     try {
       const message = await this.client.messages.create({
         model: EVALUATION_CONFIG.model,
-        max_tokens: 500,
+        max_tokens: 1024,
         temperature: 0.3, // Lower temperature for more consistent evaluation
         messages: [
           {
@@ -62,7 +89,7 @@ export class ChallengeEvaluator {
       });
 
       console.log(
-        `[Evaluator] Challenge evaluated: composite=${evaluation.compositeScore.toFixed(2)}, passed=${evaluation.passed}`
+        `[Evaluator] Attempt ${attempt + 1}: composite=${evaluation.compositeScore.toFixed(2)}, passed=${evaluation.passed}`
       );
 
       return evaluation;
@@ -75,6 +102,24 @@ export class ChallengeEvaluator {
         Date.now() - startTime
       );
     }
+  }
+
+  /**
+   * Check which scores are missing (0 with "EVALUATION ERROR" reason)
+   */
+  private getMissingScores(evaluation: ChallengeEvaluation): string[] {
+    const missing: string[] = [];
+    const scoreNames: (keyof EvaluationScores)[] = [
+      'clarity', 'difficultyAlignment', 'distractorQuality', 'educationalValue', 'skillRelevance'
+    ];
+
+    for (const name of scoreNames) {
+      if (evaluation.scores[name] === 0 && evaluation.reasons[name].includes('EVALUATION ERROR')) {
+        missing.push(name);
+      }
+    }
+
+    return missing;
   }
 
   /**
@@ -107,31 +152,74 @@ export class ChallengeEvaluator {
     usage: { inputTokens: number; outputTokens: number }
   ): ChallengeEvaluation {
     try {
-      // Extract JSON from response (handle potential markdown)
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // Step 1: Strip markdown code blocks if present
+      // Use greedy match ([\s\S]*) and $ anchor to handle nested code blocks inside JSON strings
+      let cleanedResponse = response;
+      const codeBlockMatch = response.match(/```(?:json)?\n?([\s\S]*)\n?```\s*$/);
+      if (codeBlockMatch) {
+        cleanedResponse = codeBlockMatch[1].trim();
+      }
+
+      // Step 2: Extract JSON object
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in response');
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Validate and normalize scores (0-10 from LLM, convert to 0-1)
-      const scores: EvaluationScores = {
-        clarity: this.normalizeScore(parsed.clarity),
-        difficultyAlignment: this.normalizeScore(parsed.difficultyAlignment),
-        distractorQuality: this.normalizeScore(parsed.distractorQuality),
-        educationalValue: this.normalizeScore(parsed.educationalValue),
-        skillRelevance: this.normalizeScore(parsed.skillRelevance),
+      // Step 3: Extract raw scores (handle various naming conventions)
+      const rawScores = {
+        clarity: parsed.clarity ?? parsed.Clarity,
+        difficultyAlignment: parsed.difficultyAlignment ?? parsed.difficulty_alignment ?? parsed.DIFFICULTY_ALIGNMENT,
+        distractorQuality: parsed.distractorQuality ?? parsed.distractor_quality ?? parsed.DISTRACTOR_QUALITY,
+        educationalValue: parsed.educationalValue ?? parsed.educational_value ?? parsed.EDUCATIONAL_VALUE,
+        skillRelevance: parsed.skillRelevance ?? parsed.skill_relevance ?? parsed.SKILL_RELEVANCE,
       };
 
-      // Extract per-dimension reasons
+      // Check for missing scores and log details
+      const missingScores: string[] = [];
+      if (rawScores.clarity === undefined) missingScores.push('clarity');
+      if (rawScores.difficultyAlignment === undefined) missingScores.push('difficultyAlignment');
+      if (rawScores.distractorQuality === undefined) missingScores.push('distractorQuality');
+      if (rawScores.educationalValue === undefined) missingScores.push('educationalValue');
+      if (rawScores.skillRelevance === undefined) missingScores.push('skillRelevance');
+
+      if (missingScores.length > 0) {
+        console.warn(`[Evaluator] Missing scores: ${missingScores.join(', ')}`);
+        console.warn('[Evaluator] Parsed keys:', Object.keys(parsed).join(', '));
+        console.warn('[Evaluator] Raw response:', response.substring(0, 800));
+      }
+
+      // Normalize scores (0-10 from LLM -> 0-1)
+      const scores: EvaluationScores = {
+        clarity: this.normalizeScore(rawScores.clarity),
+        difficultyAlignment: this.normalizeScore(rawScores.difficultyAlignment),
+        distractorQuality: this.normalizeScore(rawScores.distractorQuality),
+        educationalValue: this.normalizeScore(rawScores.educationalValue),
+        skillRelevance: this.normalizeScore(rawScores.skillRelevance),
+      };
+
+      // Step 4: Extract per-dimension reasons
+      // Use clear error message when score is missing
+      const getReasonOrError = (
+        rawScore: unknown,
+        rawReason: string | undefined,
+        scoreName: string
+      ): string => {
+        if (rawScore === undefined) {
+          return `EVALUATION ERROR: LLM failed to return ${scoreName} score`;
+        }
+        return rawReason ?? 'No reason provided';
+      };
+
       const reasons: EvaluationReasons = {
-        clarity: parsed.clarityReason || 'No reason provided',
-        difficultyAlignment: parsed.difficultyReason || 'No reason provided',
-        distractorQuality: parsed.distractorReason || 'No reason provided',
-        educationalValue: parsed.educationalReason || 'No reason provided',
-        skillRelevance: parsed.relevanceReason || 'No reason provided',
-        overall: parsed.overall || 'No overall summary provided',
+        clarity: getReasonOrError(rawScores.clarity, parsed.clarityReason ?? parsed.clarity_reason, 'clarity'),
+        difficultyAlignment: getReasonOrError(rawScores.difficultyAlignment, parsed.difficultyReason ?? parsed.difficulty_reason, 'difficulty alignment'),
+        distractorQuality: getReasonOrError(rawScores.distractorQuality, parsed.distractorReason ?? parsed.distractor_reason, 'distractor quality'),
+        educationalValue: getReasonOrError(rawScores.educationalValue, parsed.educationalReason ?? parsed.educational_reason, 'educational value'),
+        skillRelevance: getReasonOrError(rawScores.skillRelevance, parsed.relevanceReason ?? parsed.relevance_reason ?? parsed.skillRelevanceReason, 'skill relevance'),
+        overall: parsed.overall ?? parsed.summary ?? 'No overall summary provided',
       };
 
       // Calculate weighted composite score
@@ -150,7 +238,7 @@ export class ChallengeEvaluator {
       };
     } catch (error) {
       console.error('[Evaluator] Failed to parse response:', error);
-      console.error('[Evaluator] Response was:', response);
+      console.error('[Evaluator] Response was:', response.substring(0, 500));
 
       return this.createFailedEvaluation(
         `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`,

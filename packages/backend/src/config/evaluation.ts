@@ -17,9 +17,9 @@ export const EVALUATION_CONFIG = {
   /**
    * Minimum composite score required to pass quality gate.
    * Challenges scoring below this threshold are rejected.
-   * Range: 0-1, Default: 0.6 (60%)
+   * Range: 0-1, Default: 0.7 (70%)
    */
-  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.6'),
+  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.7'),
 
   /**
    * Weights for calculating composite score.
@@ -87,6 +87,10 @@ Rate each dimension from 0-10, where 0 is completely failing and 10 is excellent
 
 5. **SKILL_RELEVANCE**: Does this question genuinely test competence in "{{skill_name}}" as described?
 
-Return ONLY valid JSON with no markdown formatting:
-{"clarity": <0-10>, "clarityReason": "<why this score>", "difficultyAlignment": <0-10>, "difficultyReason": "<why this score>", "distractorQuality": <0-10>, "distractorReason": "<why this score>", "educationalValue": <0-10>, "educationalReason": "<why this score>", "skillRelevance": <0-10>, "relevanceReason": "<why this score>", "overall": "<1 sentence summary>"}`;
+CRITICAL: You MUST return ALL 5 scores and ALL 5 reasons. Missing fields will invalidate the evaluation.
+
+Return ONLY valid JSON with no markdown formatting. Example format:
+{"clarity": 7, "clarityReason": "The question is clear because...", "difficultyAlignment": 6, "difficultyReason": "The difficulty matches because...", "distractorQuality": 8, "distractorReason": "The distractors are good because...", "educationalValue": 7, "educationalReason": "The explanation teaches...", "skillRelevance": 9, "relevanceReason": "This tests the skill because...", "overall": "Good question with minor issues in X"}
+
+Your response (JSON only, no other text):`;
 }
