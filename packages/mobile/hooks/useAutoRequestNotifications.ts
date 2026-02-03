@@ -84,7 +84,7 @@ export function useAutoRequestNotifications() {
       try {
         const projectId = 
           Constants.expoConfig?.extra?.eas?.projectId || 
-          'b302dea4-1c3f-42d5-bd5f-eca4acebea90';
+          '';
 
         const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
 
