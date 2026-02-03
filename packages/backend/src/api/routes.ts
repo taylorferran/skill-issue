@@ -18,6 +18,7 @@ import {
 import { calibrationService } from '@/services/calibration.service';
 import { createLLMProvider } from '@/lib/llm-provider';
 import { datasetGenerator } from '@/lib/dataset-generator';
+import { experimentRunner } from '@/lib/experiment-runner';
 const router = express.Router();
 
 // Log all incoming requests for debugging
@@ -1400,6 +1401,85 @@ router.get('/datasets/:skillId/status', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Dataset status error:', error);
     res.status(500).json({ error: 'Failed to get dataset status' });
+  }
+});
+
+// ============================================================================
+// EXPERIMENT ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/experiments/run
+ * Run an experiment against a skill's dataset
+ *
+ * Body:
+ * - skillId: string (required) - The skill to run the experiment for
+ * - experimentName: string (optional) - Custom name for the experiment
+ * - useFullEvaluation: boolean (optional) - Use LLM-as-judge for deeper evaluation
+ */
+router.post('/experiments/run', async (req: Request, res: Response) => {
+  try {
+    const { skillId, experimentName, useFullEvaluation } = req.body;
+
+    if (!skillId) {
+      return res.status(400).json({ error: 'skillId is required' });
+    }
+
+    const supabase = getSupabase();
+
+    // Get skill details
+    const { data: skill, error } = await supabase
+      .from('skills')
+      .select('id, name, description')
+      .eq('id', skillId)
+      .single();
+
+    if (error || !skill) {
+      return res.status(404).json({ error: 'Skill not found' });
+    }
+
+    const skillData = skill as any;
+
+    // Check if dataset exists
+    const datasetName = `skill_${skillId}_scenarios`;
+    const dataset = await opikService.findDataset(datasetName);
+
+    if (!dataset) {
+      return res.status(400).json({
+        error: 'Dataset not found',
+        message: `No dataset exists for skill "${skillData.name}". Generate one first with POST /api/datasets/generate`,
+      });
+    }
+
+    console.log(`[API] Running experiment for skill: ${skillData.name}`);
+
+    // Run the experiment
+    const result = await experimentRunner.runExperiment({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      experimentName,
+      useFullEvaluation: useFullEvaluation || false,
+    });
+
+    res.json({
+      success: true,
+      experiment: {
+        name: result.experimentName,
+        datasetName: result.datasetName,
+        itemsEvaluated: result.itemsEvaluated,
+        averageScores: result.averageScores,
+        totalDurationMs: result.totalDurationMs,
+        totalInputTokens: result.totalInputTokens,
+        totalOutputTokens: result.totalOutputTokens,
+      },
+      message: `Experiment complete. View results in Opik Experiments tab.`,
+    });
+  } catch (error) {
+    console.error('Experiment run error:', error);
+    res.status(500).json({
+      error: 'Failed to run experiment',
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 });
 

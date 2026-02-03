@@ -17,9 +17,9 @@ export const EVALUATION_CONFIG = {
   /**
    * Minimum composite score required to pass quality gate.
    * Challenges scoring below this threshold are rejected.
-   * Range: 0-1, Default: 0.6 (60%)
+   * Range: 0-1, Default: 0.7 (70%)
    */
-  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.6'),
+  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.7'),
 
   /**
    * Weights for calculating composite score.

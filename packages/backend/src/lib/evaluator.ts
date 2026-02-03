@@ -41,7 +41,7 @@ export class ChallengeEvaluator {
     try {
       const message = await this.client.messages.create({
         model: EVALUATION_CONFIG.model,
-        max_tokens: 500,
+        max_tokens: 1024,
         temperature: 0.3, // Lower temperature for more consistent evaluation
         messages: [
           {
@@ -107,31 +107,57 @@ export class ChallengeEvaluator {
     usage: { inputTokens: number; outputTokens: number }
   ): ChallengeEvaluation {
     try {
-      // Extract JSON from response (handle potential markdown)
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      // Step 1: Strip markdown code blocks if present
+      // Use greedy match ([\s\S]*) and $ anchor to handle nested code blocks inside JSON strings
+      let cleanedResponse = response;
+      const codeBlockMatch = response.match(/```(?:json)?\n?([\s\S]*)\n?```\s*$/);
+      if (codeBlockMatch) {
+        cleanedResponse = codeBlockMatch[1].trim();
+      }
+
+      // Step 2: Extract JSON object
+      const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in response');
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Validate and normalize scores (0-10 from LLM, convert to 0-1)
+      // Debug: Log parsed response to identify missing fields
+      console.log('[Evaluator] Parsed response keys:', Object.keys(parsed).join(', '));
+      if (parsed.skillRelevance === undefined && parsed.skill_relevance === undefined) {
+        console.warn('[Evaluator] Missing skillRelevance in response');
+      }
+      if (parsed.relevanceReason === undefined && parsed.relevance_reason === undefined) {
+        console.warn('[Evaluator] Missing relevanceReason in response');
+      }
+
+      // Step 3: Validate and normalize scores (0-10 from LLM, convert to 0-1)
+      // Handle both camelCase and snake_case property names
       const scores: EvaluationScores = {
-        clarity: this.normalizeScore(parsed.clarity),
-        difficultyAlignment: this.normalizeScore(parsed.difficultyAlignment),
-        distractorQuality: this.normalizeScore(parsed.distractorQuality),
-        educationalValue: this.normalizeScore(parsed.educationalValue),
-        skillRelevance: this.normalizeScore(parsed.skillRelevance),
+        clarity: this.normalizeScore(parsed.clarity ?? parsed.Clarity),
+        difficultyAlignment: this.normalizeScore(
+          parsed.difficultyAlignment ?? parsed.difficulty_alignment ?? parsed.DIFFICULTY_ALIGNMENT
+        ),
+        distractorQuality: this.normalizeScore(
+          parsed.distractorQuality ?? parsed.distractor_quality ?? parsed.DISTRACTOR_QUALITY
+        ),
+        educationalValue: this.normalizeScore(
+          parsed.educationalValue ?? parsed.educational_value ?? parsed.EDUCATIONAL_VALUE
+        ),
+        skillRelevance: this.normalizeScore(
+          parsed.skillRelevance ?? parsed.skill_relevance ?? parsed.SKILL_RELEVANCE
+        ),
       };
 
-      // Extract per-dimension reasons
+      // Step 4: Extract per-dimension reasons (handle various naming conventions)
       const reasons: EvaluationReasons = {
-        clarity: parsed.clarityReason || 'No reason provided',
-        difficultyAlignment: parsed.difficultyReason || 'No reason provided',
-        distractorQuality: parsed.distractorReason || 'No reason provided',
-        educationalValue: parsed.educationalReason || 'No reason provided',
-        skillRelevance: parsed.relevanceReason || 'No reason provided',
-        overall: parsed.overall || 'No overall summary provided',
+        clarity: parsed.clarityReason ?? parsed.clarity_reason ?? 'No reason provided',
+        difficultyAlignment: parsed.difficultyReason ?? parsed.difficulty_reason ?? 'No reason provided',
+        distractorQuality: parsed.distractorReason ?? parsed.distractor_reason ?? 'No reason provided',
+        educationalValue: parsed.educationalReason ?? parsed.educational_reason ?? 'No reason provided',
+        skillRelevance: parsed.relevanceReason ?? parsed.relevance_reason ?? parsed.skillRelevanceReason ?? 'No reason provided',
+        overall: parsed.overall ?? parsed.summary ?? 'No overall summary provided',
       };
 
       // Calculate weighted composite score
@@ -150,7 +176,7 @@ export class ChallengeEvaluator {
       };
     } catch (error) {
       console.error('[Evaluator] Failed to parse response:', error);
-      console.error('[Evaluator] Response was:', response);
+      console.error('[Evaluator] Response was:', response.substring(0, 500));
 
       return this.createFailedEvaluation(
         `Parse error: ${error instanceof Error ? error.message : 'Unknown error'}`,

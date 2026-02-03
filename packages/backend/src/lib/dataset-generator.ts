@@ -2,7 +2,7 @@ import { createLLMProvider } from './llm-provider';
 import { opikService } from './opik';
 import type { ChallengeScenario, DatasetGenerationResult, DatasetItem } from '@/types';
 
-const SCENARIOS_PER_DIFFICULTY = 5;
+const SCENARIOS_PER_DIFFICULTY = 2;
 const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 /**
@@ -17,7 +17,7 @@ export class DatasetGenerator {
 
   /**
    * Generate a complete dataset for a skill.
-   * Creates 5 scenarios per difficulty level = 50 items total.
+   * Creates 2 scenarios per difficulty level = 20 items total.
    * Traces the entire operation with nested LLM spans for each difficulty.
    */
   async generateDatasetForSkill(params: {
