@@ -4,6 +4,7 @@ import { skillStateAgent } from '@/agents/agent3-skill-state';
 import { schedulerService } from '@/services/scheduler.service';
 import { opikService } from '@/lib/opik';
 import { apiKeyAuth } from '@/middleware/auth';
+import { updateQuestionPoolRating } from '@/lib/question-pool';
 import type { Database } from '@/types/database';
 import {
   AnswerChallengeRequestSchema,
@@ -264,6 +265,28 @@ router.post('/answer', async (req: Request, res: Response) => {
       difficulty: challenge.difficulty,
     }, traceId);
 
+    // Update question pool rating if this challenge is from the pool and user provided feedback
+    if (challenge.question_pool_id && body.userFeedback) {
+      // Parse feedback as rating (1-5)
+      const rating = parseInt(body.userFeedback);
+      if (rating >= 1 && rating <= 5) {
+        console.log(`[API] Updating pool question ${challenge.question_pool_id} with rating ${rating}`);
+
+        // Call the typed helper function to update pool rating
+        const { error: poolError } = await updateQuestionPoolRating(
+          challenge.question_pool_id,
+          rating
+        );
+
+        if (poolError) {
+          console.error('[API] Error updating pool rating:', poolError);
+          // Don't fail the request, just log the error
+        } else {
+          console.log(`[API] Pool rating updated successfully`);
+        }
+      }
+    }
+
     // End the root trace with linking metadata
     await opikService.endTrace({
       traceId,
@@ -274,6 +297,7 @@ router.post('/answer', async (req: Request, res: Response) => {
         challengeId: challenge.id,
         skillId: challenge.skill_id,
         difficulty: challenge.difficulty,
+        questionPoolId: challenge.question_pool_id || undefined,
       },
     });
 
