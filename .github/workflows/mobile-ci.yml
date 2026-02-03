@@ -8,6 +8,7 @@ on:
         default: 'preview'
         type: choice
         options:
+          - development
           - preview
           - production
       platform:
@@ -18,7 +19,8 @@ on:
         options:
           - android
           - ios
-          - both
+          - all
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,39 +30,37 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Setup PNPM
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
           version: 9
-      
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      
+
       - name: Setup EAS CLI
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
-      
+
       - name: Build Android
-        if: ${{ github.event.inputs.platform == 'android' || github.event.inputs.platform == 'both' }}
-        run: |
-          eas build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
-      
+        if: ${{ inputs.platform == 'android' || inputs.platform == 'all' }}
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive --no-wait
+
       - name: Build iOS
-        if: ${{ github.event.inputs.platform == 'ios' || github.event.inputs.platform == 'both' }}
-        run: |
-          eas build --platform ios --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
-      
+        if: ${{ inputs.platform == 'ios' || inputs.platform == 'all' }}
+        run: eas build --platform ios --profile ${{ inputs.profile }} --non-interactive --no-wait
+
       - name: Build Summary
         run: |
-          echo "Build triggered successfully!"
-          echo "Profile: ${{ github.event.inputs.profile }}"
-          echo "Platform: ${{ github.event.inputs.platform }}"
-          echo "Monitor builds at: https://expo.dev/accounts/${{ github.repository_owner }}/projects/skill-issue/builds"
+          echo "## Build Triggered" >> $GITHUB_STEP_SUMMARY
+          echo "- **Profile:** ${{ inputs.profile }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platform:** ${{ inputs.platform }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Monitor:** [Expo Builds](https://expo.dev/accounts/jmurphy786s-organization/projects/skill-issue/builds)" >> $GITHUB_STEP_SUMMARY

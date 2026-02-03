@@ -1,4 +1,4 @@
-import type { GetPendingChallengesResponse } from "@learning-platform/shared";
+import type { GetPendingChallengesResponse, GetChallengeResponse } from "@learning-platform/shared";
 
 export type MCQItem = {
   id: number;
@@ -34,22 +34,34 @@ export type MCQAnswer = z.infer<typeof MCQAnswerSchema>;
 export type MCQQuestion = z.infer<typeof MCQQuestionSchema>;
 export type QuizState = z.infer<typeof QuizStateSchema>;
 
-// Challenge type from shared
+// Challenge types from shared
 export type Challenge = GetPendingChallengesResponse[number];
+export type FullChallenge = GetChallengeResponse;
 
 /**
- * Helper function to convert a Challenge to MCQQuestion format
+ * Helper function to convert a Challenge (full or partial) to MCQQuestion format
  * This maps backend Challenge schema to the format MCQQuiz expects
+ * 
+ * When using a FullChallenge (from GET /challenges/:id), correctAnswerId and explanation
+ * will be populated from the backend. When using a pending challenge, these will be 0/empty.
  */
-export function challengeToMCQQuestion(challenge: Challenge): MCQQuestion {
+export function challengeToMCQQuestion(challenge: Challenge | FullChallenge): MCQQuestion {
+  // Check if this is a full challenge by looking for correctOption property
+  const isFullChallenge = 'correctOption' in challenge;
+  
+  // Get the challenge ID - full challenge uses 'id', pending uses 'challengeId'
+  const challengeId = isFullChallenge 
+    ? (challenge as FullChallenge).id 
+    : (challenge as Challenge).challengeId;
+  
   return {
-    id: parseInt(challenge.challengeId.slice(0, 8), 16), // Convert UUID to number for component use
+    id: parseInt(challengeId.slice(0, 8), 16), // Convert UUID to number for component use
     question: challenge.question,
     answers: challenge.options.map((option, index) => ({
       id: index,
       text: option,
     })),
-    correctAnswerId: 0, // Will be determined after answer submission
-    explanation: "", // Will be populated after answer submission
+    correctAnswerId: isFullChallenge ? (challenge as FullChallenge).correctOption : 0,
+    explanation: isFullChallenge ? (challenge as FullChallenge).explanation || "" : "",
   };
 }

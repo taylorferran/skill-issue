@@ -26,7 +26,8 @@ export function createAuthenticatedApiClient(
   axiosInstance.interceptors.request.use(async (config) => {
     try {
       config.headers = config.headers || {};
-      config.headers["Authorization"] = `Bearer whiteclaw`;
+      const bearerToken = process.env.EXPO_PUBLIC_API_BEARER_TOKEN || "";
+      config.headers["Authorization"] = `Bearer ${bearerToken}`;
       console.log("[apiService] ✅ Authorization header added");
     } catch (error) {
       console.error("[apiService] ❌ Error getting access token:", error);

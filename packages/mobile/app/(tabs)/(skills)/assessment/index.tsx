@@ -11,6 +11,7 @@ import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useGetUserSkills } from "@/api-routes/getUserSkills";
 import { useGetPendingChallenges } from "@/api-routes/getPendingChallenges";
 import { useGetChallengeHistory } from "@/api-routes/getChallengeHistory";
+import { useGetChallenge } from "@/api-routes/getChallenge";
 import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useUser } from "@/contexts/UserContext";
 import { useSkillsStore } from "@/stores/skillsStore";
@@ -46,6 +47,7 @@ const ReviewHistoryScreen = () => {
     isFetching: isFetchingHistory 
   } = useGetChallengeHistory({ clearDataOnCall: false });
   const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
+  const { execute: fetchChallenge, isLoading: isLoadingChallenge } = useGetChallenge();
 
   // UI state
   const [hasLocalAssessment, setHasLocalAssessment] = useState(false);
@@ -209,15 +211,34 @@ const ReviewHistoryScreen = () => {
   };
 
   // Handler when user selects a challenge
-  const handleChallengeSelect = (challenge: Challenge) => {
+  const handleChallengeSelect = async (challenge: Challenge) => {
     console.log('[Assessment] 📝 Challenge selected:', challenge.challengeId);
 
-    const mcqQuestion = challengeToMCQQuestion(challenge);
-    navigateTo('quiz', { 
-      skill: skill,
-      data: mcqQuestion,
-      challengeId: challenge.challengeId
-    });
+    try {
+      // Fetch full challenge details including correctOption and explanation
+      const fullChallenge = await fetchChallenge({ challengeId: challenge.challengeId });
+      
+      console.log('[Assessment] ✅ Full challenge loaded:', {
+        challengeId: fullChallenge.id,
+        hasCorrectOption: true,
+        hasExplanation: !!fullChallenge.explanation,
+      });
+
+      // Convert to MCQ format with correct answer and explanation
+      const mcqQuestion = challengeToMCQQuestion(fullChallenge);
+      
+      navigateTo('quiz', { 
+        skill: skill,
+        data: mcqQuestion,
+        challengeId: challenge.challengeId
+      });
+    } catch (error) {
+      console.error('[Assessment] ❌ Failed to load challenge details:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load challenge. Please try again.'
+      );
+    }
   };
 
   // Show loading only on initial load (when data is null and loading)
