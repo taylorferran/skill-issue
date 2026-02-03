@@ -2,30 +2,69 @@ import { StyleSheet } from 'react-native';
 import { Theme } from '@/theme/Theme';
 
 export const styles = StyleSheet.create({
-  container: {
+  // Wrapper maintains spacing in the list
+  cardWrapper: {
+    marginBottom: Theme.spacing.md,
+  },
+  
+  // Card container - fixed position in layout, overflow hidden
+  cardContainer: {
+    position: 'relative',
     backgroundColor: Theme.colors.background.secondary,
     borderRadius: Theme.borderRadius.xl,
     borderWidth: 1,
     borderColor: Theme.colors.gray[100],
+    overflow: 'hidden',
+    padding: Theme.spacing.xl,
+    ...Theme.shadows.skillCard,
+  },
+  
+  // Delete button layer - positioned on the right side
+  deleteLayer: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 80,
+    backgroundColor: Theme.colors.error.main,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Delete button container
+  deleteButtonContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.sm,
+  },
+  
+  // Delete button
+  deleteButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Delete text
+  deleteText: {
+    color: Theme.colors.text.inverse,
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: Theme.spacing.xs,
+  },
+  
+  // Content layer - slides over the delete layer
+  contentLayer: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
     padding: Theme.spacing.xl,
     gap: Theme.spacing.lg,
-    ...Theme.shadows.skillCard,
-    position: 'relative',
   },
-  deleteButton: {
-    position: 'absolute',
-    top: Theme.spacing.md,
-    right: Theme.spacing.md,
-    padding: Theme.spacing.sm,
-    borderRadius: Theme.borderRadius.sm,
-    backgroundColor: Theme.colors.background.primary,
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  
+  // Touchable content area
+  contentTouchable: {
+    gap: Theme.spacing.lg,
   },
+  
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -67,5 +106,63 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
+    overflow: 'hidden',
+  },
+  iconTouchable: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  deleteIconOverlay: {
+    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  
+  // Legacy styles (kept for compatibility)
+  wrapper: {
+    position: 'relative',
+    marginBottom: Theme.spacing.md,
+  },
+  deleteContainer: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Theme.colors.error.main,
+    borderRadius: Theme.borderRadius.xl,
+  },
+  deleteButtonLarge: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Theme.spacing.md,
+  },
+  container: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.gray[100],
+    padding: Theme.spacing.xl,
+    gap: Theme.spacing.lg,
+    ...Theme.shadows.skillCard,
+    position: 'relative',
+  },
+  cardContent: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: Theme.colors.gray[100],
+    padding: Theme.spacing.xl,
+    gap: Theme.spacing.lg,
+    ...Theme.shadows.skillCard,
+  },
+  animatedContainer: {
+    position: 'relative',
   },
 });

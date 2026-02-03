@@ -2,7 +2,7 @@ import { Theme } from "@/theme/Theme";
 import { useUser } from "@/contexts/UserContext";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -10,9 +10,9 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Switch,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { SettingItem } from "@/components/setting-item/SettingItem";
 import { SettingToggle } from "@/components/setting-toggle/SettingToggle";
 import { useNotificationStore } from "@/stores/notificationStore";
 import {
@@ -26,7 +26,7 @@ import { useCreateUser } from "@/api-routes/createUser";
 import { useUpdateUser } from "@/api-routes/updateUser";
 import type { CreateUserRequest } from "@learning-platform/shared";
 import { styles } from "./index.styles";
-import { usePush } from "@/api-routes/usePush";
+import Slider from "@react-native-community/slider";
 
 export default function ProfileScreen() {
   const { auth, userId, setUser, updateUser, isUserCreated, markUserAsCreated } =
@@ -34,13 +34,20 @@ export default function ProfileScreen() {
   const { execute: createUserApi } = useCreateUser();
   const { execute: updateUserApi } = useUpdateUser();
 
-  const { getPushToken } = useNotificationStore.getState();
   // Notification state management
   const { permissionStatus, setPermissionStatus, setExpoPushToken } =
     useNotificationStore();
   const [isTogglingNotifications, setIsTogglingNotifications] = useState(false);
   const notificationsEnabled = permissionStatus === "granted";
-  const { execute } = usePush();
+
+  // Quiet hours state
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(false);
+  const [quietHoursStart, setQuietHoursStart] = useState(22); // 10 PM
+  const [quietHoursEnd, setQuietHoursEnd] = useState(7); // 7 AM
+  
+  // Debounce ref for quiet hours API calls
+  const quietHoursDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const QUIET_HOURS_DEBOUNCE_MS = 1000; // 1 second debounce
 
   // Check current notification permission status when screen comes into focus
   // This ensures the toggle updates when user returns from system settings
@@ -51,8 +58,87 @@ export default function ProfileScreen() {
         setPermissionStatus(enabled ? "granted" : "denied");
       };
       checkPermissions();
+      
+      // Load quiet hours settings
+      const loadQuietHours = async () => {
+        try {
+          const saved = await AsyncStorage.getItem("@quiet_hours_settings");
+          if (saved) {
+            const settings = JSON.parse(saved);
+            setQuietHoursEnabled(settings.enabled ?? false);
+            setQuietHoursStart(settings.start ?? 22);
+            setQuietHoursEnd(settings.end ?? 7);
+          }
+        } catch (error) {
+          console.error("[Profile] Error loading quiet hours:", error);
+        }
+      };
+      loadQuietHours();
     }, [setPermissionStatus])
   );
+
+  // Sync quiet hours to backend API
+  const syncQuietHoursToBackend = useCallback(async (enabled: boolean, start: number, end: number) => {
+    if (!userId) {
+      console.log("[Profile] ⚠️ Cannot sync quiet hours - no userId available");
+      return;
+    }
+
+    try {
+      // Build update payload - only include quiet hours when enabled
+      // When disabled, we don't pass the fields (which effectively sets them to null/undefined on backend)
+      const updatePayload: { userId: string; quietHoursStart?: number; quietHoursEnd?: number } = { 
+        userId 
+      };
+
+      if (enabled) {
+        updatePayload.quietHoursStart = start;
+        updatePayload.quietHoursEnd = end;
+      }
+
+      console.log("[Profile] 📤 Syncing quiet hours to backend:", {
+        userId,
+        enabled,
+        quietHoursStart: updatePayload.quietHoursStart,
+        quietHoursEnd: updatePayload.quietHoursEnd,
+      });
+
+      await updateUserApi(updatePayload);
+
+      console.log("[Profile] ✅ Quiet hours synced successfully");
+    } catch (error) {
+      console.error("[Profile] ❌ Failed to sync quiet hours:", error);
+    }
+  }, [userId, updateUserApi]);
+
+  // Save quiet hours settings with debounced API sync
+  const saveQuietHours = useCallback((enabled: boolean, start: number, end: number) => {
+    // Save to local storage immediately
+    AsyncStorage.setItem(
+      "@quiet_hours_settings",
+      JSON.stringify({ enabled, start, end })
+    ).catch((error) => {
+      console.error("[Profile] Error saving quiet hours to storage:", error);
+    });
+
+    // Clear any pending debounced call
+    if (quietHoursDebounceRef.current) {
+      clearTimeout(quietHoursDebounceRef.current);
+    }
+
+    // Debounce the API call
+    quietHoursDebounceRef.current = setTimeout(() => {
+      syncQuietHoursToBackend(enabled, start, end);
+    }, QUIET_HOURS_DEBOUNCE_MS);
+  }, [userId, updateUserApi, syncQuietHoursToBackend]);
+
+  // Format time for display (24h to 12h format)
+  const formatTime = (hour: number) => {
+    if (hour === 0) return "12:00 AM";
+    if (hour === 12) return "12:00 PM";
+    if (hour < 12) return `${hour}:00 AM`;
+    return `${hour - 12}:00 PM`;
+  };
 
   // Handle notification toggle
   const handleNotificationToggle = async (value: boolean) => {
@@ -72,7 +158,7 @@ export default function ProfileScreen() {
               text: "Cancel",
               style: "cancel",
             },
-          ],
+          ]
         );
         return;
       }
@@ -95,7 +181,7 @@ export default function ProfileScreen() {
           // Check if backend user exists
           if (!isUserCreated() || !userId) {
             console.log(
-              "[Profile] ⚠️ Backend user not found - creating as fallback...",
+              "[Profile] ⚠️ Backend user not found - creating as fallback..."
             );
 
             try {
@@ -132,24 +218,24 @@ export default function ProfileScreen() {
               Alert.alert(
                 "Setup Notice",
                 "Notifications are enabled, but we encountered an issue setting up your account. You can continue using the app.",
-                [{ text: "OK", style: "default" }],
+                [{ text: "OK", style: "default" }]
               );
             }
           } else {
             console.log(
-              "[Profile] 🔄 User exists - updating push token on backend...",
+              "[Profile] 🔄 User exists - updating push token on backend..."
             );
 
             // PRIMARY PATH: Update existing user with push token
             try {
               console.log("[Profile] 📤 Calling updateUser API with userId:", userId);
-              
+
               // Update on backend via PUT /users/:userId
               await updateUserApi({
                 userId,
                 deviceId: token,
               });
-              
+
               console.log("[Profile] ✅ Push token updated on backend");
 
               // Also update local UserContext state
@@ -179,15 +265,12 @@ export default function ProfileScreen() {
                 onPress: () => handleNotificationToggle(true),
               },
               { text: "Cancel", style: "cancel" },
-            ],
+            ]
           );
         }
       } catch (error) {
         console.error("[Profile] ❌ Error enabling notifications:", error);
-        Alert.alert(
-          "Error",
-          "Failed to enable notifications. Please try again.",
-        );
+        Alert.alert("Error", "Failed to enable notifications. Please try again.");
       } finally {
         setIsTogglingNotifications(false);
       }
@@ -219,7 +302,7 @@ export default function ProfileScreen() {
                     },
                     style: "cancel",
                   },
-                ],
+                ]
               );
             },
           },
@@ -227,28 +310,9 @@ export default function ProfileScreen() {
             text: "Cancel",
             style: "cancel",
           },
-        ],
+        ]
       );
     }
-  };
-
-  const handleAccountDetails = () => {
-    console.log("Navigate to account details");
-    const token = getPushToken();
-    if (token !== null) {
-      execute({ pushToken: token });
-    }
-    // Example: router.push('/account-details');
-  };
-
-  const handlePrivacy = () => {
-    console.log("Navigate to privacy");
-    // Example: router.push('/privacy');
-  };
-
-  const handleHelp = () => {
-    console.log("Navigate to help");
-    // Example: Linking.openURL('https://yourapp.com/help');
   };
 
   const handleLogout = async () => {
@@ -258,45 +322,6 @@ export default function ProfileScreen() {
     } catch (err) {
       console.error("Sign out error:", err);
     }
-  };
-
-  // Debug: Retry token fetch
-  const handleDebugRetryToken = async () => {
-    Alert.alert(
-      "Debug: Retry Token",
-      "This will attempt to fetch your push notification token again.",
-      [
-        {
-          text: "Retry",
-          onPress: async () => {
-            setIsTogglingNotifications(true);
-            try {
-              const token = await registerForPushNotificationsAsync();
-
-              if (token && token.trim() !== "") {
-                setExpoPushToken(token);
-                setPermissionStatus("granted");
-                Alert.alert(
-                  "Success!",
-                  `Token retrieved:\n\n${token.substring(0, 50)}...`,
-                );
-              } else {
-                Alert.alert("Failed", "Token is still null.");
-              }
-            } catch (error) {
-              console.error("[DEBUG] Error during retry:", error);
-              Alert.alert(
-                "Error",
-                error instanceof Error ? error.message : "Unknown error",
-              );
-            } finally {
-              setIsTogglingNotifications(false);
-            }
-          },
-        },
-        { text: "Cancel", style: "cancel" },
-      ],
-    );
   };
 
   return (
@@ -373,131 +398,143 @@ export default function ProfileScreen() {
             loading={isTogglingNotifications}
             testID="setting-notifications"
           />
-          <SettingItem
-            icon="person-outline"
-            title="Account Details"
-            subtitle="Personal info and password"
-            onPress={handleAccountDetails}
-            testID="setting-account"
-          />
-          <SettingItem
-            icon="shield-checkmark-outline"
-            title="Privacy & Visibility"
-            subtitle="Control who sees your badges"
-            onPress={handlePrivacy}
-            testID="setting-privacy"
-          />
         </View>
       </View>
 
-      {/* Support Section */}
+      {/* Quiet Hours Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>SUPPORT</Text>
-        <View style={styles.settingsGroup}>
-          <SettingItem
-            icon="help-circle-outline"
-            title="Help & Documentation"
-            onPress={handleHelp}
-            variant="support"
-            isExternalLink
-            testID="setting-help"
-          />
+        <Text style={styles.sectionTitle}>QUIET HOURS</Text>
+        
+        {/* Unified Quiet Hours Card */}
+        <View style={styles.quietHoursCard}>
+          {/* Card Header with Toggle */}
+          <View style={styles.quietHoursCardHeader}>
+            <View style={styles.quietHoursCardHeaderLeft}>
+              <View style={[styles.quietHoursIconContainer, { backgroundColor: Theme.colors.primary.medium }]}>
+                <Ionicons name="moon-outline" size={Theme.iconSize.md} color={Theme.colors.primary.main} />
+              </View>
+              <View style={styles.quietHoursCardHeaderText}>
+                <Text style={styles.quietHoursCardTitle}>Quiet Hours</Text>
+                <Text style={styles.quietHoursCardSubtitle}>Set do-not-disturb times</Text>
+              </View>
+            </View>
+            <View style={styles.switchContainer}>
+              <Switch
+                value={quietHoursEnabled}
+                onValueChange={(value: boolean) => {
+                  setQuietHoursEnabled(value);
+                  saveQuietHours(value, quietHoursStart, quietHoursEnd);
+                }}
+                trackColor={{
+                  false: Theme.colors.gray[200],
+                  true: Theme.colors.success.light,
+                }}
+                thumbColor={Theme.colors.background.secondary}
+                ios_backgroundColor={Theme.colors.gray[200]}
+                testID="setting-quiet-hours-switch"
+              />
+            </View>
+          </View>
+          
+          {/* Divider */}
+          <View style={styles.quietHoursCardDivider} />
+          
+          {/* Card Content */}
+          {!quietHoursEnabled ? (
+            <View style={styles.quietHoursDisabledContent}>
+              <Ionicons
+                name="moon-outline"
+                size={20}
+                color={Theme.colors.text.secondary}
+              />
+              <Text style={styles.quietHoursDisabledText}>
+                Quiet hours are disabled
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.quietHoursEnabledContent}>
+              {/* Start Time Slider */}
+              <View style={styles.sliderContainer}>
+                <View style={styles.sliderLabelRow}>
+                  <View style={styles.sliderLabelWithIcon}>
+                    <Ionicons
+                      name="time-outline"
+                      size={16}
+                      color={Theme.colors.text.secondary}
+                      style={styles.sliderIcon}
+                    />
+                    <Text style={styles.sliderLabel}>Start Time</Text>
+                  </View>
+                  <View style={styles.timeBadge}>
+                    <Text style={styles.timeBadgeText}>{formatTime(quietHoursStart)}</Text>
+                  </View>
+                </View>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={23}
+                  step={1}
+                  value={quietHoursStart}
+                  onValueChange={(value) => {
+                    setQuietHoursStart(value);
+                    saveQuietHours(quietHoursEnabled, value, quietHoursEnd);
+                  }}
+                  minimumTrackTintColor={Theme.colors.primary.main}
+                  maximumTrackTintColor={Theme.colors.background.tertiary}
+                  thumbTintColor={Theme.colors.primary.main}
+                />
+              </View>
+
+              {/* Divider */}
+              <View style={styles.sliderDivider} />
+
+              {/* End Time Slider */}
+              <View style={styles.sliderContainer}>
+                <View style={styles.sliderLabelRow}>
+                  <View style={styles.sliderLabelWithIcon}>
+                    <Ionicons
+                      name="time-outline"
+                      size={16}
+                      color={Theme.colors.text.secondary}
+                      style={styles.sliderIcon}
+                    />
+                    <Text style={styles.sliderLabel}>End Time</Text>
+                  </View>
+                  <View style={styles.timeBadge}>
+                    <Text style={styles.timeBadgeText}>{formatTime(quietHoursEnd)}</Text>
+                  </View>
+                </View>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={23}
+                  step={1}
+                  value={quietHoursEnd}
+                  onValueChange={(value) => {
+                    setQuietHoursEnd(value);
+                    saveQuietHours(quietHoursEnabled, quietHoursStart, value);
+                  }}
+                  minimumTrackTintColor={Theme.colors.primary.main}
+                  maximumTrackTintColor={Theme.colors.background.tertiary}
+                  thumbTintColor={Theme.colors.primary.main}
+                />
+              </View>
+
+              {/* Info Text */}
+              <View style={styles.quietHoursInfo}>
+                <Ionicons
+                  name="notifications-off-outline"
+                  size={14}
+                  color={Theme.colors.text.secondary}
+                />
+                <Text style={styles.quietHoursInfoText}>
+                  No notifications from {formatTime(quietHoursStart)} to {formatTime(quietHoursEnd)}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       </View>
-
-      {/* Developer Tools (only visible in __DEV__ mode) */}
-      {__DEV__ && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔧 DEVELOPER TOOLS</Text>
-          <View style={styles.settingsGroup}>
-            <SettingItem
-              icon="refresh-outline"
-              title="Reset User Creation Flag"
-              subtitle="Clear user created state for testing"
-              onPress={async () => {
-                try {
-                  await AsyncStorage.removeItem("@skill_issue_user_created");
-                  Alert.alert(
-                    "Reset Complete",
-                    "User creation flag cleared.\n\nRestart the app to trigger user creation again.",
-                    [{ text: "OK" }],
-                  );
-                } catch (error) {
-                  Alert.alert("Error", "Failed to reset: " + error);
-                }
-              }}
-              testID="dev-reset-user"
-            />
-            <SettingItem
-              icon="information-circle-outline"
-              title="Check Token State"
-              subtitle="View current notification token status"
-              onPress={() => {
-                const { expoPushToken, permissionStatus } =
-                  useNotificationStore.getState();
-                Alert.alert(
-                  "Token Debug Info",
-                  `Permission Status: ${permissionStatus}\n\nExpo Push Token:\n${expoPushToken || "NULL"}\n\nToken Length: ${expoPushToken?.length || 0} chars`,
-                  [{ text: "OK" }],
-                );
-              }}
-              testID="dev-check-token"
-            />
-            <SettingItem
-              icon="trash-outline"
-              title="Clear All App Data"
-              subtitle="Reset entire app state"
-              onPress={async () => {
-                Alert.alert(
-                  "Clear All Data?",
-                  "This will reset the entire app to fresh install state. You will need to sign in again.",
-                  [
-                    {
-                      text: "Cancel",
-                      style: "cancel",
-                    },
-                    {
-                      text: "Clear All",
-                      style: "destructive",
-                      onPress: async () => {
-                        try {
-                          await AsyncStorage.clear();
-                          Alert.alert(
-                            "Success",
-                            "All app data cleared. Please restart the app.",
-                          );
-                        } catch (error) {
-                          Alert.alert(
-                            "Error",
-                            "Failed to clear data: " + error,
-                          );
-                        }
-                      },
-                    },
-                  ],
-                );
-              }}
-              testID="dev-clear-all"
-            />
-          </View>
-        </View>
-      )}
-
-      {/* Debug Section */}
-      {__DEV__ && (
-        <>
-          <Text style={styles.sectionTitle}>🐛 DEBUG TOOLS</Text>
-          <View style={styles.settingsGroup}>
-            <SettingItem
-              icon="refresh"
-              title="Retry Token Fetch"
-              subtitle="Manually retry push notification token"
-              onPress={handleDebugRetryToken}
-              variant="support"
-            />
-          </View>
-        </>
-      )}
 
       {/* Logout Button */}
       <TouchableOpacity

@@ -31,10 +31,12 @@ export type ApiOptions<
     ? {
       selector?: never;
       globalState?: never;
+      clearDataOnCall?: boolean;
     }
     : {
       selector?: never;
       globalState?: never;
+      clearDataOnCall?: boolean;
     });
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

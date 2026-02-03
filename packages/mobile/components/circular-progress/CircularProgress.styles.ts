@@ -93,6 +93,24 @@ export const styles = StyleSheet.create({
     color: Theme.colors.text.secondary,
   },
 
+  // Compact styles
+  compactGaugeContainer: {
+    marginBottom: 0,
+  },
+
+  compactSvgContainer: {
+    width: 100,
+    height: 100,
+  },
+
+  compactGaugeNumber: {
+    fontSize: 24,
+  },
+
+  compactGaugeTotal: {
+    fontSize: Theme.typography.fontSize.sm,
+  },
+
   // Progress indicator (dots around circle)
   progressIndicatorContainer: {
     position: "absolute",

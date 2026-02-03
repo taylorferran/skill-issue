@@ -4,9 +4,7 @@ export interface IQuizState {
   currentQuestion: number;
   totalQuestions: number;
   isSingleQuestion: boolean;
-  timeLeft: number;
-  totalTime: number;
-  isTimeUp: boolean;
+  elapsedTime: number;
 }
 
 interface QuizContextType {

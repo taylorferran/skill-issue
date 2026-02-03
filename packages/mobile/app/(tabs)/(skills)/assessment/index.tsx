@@ -1,158 +1,207 @@
 import { Theme } from "@/theme/Theme";
-import { spacing, flex, createBadgeStyle } from "@/theme/ThemeUtils";
-import { MaterialIcons } from "@expo/vector-icons";
+import { spacing } from "@/theme/ThemeUtils";
 import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { styles } from "./_index.styles";
 import SkillOverviewScreen from "@/components/skill-overview/SkillOverview";
 import SkillLevelRating from "@/components/skill-level-rating/SkillLevelRating";
-import { MCQItem } from "@/types/Quiz";
-import { useRouteParams } from "@/navigation/navigation";
+import { challengeToMCQQuestion, type Challenge } from "@/types/Quiz";
+import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useGetUserSkills } from "@/api-routes/getUserSkills";
+import { useGetPendingChallenges } from "@/api-routes/getPendingChallenges";
+import { useGetChallengeHistory } from "@/api-routes/getChallengeHistory";
+import { useGetChallenge } from "@/api-routes/getChallenge";
 import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useUser } from "@/contexts/UserContext";
 import { useSkillsStore } from "@/stores/skillsStore";
-import type { GetUserSkillsResponse } from "@learning-platform/shared";
+import type { GetChallengeHistoryResponse } from "@learning-platform/shared";
 import { hasAssessedSkill, markSkillAssessed } from "@/utils/assessmentStorage";
+import { ChallengeHistoryCard } from "@/components/challenge-history-card/ChallengeHistoryCard";
+
+const CHALLENGES_PER_PAGE = 10;
 
 const ReviewHistoryScreen = () => {
   const [selectedSegment, setSelectedSegment] = useState<"overview" | "review">(
     "overview",
   );
-  
+
   // Get route params
-  const { skill, skillId, isNewSkill } = useRouteParams('assessment');
-  
-  // Context & API hooks
+  const { skill, skillId } = useRouteParams('assessment');
+  const params = useLocalSearchParams();
+
+  // Context & store
   const { userId } = useUser();
-  const { execute: fetchUserSkills, isLoading: isFetchingSkills } = useGetUserSkills();
-  const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
   const { setUserSkills } = useSkillsStore();
-  
-  // Local state for this skill's data
-  const [skillData, setSkillData] = useState<GetUserSkillsResponse[number] | null>(null);
-  const [isLoadingSkill, setIsLoadingSkill] = useState(true);
+
+  // API hooks with clearDataOnCall: false - keeps data between calls, only shows loading on first call
+  const { execute: fetchUserSkills, data: userSkillsData } = useGetUserSkills();
+  const { 
+    execute: fetchPendingChallenges, 
+    data: pendingChallengesData, 
+    isLoading: isLoadingChallenges 
+  } = useGetPendingChallenges({ clearDataOnCall: false });
+  const { 
+    execute: fetchChallengeHistory, 
+    data: challengeHistoryData, 
+    isFetching: isFetchingHistory 
+  } = useGetChallengeHistory({ clearDataOnCall: false });
+  const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
+  const { execute: fetchChallenge, isLoading: isLoadingChallenge } = useGetChallenge();
+
+  // UI state
   const [hasLocalAssessment, setHasLocalAssessment] = useState(false);
-  
-  // Determine if user needs to set difficulty level
-  // User needs to rate if ALL of the following are true:
-  // 1. No local assessment record (hasLocalAssessment = false), AND
-  // 2. No backend record OR backend record has no difficultyTarget
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
+  const [recentlyAnswered, setRecentlyAnswered] = useState<GetChallengeHistoryResponse>([]);
+
+  // Derived data
+  const skillData = userSkillsData?.find(s => s.skillName === skill) || null;
+  const pendingChallenges = (pendingChallengesData || []).filter(c => c.skillId === skillId);
+  const challengeHistory = (challengeHistoryData || [])
+    .filter(h => h.skillId === skillId)
+    .sort((a, b) => new Date(b.answeredAt).getTime() - new Date(a.answeredAt).getTime());
   const needsRating = !hasLocalAssessment && (!skillData || !skillData.difficultyTarget);
-  
-  // Fetch skill data from backend on mount
+
+  // Combined display history with optimistic updates
+  const displayHistory = [
+    ...recentlyAnswered,
+    ...challengeHistory.filter(h => !recentlyAnswered.some(r => r.answerId === h.answerId))
+  ];
+
+  // Check for recently answered challenge from navigation params
   useEffect(() => {
-    loadSkillData();
-  }, [userId, skill]);
-  
-  // Refetch when screen comes into focus (after navigation back)
-  useFocusEffect(
-    useCallback(() => {
-      loadSkillData();
-    }, [userId, skill])
-  );
-  
-  const loadSkillData = async () => {
+    if (params.answeredChallenge) {
+      try {
+        const answeredChallenge = JSON.parse(params.answeredChallenge as string);
+        if (answeredChallenge.skillId === skillId) {
+          setRecentlyAnswered(prev => [answeredChallenge, ...prev]);
+        }
+      } catch (e) {
+        console.error('[Assessment] Failed to parse answered challenge:', e);
+      }
+    }
+  }, [params.answeredChallenge, skillId]);
+
+  // Initial load - fetch all data in parallel
+  useEffect(() => {
     if (!userId || !skillId) return;
-    
-    setIsLoadingSkill(true);
-    try {
-      console.log('[Assessment] 🔄 Loading skill data...');
-      
+
+    const loadInitialData = async () => {
+      console.log('[Assessment] 🔄 Initial load - fetching all data...');
+
       // Check local storage first (fast)
       const localAssessment = await hasAssessedSkill(skillId);
       setHasLocalAssessment(localAssessment);
-      
-      console.log('[Assessment] 💾 Local assessment status:', localAssessment);
-      
-      // Fetch from backend (source of truth)
-      const userSkills = await fetchUserSkills({ userId });
-      const currentSkill = userSkills.find(s => s.skillName === skill);
-      
-      setSkillData(currentSkill || null);
-      
-      if (currentSkill) {
-        console.log('[Assessment] ✅ Skill data loaded:', {
-          skillName: currentSkill.skillName,
-          difficultyTarget: currentSkill.difficultyTarget,
-          accuracy: currentSkill.accuracy,
-          attempts: currentSkill.attemptsTotal
-        });
-        
-        // If backend has data but local doesn't, sync local storage
-        if (currentSkill.difficultyTarget && !localAssessment) {
-          console.log('[Assessment] 🔄 Syncing local assessment from backend...');
-          await markSkillAssessed(skillId, currentSkill.difficultyTarget);
-          setHasLocalAssessment(true);
-        }
-      } else {
-        console.log('[Assessment] ℹ️ No backend record for this skill (new enrollment)');
+
+      // Fetch all data in parallel
+      await Promise.all([
+        fetchUserSkills({ userId }),
+        fetchPendingChallenges({ userId }),
+        fetchChallengeHistory({ userId, limit: CHALLENGES_PER_PAGE, offset: 0 })
+      ]);
+
+      setHistoryOffset(CHALLENGES_PER_PAGE);
+      setHasMoreHistory((challengeHistoryData?.length || 0) === CHALLENGES_PER_PAGE);
+
+      // Sync local assessment if needed
+      const currentSkill = userSkillsData?.find(s => s.skillName === skill);
+      if (currentSkill?.difficultyTarget && !localAssessment) {
+        await markSkillAssessed(skillId, currentSkill.difficultyTarget);
+        setHasLocalAssessment(true);
       }
-      
+    };
+
+    loadInitialData();
+  }, [userId, skill, skillId]);
+
+  // Background refresh when screen comes into focus (silent - no loading UI)
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId || !skillId) return;
+
+      console.log('[Assessment] 🔄 Background refresh...');
+
+      // Refresh all data silently (hooks keep existing data visible)
+      Promise.all([
+        fetchUserSkills({ userId }),
+        fetchPendingChallenges({ userId }),
+        fetchChallengeHistory({ userId, limit: CHALLENGES_PER_PAGE, offset: 0 })
+      ]).then(() => {
+        setHistoryOffset(CHALLENGES_PER_PAGE);
+        setHasMoreHistory((challengeHistoryData?.length || 0) === CHALLENGES_PER_PAGE);
+        setRecentlyAnswered([]);
+      }).catch(error => {
+        console.error('[Assessment] ❌ Background refresh failed:', error);
+      });
+    }, [userId, skill, skillId])
+  );
+
+  const loadMoreHistory = async () => {
+    if (!userId || !skillId || isFetchingHistory) return;
+
+    try {
+      const history = await fetchChallengeHistory({ 
+        userId,
+        limit: CHALLENGES_PER_PAGE,
+        offset: historyOffset 
+      });
+
+      setHistoryOffset(prev => prev + CHALLENGES_PER_PAGE);
+      setHasMoreHistory(history.length === CHALLENGES_PER_PAGE);
     } catch (error) {
-      console.error('[Assessment] ❌ Failed to load skill data:', error);
-      Alert.alert('Error', 'Could not load skill data. Please try again.');
-    } finally {
-      setIsLoadingSkill(false);
+      console.error('[Assessment] ❌ Failed to load more history:', error);
     }
   };
-  
+
+  const handleLoadMore = () => {
+    if (!isFetchingHistory && hasMoreHistory) {
+      loadMoreHistory();
+    }
+  };
+
+  const handleToggleExpand = (answerId: string) => {
+    setExpandedChallengeId(prev => prev === answerId ? null : answerId);
+  };
+
   // Handler when user submits difficulty rating
   const handleRatingSubmit = async (rating: number) => {
     if (!userId || !skillId) {
       Alert.alert('Error', 'Missing user or skill information');
       return;
     }
-    
+
     try {
       console.log('[Assessment] 📝 Enrolling in skill with difficulty:', rating);
-      
-      // STEP 1: Mark as assessed locally IMMEDIATELY (optimistic update)
-      // This hides the slider right away, even if API call is slow/fails
+
+      // Mark as assessed locally (optimistic update)
       await markSkillAssessed(skillId, rating);
       setHasLocalAssessment(true);
-      console.log('[Assessment] ✅ Local assessment saved');
-      
-      // STEP 2: Call backend API to enroll
-      const enrollmentResult = await enrollSkill({
-        userId,
-        skillId,
-        difficultyTarget: rating,
-      });
-      
-      console.log('[Assessment] ✅ Enrollment successful:', enrollmentResult);
-      
-      // STEP 3: Refetch ALL user skills to update cache
-      const updatedSkills = await fetchUserSkills({ userId });
+
+      // Enroll in skill
+      await enrollSkill({ userId, skillId, difficultyTarget: rating });
+
+      // Refetch all data
+      const [updatedSkills] = await Promise.all([
+        fetchUserSkills({ userId }),
+        fetchPendingChallenges({ userId })
+      ]);
+
       setUserSkills(updatedSkills);
-      
-      // Update local state with the newly enrolled skill
-      const newSkillData = updatedSkills.find(s => s.skillId === skillId);
-      setSkillData(newSkillData || null);
-      
-      // Show success message and switch to Overview tab
+
       Alert.alert(
         'Enrollment Complete!',
         `You're now learning ${skill} at level ${rating}. View your progress in the Overview tab.`,
         [
           { 
             text: 'View Overview',
-            onPress: () => {
-              // Switch to overview tab to show enrolled skill stats
-              setSelectedSegment('overview');
-            }
+            onPress: () => setSelectedSegment('overview')
           }
         ]
       );
-      
     } catch (error) {
       console.error('[Assessment] ❌ Enrollment failed:', error);
-      
-      // Note: We don't revert the local assessment flag here
-      // This prevents the slider from reappearing immediately
-      // User can retry from settings if needed
-      
       Alert.alert(
         'Enrollment Failed',
         'Your assessment was saved locally, but we could not sync with the server. Your progress will sync when connection is restored.',
@@ -160,34 +209,40 @@ const ReviewHistoryScreen = () => {
       );
     }
   };
-  
-  // Mock MCQ data (keep as-is)
-  const mcqAnswers: MCQItem[] = [
-    {
-      question: "How do you define a decorator?",
-      id: 1,
-      isCorrect: true,
-      timestamp: "2 days ago",
-    },
-    {
-      question: "Time complexity of Dict lookups?",
-      id: 2,
-      isCorrect: false,
-      timestamp: "3 days ago",
-    },
-    {
-      question: "Difference between __str__ & __repr__",
-      id: 3,
-      isCorrect: true,
-      timestamp: "5 days ago",
-    },
-    {
-      question: "List comprehensions vs Generators",
-      id: 4,
-      isCorrect: false,
-      timestamp: "1 week ago",
-    },
-  ];
+
+  // Handler when user selects a challenge
+  const handleChallengeSelect = async (challenge: Challenge) => {
+    console.log('[Assessment] 📝 Challenge selected:', challenge.challengeId);
+
+    try {
+      // Fetch full challenge details including correctOption and explanation
+      const fullChallenge = await fetchChallenge({ challengeId: challenge.challengeId });
+      
+      console.log('[Assessment] ✅ Full challenge loaded:', {
+        challengeId: fullChallenge.id,
+        hasCorrectOption: true,
+        hasExplanation: !!fullChallenge.explanation,
+      });
+
+      // Convert to MCQ format with correct answer and explanation
+      const mcqQuestion = challengeToMCQQuestion(fullChallenge);
+      
+      navigateTo('quiz', { 
+        skill: skill,
+        data: mcqQuestion,
+        challengeId: challenge.challengeId
+      });
+    } catch (error) {
+      console.error('[Assessment] ❌ Failed to load challenge details:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load challenge. Please try again.'
+      );
+    }
+  };
+
+  // Show loading only on initial load (when data is null and loading)
+  const showLoading = isLoadingChallenges && !pendingChallengesData;
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -233,8 +288,8 @@ const ReviewHistoryScreen = () => {
         </View>
       </View>
 
-      {/* Show loading state while fetching skill data */}
-      {isLoadingSkill ? (
+      {/* Show loading state only on initial load */}
+      {showLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Theme.colors.primary.main} />
           <Text style={styles.loadingText}>Loading skill data...</Text>
@@ -247,6 +302,9 @@ const ReviewHistoryScreen = () => {
               needsRating={needsRating}
               onRatingSubmit={handleRatingSubmit}
               isEnrolling={isEnrolling}
+              pendingChallenges={pendingChallenges}
+              onChallengeSelect={handleChallengeSelect}
+              skillName={skill}
             />
           ) : (
             <View style={styles.historyList}>
@@ -259,74 +317,41 @@ const ReviewHistoryScreen = () => {
                 />
               )}
               
-              {/* MCQ History */}
-              {mcqAnswers.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.historyItem,
-                    index !== mcqAnswers.length - 1 && styles.historyItemBorder,
-                  ]}
-                  activeOpacity={0.7}
-                >
-                  <View style={flex.row}>
-                    <View
-                      style={[
-                        styles.iconContainer,
-                        item.isCorrect
-                          ? styles.iconContainerSuccess
-                          : styles.iconContainerError,
-                      ]}
+              {/* Challenge History Cards */}
+              {displayHistory.length === 0 && !isFetchingHistory ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>
+                    No challenges answered yet. Start practicing to see your history here!
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {displayHistory.map((challenge) => (
+                    <ChallengeHistoryCard
+                      key={challenge.answerId}
+                      challenge={challenge}
+                      isExpanded={expandedChallengeId === challenge.answerId}
+                      onToggle={() => handleToggleExpand(challenge.answerId)}
+                    />
+                  ))}
+                  
+                  {/* Load More Button */}
+                  {hasMoreHistory && (
+                    <TouchableOpacity
+                      style={styles.loadMoreButton}
+                      onPress={handleLoadMore}
+                      disabled={isFetchingHistory}
+                      activeOpacity={0.7}
                     >
-                      <MaterialIcons
-                        name={item.isCorrect ? "check-circle" : "cancel"}
-                        size={24}
-                        color={
-                          item.isCorrect
-                            ? Theme.colors.success.main
-                            : Theme.colors.primary.main
-                        }
-                      />
-                    </View>
-
-                    <View style={styles.historyContent}>
-                      <Text style={styles.questionText} numberOfLines={1}>
-                        {item.question}
-                      </Text>
-
-                      <View style={[flex.row, styles.historyMeta]}>
-                        <View
-                          style={[
-                            createBadgeStyle(
-                              item.isCorrect ? "success" : "primary",
-                            ),
-                            styles.statusBadge,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.statusBadgeText,
-                              item.isCorrect
-                                ? styles.statusBadgeTextSuccess
-                                : styles.statusBadgeTextError,
-                            ]}
-                          >
-                            {item.isCorrect ? "CORRECT" : "INCORRECT"}
-                          </Text>
-                        </View>
-
-                        <Text style={styles.timestampText}>{item.timestamp}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <MaterialIcons
-                    name="chevron-right"
-                    size={24}
-                    color={Theme.colors.settings.chevron}
-                  />
-                </TouchableOpacity>
-              ))}
+                      {isFetchingHistory ? (
+                        <ActivityIndicator size="small" color={Theme.colors.primary.main} />
+                      ) : (
+                        <Text style={styles.loadMoreText}>Load More</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </View>
           )}
         </>

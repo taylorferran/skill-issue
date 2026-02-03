@@ -18,7 +18,7 @@ export const StarRating: React.FC<StarRatingProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>How useful was this question?</Text>
+      <Text style={styles.title}>{text}</Text>
 
       <View style={styles.starsContainer}>
         {[1, 2, 3, 4, 5].map((star) => (

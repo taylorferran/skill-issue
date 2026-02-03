@@ -314,6 +314,11 @@ export default function SkillSelectScreen() {
                       skill.skillName.charCodeAt(0) % skillColors.length
                     ];
                     
+                    // Calculate progress based on difficulty level (1-10 scale to 0-100%)
+                    const difficultyProgress = skill.difficultyTarget 
+                      ? Math.round((skill.difficultyTarget / 10) * 100)
+                      : 0;
+                    
                     return (
                       <SkillCard
                         key={skill.skillId}
@@ -322,7 +327,7 @@ export default function SkillSelectScreen() {
                           name: skill.skillName,
                           icon: 'code-outline' as keyof typeof Ionicons.glyphMap,
                           category: skill.skillDescription,
-                          progress: Math.round(skill.accuracy * 100),
+                          progress: difficultyProgress,
                           level: skill.difficultyTarget,
                           isPrimary: false,
                           subtopics: skill.attemptsTotal,

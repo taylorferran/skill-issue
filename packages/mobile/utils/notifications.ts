@@ -24,7 +24,7 @@ export function configureNotificationHandler() {
 function getProjectId(): string {
   return (
     Constants.expoConfig?.extra?.eas?.projectId ||
-    "b302dea4-1c3f-42d5-bd5f-eca4acebea90"
+    ""
   );
 }
 
