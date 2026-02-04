@@ -62,13 +62,18 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
         clearDataOnCall: options?.clearDataOnCall
       });
 
-      const shouldClearData = options?.clearDataOnCall !== false;
+      const shouldClearData = options?.clearDataOnCall === true;
       setIsFetching(true);
 
       if (shouldClearData) {
-        // First call - clear data and show loading
+        // Explicit clear requested - clear data and show loading
         setState((prev) => ({ ...prev, data: null, isLoading: true, error: null }));
+      } else if (!state.data) {
+        // First call with no cached data - show loading
+        setState((prev) => ({ ...prev, isLoading: true, error: null }));
       }
+      // If we have cached data and clearDataOnCall is false/undefined,
+      // we keep showing the cached data during refresh (cache-first behavior)
 
       try {
         const response = await SendRequest(

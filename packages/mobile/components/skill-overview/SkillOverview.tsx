@@ -11,6 +11,7 @@ import SkillLevelRating from "../skill-level-rating/SkillLevelRating";
 import { styles } from "./SkillsOverview.styles";
 import StatCard from "../stat-card/StatCard";
 import CircularProgress from "../circular-progress/CircularProgress";
+import { AnimatedNumber, AnimatedText } from "../animated";
 import type { GetUserSkillsResponse } from "@learning-platform/shared";
 import type { Challenge } from "@/types/Quiz";
 
@@ -35,9 +36,12 @@ interface SkillOverviewProps {
 
   // Skill name for display
   skillName: string;
+
+  // Whether the animation has already played (prevents re-animation on tab switch)
+  hasAnimated?: boolean;
 }
 
-const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({ 
+const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
   skillData,
   needsRating,
   onRatingSubmit,
@@ -45,13 +49,88 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
   pendingChallenges,
   onChallengeSelect,
   skillName,
+  hasAnimated = false,
 }) => {
-  // Extract data from backend response (with defaults for new skills)
+  // Extract data from backend response (with defaults to show immediately)
   const currentLevel = skillData?.difficultyTarget ?? 0;
   const maxLevel = 10;
   const hotStreak = skillData?.streakCorrect ?? 0;
   const questionsAnswered = skillData?.attemptsTotal ?? 0;
   const accuracy = skillData?.accuracy ?? 0;
+  const correctTotal = skillData?.correctTotal ?? 0;
+  const hasAnsweredQuestions = questionsAnswered > 0;
+  const hasHotStreak = hotStreak > 0;
+  
+  // Styles for stat values (matching original statValue style)
+  const statValueStyle = {
+    fontSize: Theme.typography.fontSize["2xl"],
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
+    lineHeight: Theme.typography.lineHeight.normal,
+  };
+
+  // Styles for stat subtitles (matching original statSubtitle style)
+  const statSubtitleStyle = {
+    fontSize: Theme.typography.fontSize.xs,
+    fontWeight: Theme.typography.fontWeight.bold,
+    marginTop: Theme.spacing.xs / 2,
+  };
+
+  // Create animated value components with proper styling
+  // These will animate from 0 to actual values on first load only
+  const hotStreakValue = (
+    <AnimatedNumber
+      value={hotStreak}
+      suffix=" Days"
+      style={statValueStyle}
+      skipAnimation={hasAnimated}
+    />
+  );
+
+  const hotStreakSubtitle = hasHotStreak ? (
+    <AnimatedText 
+      value={`${hotStreak} correct in a row!`} 
+      style={[statSubtitleStyle, { color: "#07880b" }]}
+    />
+  ) : (
+    <AnimatedText value="Starting fresh" style={[statSubtitleStyle, { color: Theme.colors.text.secondary }]} />
+  );
+
+  const answeredValue = (
+    <AnimatedNumber
+      value={questionsAnswered}
+      suffix=" Qs"
+      style={statValueStyle}
+      skipAnimation={hasAnimated}
+    />
+  );
+
+  const answeredSubtitle = hasAnsweredQuestions ? (
+    <AnimatedText 
+      value={`${Math.round(accuracy * 100)}% accuracy`}
+      style={[statSubtitleStyle, { color: Theme.colors.text.secondary }]}
+    />
+  ) : (
+    <AnimatedText value="Starting fresh" style={[statSubtitleStyle, { color: Theme.colors.text.secondary }]} />
+  );
+
+  const accuracyValue = hasAnsweredQuestions ? (
+    <AnimatedText 
+      value={`${Math.round(accuracy * 100)}%`}
+      style={styles.compactAccuracyValue}
+    />
+  ) : (
+    <AnimatedText value="0%" style={[styles.compactAccuracyValue, { color: Theme.colors.text.secondary }]} />
+  );
+
+  const accuracySubtext = hasAnsweredQuestions ? (
+    <AnimatedText 
+      value={`${correctTotal} / ${questionsAnswered} correct`}
+      style={styles.compactAccuracySubtext}
+    />
+  ) : (
+    <AnimatedText value="Start answering!" style={styles.compactAccuracySubtext} />
+  );
   
   return (
     <View style={styles.container}>
@@ -74,17 +153,9 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
           <View style={styles.statCardWrapper}>
             <StatCard
               label="HOT STREAK"
-              value={`${hotStreak} Days`}
-              subtitle={
-                hotStreak > 0 
-                  ? `${hotStreak} correct in a row!` 
-                  : "Starting fresh"
-              }
-              subtitleColor={
-                hotStreak > 0 
-                  ? "#07880b" 
-                  : Theme.colors.text.secondary
-              }
+              value={hotStreakValue}
+              subtitle={hotStreakSubtitle}
+              subtitleColor={(hotStreak ?? 0) > 0 ? "#07880b" : Theme.colors.text.secondary}
               iconName="local-fire-department"
               iconColor="#ff4d4d"
               iconFilled={true}
@@ -94,12 +165,8 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
           <View style={styles.statCardWrapper}>
             <StatCard
               label="ANSWERED"
-              value={`${questionsAnswered} Qs`}
-              subtitle={
-                questionsAnswered > 0
-                  ? `${Math.round(accuracy * 100)}% accuracy`
-                  : "Starting fresh"
-              }
+              value={answeredValue}
+              subtitle={answeredSubtitle}
               iconName="task-alt"
               iconColor="#3B82F6"
             />
@@ -112,19 +179,12 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
           <View style={styles.statCardWrapper}>
             <View style={styles.compactProgressCard}>
               <Text style={styles.compactProgressHeader}>YOUR DIFFICULTY LEVEL</Text>
-              {!skillData ? (
-                <View style={styles.emptyProgressContainer}>
-                  <Text style={styles.emptyProgressText}>
-                    Set skill level
-                  </Text>
-                </View>
-              ) : (
-                <CircularProgress 
-                  current={currentLevel} 
-                  total={maxLevel} 
-                  compact={true}
-                />
-              )}
+              <CircularProgress
+                current={currentLevel}
+                total={maxLevel}
+                compact={true}
+                skipAnimation={hasAnimated}
+              />
             </View>
           </View>
 
@@ -132,16 +192,10 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
           <View style={styles.statCardWrapper}>
             <View style={styles.compactAccuracyCard}>
               <Text style={styles.compactAccuracyLabel}>ACCURACY</Text>
-              <Text style={styles.compactAccuracyValue}>
-                {skillData && questionsAnswered > 0 
-                  ? `${Math.round(accuracy * 100)}%` 
-                  : "--"}
-              </Text>
-              <Text style={styles.compactAccuracySubtext}>
-                {skillData && questionsAnswered > 0 
-                  ? `${skillData.correctTotal} / ${questionsAnswered} correct`
-                  : "Start answering!"}
-              </Text>
+              <View style={styles.accuracyContent}>
+                {accuracyValue}
+                {accuracySubtext}
+              </View>
             </View>
           </View>
         </View>

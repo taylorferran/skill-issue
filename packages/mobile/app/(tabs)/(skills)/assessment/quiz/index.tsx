@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { router } from "expo-router";
 import { MCQQuiz } from "@/components/mcq-quiz/quiz/MCQQuiz";
-import { useRouteParams } from "@/navigation/navigation";
+import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { useSubmitAnswer } from "@/api-routes/submitAnswer";
+import { useGetUserSkills } from "@/api-routes/getUserSkills";
 import { Alert } from "react-native";
 import type { AnswerChallengeResponse } from "@learning-platform/shared";
 import type { MCQQuestion } from "@/types/Quiz";
+import { notificationEventEmitter } from "@/utils/notificationEvents";
 
 interface AnswerSubmissionData {
   challengeId: string;
@@ -24,9 +26,13 @@ interface QuizResultData extends AnswerChallengeResponse {
 }
 
 const SkillAssessmentScreen = () => {
-  const { data, challengeId, skill } = useRouteParams("quiz");
+  const { data, challengeId, skill, skillId } = useRouteParams("quiz");
   const { userId } = useUser();
   const { execute: submitAnswer, isLoading: isSubmitting } = useSubmitAnswer();
+  const { execute: fetchUserSkills, isLoading: isFetchingSkills } = useGetUserSkills();
+  
+  // Combined loading state for the entire finish flow
+  const isProcessing = isSubmitting || isFetchingSkills;
   
   // Store quiz result for optimistic update
   const [quizResult, setQuizResult] = useState<QuizResultData | null>(null);
@@ -63,6 +69,9 @@ const SkillAssessmentScreen = () => {
         confidence: answerData.confidence,
       });
 
+      // Emit notification event to refresh pending challenges in header
+      notificationEventEmitter.emit();
+
       console.log('[Quiz] ✅ Answer submitted successfully:', result);
     } catch (error) {
       console.error('[Quiz] ❌ Failed to submit answer:', error);
@@ -74,13 +83,13 @@ const SkillAssessmentScreen = () => {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     // Construct answered challenge data for optimistic update
-    if (quizResult && questionData) {
+    if (quizResult && questionData && skillId && userId) {
       const answeredChallenge = {
         answerId: `temp-${Date.now()}`, // Temporary ID until server assigns one
         challengeId: challengeId,
-        skillId: '', // Will be filled by assessment screen
+        skillId: skillId,
         skillName: skill,
         difficulty: 5, // Default, could be passed in params
         question: questionData.question,
@@ -95,16 +104,34 @@ const SkillAssessmentScreen = () => {
         createdAt: new Date().toISOString(),
       };
 
-      // Navigate back with answered challenge data
-      router.back();
-      
-      // Use setTimeout to ensure the navigation completes before setting params
-      setTimeout(() => {
-        router.setParams({
+      try {
+        // Fetch current skill progress from API
+        console.log('[Quiz] 🔄 Fetching skill progress for navigation...');
+        const userSkills = await fetchUserSkills({ userId });
+        const skillData = userSkills?.find(s => s.skillId === skillId);
+        const progress = skillData ? skillData.accuracy * 100 : 0;
+        
+        console.log('[Quiz] ✅ Navigating to assessment with progress:', progress);
+        
+        // Navigate explicitly to assessment with all required params
+        navigateTo('assessment', { 
+          skill, 
+          skillId, 
+          progress,
           answeredChallenge: JSON.stringify(answeredChallenge),
         });
-      }, 100);
+      } catch (error) {
+        console.error('[Quiz] ❌ Failed to fetch skill progress:', error);
+        // Fallback: navigate without progress data
+        navigateTo('assessment', { 
+          skill, 
+          skillId, 
+          progress: 0,
+          answeredChallenge: JSON.stringify(answeredChallenge),
+        });
+      }
     } else {
+      // If missing data, just go back
       router.back();
     }
   };
@@ -117,6 +144,7 @@ const SkillAssessmentScreen = () => {
       challengeId={challengeId}
       userId={userId || ''}
       onSubmitAnswer={handleSubmitAnswer}
+      isFinishing={isProcessing}
     />
   );
 };

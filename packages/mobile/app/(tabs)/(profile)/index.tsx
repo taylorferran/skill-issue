@@ -24,6 +24,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import { useCreateUser } from "@/api-routes/createUser";
 import { useUpdateUser } from "@/api-routes/updateUser";
+
 import type { CreateUserRequest } from "@learning-platform/shared";
 import { styles } from "./index.styles";
 import Slider from "@react-native-community/slider";
@@ -33,6 +34,7 @@ export default function ProfileScreen() {
     useUser();
   const { execute: createUserApi } = useCreateUser();
   const { execute: updateUserApi } = useUpdateUser();
+
 
   // Notification state management
   const { permissionStatus, setPermissionStatus, setExpoPushToken } =
@@ -544,7 +546,7 @@ export default function ProfileScreen() {
         testID="logout-button"
       >
         <LinearGradient
-          colors={["#eb8b47", "#ffae70"]}
+          colors={[Theme.colors.primary.main, Theme.colors.primary.main]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.logoutButton}

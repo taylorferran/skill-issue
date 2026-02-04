@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, Pressable } from "react-native";
+import { View, ScrollView, Text, Pressable, ActivityIndicator } from "react-native";
 import { styles } from "./MCQQuiz.styles";
+import { Theme } from "@/theme/Theme";
 import { QuestionCard } from "../question-card/QuestionCard";
 import { QuizResult } from "../quiz-result/QuizResult";
 import { FinishButton } from "@/components/buttons/FinishButton";
@@ -13,6 +14,7 @@ type MCQQuizProps = {
   onFinish: () => void;
   challengeId?: string;
   userId?: string;
+  isFinishing?: boolean;
   onSubmitAnswer?: (answerData: {
     challengeId: string;
     userId: string;
@@ -38,6 +40,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   onFinish,
   challengeId,
   userId,
+  isFinishing,
   onSubmitAnswer,
 }) => {
   const { setQuizState } = useQuiz();
@@ -228,6 +231,17 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
               <FinishButton  onPress={handleNext} text={isLastQuestion ? 'Finish' : quizSession.hasAnswered ? 'Next': 'Confirm'} />
             </View>
           </>
+        )}
+
+        {/* Loading Overlay */}
+        {isFinishing && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator 
+              size="large" 
+              color={Theme.colors.primary.main} 
+            />
+            <Text style={styles.loadingText}>We are processing your skill level...</Text>
+          </View>
         )}
       </View>
     </ScrollView>

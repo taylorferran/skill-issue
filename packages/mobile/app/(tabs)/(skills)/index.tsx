@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -30,6 +31,7 @@ export default function SkillSelectScreen() {
   const [selectedSegment, setSelectedSegment] = useState<
     "Current Skills" | "New Skills"
   >("Current Skills");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Get userId from UserContext
   const { userId } = useUser();
@@ -71,6 +73,8 @@ export default function SkillSelectScreen() {
   useFocusEffect(
     useCallback(() => {
       loadSkills();
+      // Clear search query when returning to this screen
+      setSearchQuery("");
     }, [userId])
   );
   
@@ -213,13 +217,8 @@ export default function SkillSelectScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.innerContainer}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Segmented Control */}
-          <View style={[spacing.containerPadding, styles.segmentedContainer]}>
+        {/* Sticky Segmented Control - Outside ScrollView */}
+        <View style={[spacing.containerPadding, styles.segmentedContainer]}>
             <View style={styles.segmentedControl}>
               <TouchableOpacity
                 style={[
@@ -227,7 +226,10 @@ export default function SkillSelectScreen() {
                   selectedSegment === "Current Skills" &&
                   styles.segmentButtonActive,
                 ]}
-                onPress={() => setSelectedSegment("Current Skills")}
+                onPress={() => {
+                  setSelectedSegment("Current Skills");
+                  setSearchQuery("");
+                }}
                 activeOpacity={0.7}
               >
                 <Text
@@ -262,8 +264,13 @@ export default function SkillSelectScreen() {
             </View>
           </View>
 
-          {/* Current Skills View */}
-          {selectedSegment === "Current Skills" && (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Current Skills View */}
+            {selectedSegment === "Current Skills" && (
             <>
               {/* Stats Cards Section */}
               <View style={styles.statsSection}>
@@ -354,6 +361,41 @@ export default function SkillSelectScreen() {
                 </View>
               </View>
 
+              {/* Search Input */}
+              <View style={styles.searchContainer}>
+                <View style={styles.searchInputWrapper}>
+                  <Ionicons
+                    name="search-outline"
+                    size={20}
+                    color={Theme.colors.text.secondary}
+                    style={styles.searchIcon}
+                  />
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search skills..."
+                    placeholderTextColor={Theme.colors.text.quaternary}
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    returnKeyType="search"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  {searchQuery.length > 0 && (
+                    <TouchableOpacity
+                      style={styles.clearButton}
+                      onPress={() => setSearchQuery("")}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={20}
+                        color={Theme.colors.text.quaternary}
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
               {/* Skills Grid */}
               <View style={styles.newSkillsGrid}>
                 {isLoadingAvailableSkills ? (
@@ -370,13 +412,22 @@ export default function SkillSelectScreen() {
                     .filter(skill => {
                       // 1. Skill must be active
                       if (!skill.active) return false;
-                      
+
                       // 2. Skill must NOT be already enrolled by user
                       const isEnrolled = userSkills.some(
                         userSkill => userSkill.skillId === skill.id
                       );
-                      
-                      return !isEnrolled; // Show only if NOT enrolled
+
+                      if (isEnrolled) return false;
+
+                      // 3. Filter by search query
+                      if (searchQuery.trim() === "") return true;
+
+                      const query = searchQuery.toLowerCase().trim();
+                      const nameMatch = skill.name.toLowerCase().includes(query);
+                      const descriptionMatch = skill.description?.toLowerCase().includes(query);
+
+                      return nameMatch || descriptionMatch;
                     })
                     .map(renderNewSkillCard)
                 ) : (

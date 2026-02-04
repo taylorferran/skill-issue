@@ -6,9 +6,16 @@
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo run:android",
+    "android:clean": "cd android && ./gradlew clean 2>/dev/null || true && rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native ~/.gradle/wrapper",
+    "android:fresh": "rm -rf android && rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native ~/.gradle/wrapper && npx expo prebuild --platform android && expo run:android",
     "ios": "expo run:ios",
+    "ios:fresh": "rm -rf ios && npx expo prebuild --platform ios && expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:android:test": "NODE_ENV=development eas build --platform android --profile preview --local",
+    "build:android:prod": "eas build --platform android --profile production --local",
+    "submit:android": "eas submit --platform android --path",
+    "release:android": "npm run build:android:prod && npm run submit:android"
   },
   "dependencies": {
     "@clerk/clerk-expo": "1.2.9",
@@ -22,6 +29,7 @@
     "@react-navigation/native": "^7.1.8",
     "axios": "^1.13.2",
     "expo": "~54.0.31",
+    "expo-build-properties": "^1.0.10",
     "expo-constants": "~18.0.13",
     "expo-crypto": "^15.0.8",
     "expo-device": "^8.0.10",
@@ -54,7 +62,9 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@expo/config-plugins": "~9.0.0",
     "@types/react": "~19.1.0",
+    "babel-preset-expo": "^54.0.10",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"

@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuiz } from "@/contexts/QuizContext";
 import { Theme } from "@/theme/Theme";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -46,6 +47,9 @@ export function CustomHeader({
   const handleBackPress = () => {
     if (router.canGoBack()) {
       router.back();
+    } else {
+      // Fallback: navigate to skills screen if can't go back (e.g., from notification)
+      router.navigate('/(tabs)/(skills)');
     }
   };
 
@@ -92,26 +96,6 @@ export function CustomHeader({
       <View style={styles.actionsContainer}>
         {isQuizRoute && quizState ? (
           <QuizTimer elapsedTime={quizState.elapsedTime} />
-        ) : !isQuizRoute ? (
-          <Pressable
-            style={({ pressed }) => [
-              styles.notificationButton,
-              {
-                backgroundColor: pressed
-                  ? Theme.colors.background.primary
-                  : "transparent",
-              },
-            ]}
-            onPress={() => {
-              console.log("Notifications pressed");
-            }}
-          >
-            <MaterialIcons
-              name="notifications"
-              color={Theme.colors.primary.main}
-              size={Theme.iconSize.lg}
-            />
-          </Pressable>
         ) : null}
       </View>
     </View>

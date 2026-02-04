@@ -302,4 +302,5 @@ export const styles = StyleSheet.create({
     ...createTextStyle("xs", "bold", "primary"),
     color: Theme.colors.primary.main,
   },
+
 });

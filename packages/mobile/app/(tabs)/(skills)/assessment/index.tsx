@@ -18,6 +18,7 @@ import { useSkillsStore } from "@/stores/skillsStore";
 import type { GetChallengeHistoryResponse } from "@learning-platform/shared";
 import { hasAssessedSkill, markSkillAssessed } from "@/utils/assessmentStorage";
 import { ChallengeHistoryCard } from "@/components/challenge-history-card/ChallengeHistoryCard";
+import { notificationEventEmitter } from "@/utils/notificationEvents";
 
 const CHALLENGES_PER_PAGE = 10;
 
@@ -34,20 +35,22 @@ const ReviewHistoryScreen = () => {
   const { userId } = useUser();
   const { setUserSkills } = useSkillsStore();
 
-  // API hooks with clearDataOnCall: false - keeps data between calls, only shows loading on first call
-  const { execute: fetchUserSkills, data: userSkillsData } = useGetUserSkills();
+  // API hooks with cache-first behavior - keeps data between calls, only shows loading on first call
+  const { 
+    execute: fetchUserSkills, 
+    data: userSkillsData
+  } = useGetUserSkills();
   const { 
     execute: fetchPendingChallenges, 
-    data: pendingChallengesData, 
-    isLoading: isLoadingChallenges 
-  } = useGetPendingChallenges({ clearDataOnCall: false });
+    data: pendingChallengesData
+  } = useGetPendingChallenges();
   const { 
     execute: fetchChallengeHistory, 
     data: challengeHistoryData, 
     isFetching: isFetchingHistory 
   } = useGetChallengeHistory({ clearDataOnCall: false });
   const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
-  const { execute: fetchChallenge, isLoading: isLoadingChallenge } = useGetChallenge();
+  const { execute: fetchChallenge } = useGetChallenge();
 
   // UI state
   const [hasLocalAssessment, setHasLocalAssessment] = useState(false);
@@ -55,6 +58,7 @@ const ReviewHistoryScreen = () => {
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
   const [recentlyAnswered, setRecentlyAnswered] = useState<GetChallengeHistoryResponse>([]);
+  const [hasOverviewAnimated, setHasOverviewAnimated] = useState(false);
 
   // Derived data
   const skillData = userSkillsData?.find(s => s.skillName === skill) || null;
@@ -83,6 +87,17 @@ const ReviewHistoryScreen = () => {
       }
     }
   }, [params.answeredChallenge, skillId]);
+
+  // Track when overview animation has played
+  useEffect(() => {
+    if (selectedSegment === "overview" && !hasOverviewAnimated) {
+      // Mark animation as played after a short delay to allow the initial animation to start
+      const timer = setTimeout(() => {
+        setHasOverviewAnimated(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedSegment, hasOverviewAnimated]);
 
   // Initial load - fetch all data in parallel
   useEffect(() => {
@@ -137,6 +152,18 @@ const ReviewHistoryScreen = () => {
       });
     }, [userId, skill, skillId])
   );
+
+  // Listen for notification events to refresh pending challenges
+  useEffect(() => {
+    const unsubscribe = notificationEventEmitter.subscribe(() => {
+      if (userId) {
+        console.log('[Assessment] 📨 Notification event received, refreshing pending challenges...');
+        fetchPendingChallenges({ userId });
+      }
+    });
+
+    return unsubscribe;
+  }, [userId, fetchPendingChallenges]);
 
   const loadMoreHistory = async () => {
     if (!userId || !skillId || isFetchingHistory) return;
@@ -241,9 +268,6 @@ const ReviewHistoryScreen = () => {
     }
   };
 
-  // Show loading only on initial load (when data is null and loading)
-  const showLoading = isLoadingChallenges && !pendingChallengesData;
-
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
       {/* Segmented Control */}
@@ -288,73 +312,68 @@ const ReviewHistoryScreen = () => {
         </View>
       </View>
 
-      {/* Show loading state only on initial load */}
-      {showLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Theme.colors.primary.main} />
-          <Text style={styles.loadingText}>Loading skill data...</Text>
-        </View>
-      ) : (
-        <>
-          {selectedSegment === "overview" ? (
-            <SkillOverviewScreen 
-              skillData={skillData}
-              needsRating={needsRating}
-              onRatingSubmit={handleRatingSubmit}
-              isEnrolling={isEnrolling}
-              pendingChallenges={pendingChallenges}
-              onChallengeSelect={handleChallengeSelect}
+      {/* Overview Tab */}
+      {selectedSegment === "overview" && (
+        <SkillOverviewScreen 
+          skillData={skillData}
+          needsRating={needsRating}
+          onRatingSubmit={handleRatingSubmit}
+          isEnrolling={isEnrolling}
+          pendingChallenges={pendingChallenges}
+          onChallengeSelect={handleChallengeSelect}
+          skillName={skill}
+          hasAnimated={hasOverviewAnimated}
+        />
+      )}
+
+      {/* Review Tab */}
+      {selectedSegment === "review" && (
+        <View style={styles.historyList}>
+          {/* Skill Level Rating - Only show if needs rating */}
+          {needsRating && (
+            <SkillLevelRating 
               skillName={skill}
+              onRatingSubmit={handleRatingSubmit}
+              isSubmitting={isEnrolling}
             />
-          ) : (
-            <View style={styles.historyList}>
-              {/* Skill Level Rating - Only show if needs rating */}
-              {needsRating && (
-                <SkillLevelRating 
-                  skillName={skill}
-                  onRatingSubmit={handleRatingSubmit}
-                  isSubmitting={isEnrolling}
-                />
-              )}
-              
-              {/* Challenge History Cards */}
-              {displayHistory.length === 0 && !isFetchingHistory ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateText}>
-                    No challenges answered yet. Start practicing to see your history here!
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {displayHistory.map((challenge) => (
-                    <ChallengeHistoryCard
-                      key={challenge.answerId}
-                      challenge={challenge}
-                      isExpanded={expandedChallengeId === challenge.answerId}
-                      onToggle={() => handleToggleExpand(challenge.answerId)}
-                    />
-                  ))}
-                  
-                  {/* Load More Button */}
-                  {hasMoreHistory && (
-                    <TouchableOpacity
-                      style={styles.loadMoreButton}
-                      onPress={handleLoadMore}
-                      disabled={isFetchingHistory}
-                      activeOpacity={0.7}
-                    >
-                      {isFetchingHistory ? (
-                        <ActivityIndicator size="small" color={Theme.colors.primary.main} />
-                      ) : (
-                        <Text style={styles.loadMoreText}>Load More</Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
-                </>
-              )}
-            </View>
           )}
-        </>
+          
+          {/* Challenge History Cards */}
+          {displayHistory.length === 0 && !isFetchingHistory ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                No challenges answered yet. Start practicing to see your history here!
+              </Text>
+            </View>
+          ) : (
+            <>
+              {displayHistory.map((challenge) => (
+                <ChallengeHistoryCard
+                  key={challenge.answerId}
+                  challenge={challenge}
+                  isExpanded={expandedChallengeId === challenge.answerId}
+                  onToggle={() => handleToggleExpand(challenge.answerId)}
+                />
+              ))}
+              
+              {/* Load More Button */}
+              {hasMoreHistory && (
+                <TouchableOpacity
+                  style={styles.loadMoreButton}
+                  onPress={handleLoadMore}
+                  disabled={isFetchingHistory}
+                  activeOpacity={0.7}
+                >
+                  {isFetchingHistory ? (
+                    <ActivityIndicator size="small" color={Theme.colors.primary.main} />
+                  ) : (
+                    <Text style={styles.loadMoreText}>Load More</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </>
+          )}
+        </View>
       )}
     </ScrollView>
   );
