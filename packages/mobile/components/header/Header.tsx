@@ -1,5 +1,4 @@
-import React from "react";
-import { useQuiz } from "@/contexts/QuizContext";
+import React, { useEffect, useState } from "react";
 import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import { Theme } from "@/theme/Theme";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
@@ -9,6 +8,7 @@ import { View, Pressable, Text } from "react-native";
 import { QuizTimer } from "../mcq-quiz/timer/QuizTimer";
 import { styles } from "./Header.styles";
 import { navigateTo } from "@/navigation/navigation";
+import { quizTimerEmitter } from "@/utils/quizTimerEmitter";
 
 export function CustomHeader({
   navigation,
@@ -18,8 +18,8 @@ export function CustomHeader({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useLocalSearchParams();
-  const { quizState } = useQuiz();
   const { title: navigationTitle } = useNavigationTitle();
+  const [elapsedTime, setElapsedTime] = useState(0);
   const backgroundColor = "white";
 
   // Check if we're at a root tab route by pathname
@@ -34,15 +34,35 @@ export function CustomHeader({
   const isQuizRoute = pathname?.includes("quiz");
   const isAssessmentRoute = pathname?.includes("assessment") && !isQuizRoute;
 
+  // Subscribe to timer updates when on quiz route
+  useEffect(() => {
+    if (!isQuizRoute) {
+      setElapsedTime(0);
+      return;
+    }
+
+    console.log(`[Header] 🎯 Quiz route detected, subscribing to timer`);
+    
+    // Subscribe to timer events
+    const unsubscribe = quizTimerEmitter.subscribe((time) => {
+      console.log(`[Header] ⏱️ Timer update received: ${time}s`);
+      setElapsedTime(time);
+    });
+
+    return () => {
+      console.log(`[Header] 🧹 Quiz route leaving, unsubscribing`);
+      unsubscribe();
+      setElapsedTime(0);
+    };
+  }, [isQuizRoute]);
+
   let displayTitle = "Skill Issue";
   if (navigationTitle) {
     displayTitle = navigationTitle;
-  } else if (quizState) {
-    if (!quizState.isSingleQuestion && isQuizRoute) {
-      displayTitle = `Question ${quizState.currentQuestion} of ${quizState.totalQuestions}`;
-    } else {
-      displayTitle = "";
-    }
+  } else if (isQuizRoute) {
+    // For quiz route, show empty title or question counter
+    // We could also emit question metadata through the emitter if needed
+    displayTitle = "";
   } else if (isProfileRoute) {
     displayTitle = "Profile";
   } else if (isSkillsRoute) {
@@ -126,8 +146,8 @@ export function CustomHeader({
       </View>
       {/* Right Actions */}
       <View style={styles.actionsContainer}>
-        {isQuizRoute && quizState ? (
-          <QuizTimer elapsedTime={quizState.elapsedTime} />
+        {isQuizRoute ? (
+          <QuizTimer elapsedTime={elapsedTime} />
         ) : null}
       </View>
     </View>

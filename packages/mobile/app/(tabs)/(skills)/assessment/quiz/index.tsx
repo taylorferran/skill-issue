@@ -32,6 +32,14 @@ const SkillAssessmentScreen = () => {
   const { data, challengeId, skill, skillId } = useRouteParams("quiz");
   const { userId } = useUser();
   
+  // Mount tracking for debugging
+  useEffect(() => {
+    console.log(`[QuizScreen] 🔄 Mounted - challengeId: ${challengeId}`);
+    return () => {
+      console.log(`[QuizScreen] 🧹 Unmounted - challengeId: ${challengeId}`);
+    };
+  }, [challengeId]);
+  
   // RENDER TRACKING - To detect infinite loops
   const renderCount = useRef(0);
   const prevQuizKey = useRef<string | null>(null);
@@ -58,7 +66,7 @@ const SkillAssessmentScreen = () => {
   // Store quiz result for optimistic update
   const [quizResult, setQuizResult] = useState<QuizResultData | null>(null);
 
-  // MEMOIZE quizKey to prevent unnecessary re-renders
+  // MEMOIZE quizKey based on challenge data
   const quizKey = useMemo(() => {
     const key = Array.isArray(data)
       ? data.map((q) => q.id).join("-")

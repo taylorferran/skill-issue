@@ -49,7 +49,7 @@ export const styles = StyleSheet.create({
     color: Theme.colors.text.secondary,
   },
   scrollContainer: {
-    maxHeight: 340,
+    flex: 1,
   },
   scrollContent: {
     paddingVertical: Theme.spacing.sm,

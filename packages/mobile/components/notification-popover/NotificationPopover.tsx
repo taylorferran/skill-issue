@@ -40,6 +40,8 @@ export function NotificationPopover({
           style={styles.scrollContainer}
           showsVerticalScrollIndicator={true}
           contentContainerStyle={styles.scrollContent}
+          nestedScrollEnabled={true}
+          keyboardShouldPersistTaps="handled"
         >
           {challenges.length === 0 ? (
             <View style={styles.emptyState}>

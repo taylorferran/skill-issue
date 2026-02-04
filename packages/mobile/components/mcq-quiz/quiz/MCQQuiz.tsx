@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, ScrollView, Text, Pressable, ActivityIndicator } from "react-native";
 import { styles } from "./MCQQuiz.styles";
 import { Theme } from "@/theme/Theme";
@@ -7,7 +7,7 @@ import { QuizResult } from "../quiz-result/QuizResult";
 import { FinishButton } from "@/components/buttons/FinishButton";
 import { QuizState } from "@/types/Quiz";
 import { StarRating } from "@/components/star-rating/StarRating";
-import { useQuiz } from "@/contexts/QuizContext";
+import { quizTimerEmitter } from "@/utils/quizTimerEmitter";
 
 type MCQQuizProps = {
   data: QuizState;
@@ -33,7 +33,11 @@ interface QuizSessionState {
   elapsedTime: number;
   confidenceRating: number | null;
   usefulRating: number | null;
+  isFinished: boolean;
 }
+
+// Generate unique quiz instance ID
+let quizInstanceCounter = 0;
 
 export const MCQQuiz: React.FC<MCQQuizProps> = ({
   data,
@@ -43,11 +47,19 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   isFinishing,
   onSubmitAnswer,
 }) => {
-  const { setQuizState } = useQuiz();
   const isSingleQuestion = !Array.isArray(data);
   const questions = isSingleQuestion ? [data] : data;
+  
+  // Generate unique ID for this quiz instance
+  const quizInstanceId = useRef(`quiz-${++quizInstanceCounter}-${Date.now()}`);
+  
+  // Track if component is mounted
+  const isMountedRef = useRef(true);
+  
+  // Store timer interval in a ref so we can always access and clear it
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ✅ Consolidated state
+  // Consolidated state
   const [quizSession, setQuizSession] = useState<QuizSessionState>({
     currentQuestionIndex: 0,
     selectedAnswerId: null,
@@ -55,69 +67,137 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     isCorrect: false,
     elapsedTime: 0,
     confidenceRating: null,
-    usefulRating: null
+    usefulRating: null,
+    isFinished: false,
   });
 
   const currentQuestion = questions[quizSession.currentQuestionIndex];
   const isLastQuestion = quizSession.currentQuestionIndex === questions.length - 1;
+  
+  // Store quiz key to detect when we switch to a completely different quiz
+  const quizKeyRef = useRef<string | null>(null);
+  const currentQuizKey = isSingleQuestion 
+    ? (data as any).id 
+    : (data as any[]).map(q => q.id).join('-');
 
-  // Update context with quiz state
+  // Emit time updates via event emitter with quiz instance ID
   useEffect(() => {
-    setQuizState({
-      currentQuestion: quizSession.currentQuestionIndex + 1,
-      totalQuestions: questions.length,
-      isSingleQuestion,
-      elapsedTime: quizSession.elapsedTime,
-    });
-  }, [
-    quizSession.currentQuestionIndex,
-    quizSession.elapsedTime,
-    questions.length,
-    isSingleQuestion,
-    setQuizState,
-  ]);
+    if (!isMountedRef.current) return;
+    quizTimerEmitter.emit(quizSession.elapsedTime, quizInstanceId.current);
+  }, [quizSession.elapsedTime]);
 
-  // Clean up on unmount
+  // On mount: immediately claim this as the active quiz
   useEffect(() => {
+    // Capture the instance ID in a variable for the cleanup function
+    const instanceId = quizInstanceId.current;
+    console.log(`[MCQQuiz] 🎯 Mounting quiz instance: ${instanceId}`);
+    // Immediately reset and set this as the active quiz
+    quizTimerEmitter.reset(instanceId);
+    
     return () => {
-      setQuizState(null);
+      console.log(`[MCQQuiz] 🧹 Unmounting quiz instance: ${instanceId}`);
+      isMountedRef.current = false;
+      
+      // Clear any running timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      
+      // Clear the active quiz
+      quizTimerEmitter.clearActiveQuiz();
     };
-  }, [setQuizState]);
+  }, []);
 
-  // Reset quiz session when data changes
+  // Reset quiz session when quiz data changes (different quiz)
   useEffect(() => {
-    setQuizSession({
-      currentQuestionIndex: 0,
-      selectedAnswerId: null,
-      hasAnswered: false,
-      isCorrect: false,
-      elapsedTime: 0,
-      usefulRating: null,
-      confidenceRating: null
-    });
-  }, [data]);
+    // Check if this is a different quiz
+    if (quizKeyRef.current !== currentQuizKey) {
+      console.log(`[MCQQuiz] 🔄 Quiz changed: ${quizKeyRef.current} → ${currentQuizKey}`);
+      
+      // Update the key ref
+      quizKeyRef.current = currentQuizKey;
+      
+      // Clear any existing timer first
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      
+      // Reset the timer emitter for this quiz instance
+      quizTimerEmitter.reset(quizInstanceId.current);
+      
+      // Reset all state
+      setQuizSession({
+        currentQuestionIndex: 0,
+        selectedAnswerId: null,
+        hasAnswered: false,
+        isCorrect: false,
+        elapsedTime: 0,
+        usefulRating: null,
+        confidenceRating: null,
+        isFinished: false,
+      });
+    }
+  }, [currentQuizKey]);
 
-  // Reset timer when question changes
+  // Timer effect - only runs when timer should be active
   useEffect(() => {
-    setQuizSession((prev) => ({
-      ...prev,
-      elapsedTime: 0,
-    }));
-  }, [quizSession.currentQuestionIndex]);
+    // Don't start timer if:
+    // - Component is unmounted
+    // - User has answered
+    // - Quiz is finished
+    if (!isMountedRef.current || quizSession.hasAnswered || quizSession.isFinished) {
+      // Clear any existing timer
+      if (timerIntervalRef.current) {
+        console.log(`[MCQQuiz] 🛑 Timer stopped (answered/finished)`);
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      return;
+    }
 
-  // Timer that counts up until user answers
-  useEffect(() => {
-    if (quizSession.hasAnswered) return;
+    // Don't start if elapsedTime is 0 and we already have a timer (prevents double timers)
+    if (quizSession.elapsedTime === 0 && timerIntervalRef.current) {
+      console.log(`[MCQQuiz] ⏱️ Already have timer, not starting another`);
+      return;
+    }
 
-    const timer = setInterval(() => {
+    // Clear any existing timer before starting a new one
+    if (timerIntervalRef.current) {
+      console.log(`[MCQQuiz] 🛑 Clearing old timer before starting new one`);
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    console.log(`[MCQQuiz] ⏱️ Starting timer for quiz: ${currentQuizKey}, elapsedTime: ${quizSession.elapsedTime}`);
+
+    // Start new timer
+    timerIntervalRef.current = setInterval(() => {
+      if (!isMountedRef.current) {
+        // Safety check - clear timer if component unmounted
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
+        return;
+      }
+      
       setQuizSession((prev) => ({
         ...prev,
         elapsedTime: prev.elapsedTime + 1,
       }));
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [quizSession.hasAnswered]);
+    // Cleanup function
+    return () => {
+      if (timerIntervalRef.current) {
+        console.log(`[MCQQuiz] 🛑 Clearing timer (effect cleanup)`);
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [quizSession.hasAnswered, quizSession.isFinished, quizSession.currentQuestionIndex, currentQuizKey]);
 
   const handleAnswerSelect = (answerId: number) => {
     if (quizSession.hasAnswered) return;
@@ -137,8 +217,21 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
 
   const handleNext = () => {
     if (isLastQuestion) {
+      // Stop timer immediately when finish is pressed
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      
+      setQuizSession((prev) => ({ ...prev, isFinished: true }));
       onFinish();
     } else {
+      // Clear timer before moving to next question
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      
       setQuizSession((prev) => ({
         ...prev,
         currentQuestionIndex: prev.currentQuestionIndex + 1,
@@ -153,7 +246,15 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   };
 
   const handleFinish = async () => {
-    console.log('[MCQQuiz] 🎯 handleFinish called');
+    console.log(`[MCQQuiz] 🎯 handleFinish called`);
+    
+    // Stop timer immediately when finish is pressed
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    
+    setQuizSession((prev) => ({ ...prev, isFinished: true }));
     
     if (!quizSession.confidenceRating || !quizSession.usefulRating || quizSession.selectedAnswerId === null) {
       console.log('[MCQQuiz] ⛔ Early return - missing ratings or answer:', {
