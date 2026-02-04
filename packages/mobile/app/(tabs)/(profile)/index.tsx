@@ -24,6 +24,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import { useCreateUser } from "@/api-routes/createUser";
 import { useUpdateUser } from "@/api-routes/updateUser";
+import { useTriggerSchedulerTick } from "@/api-routes/triggerSchedulerTick";
 
 import type { CreateUserRequest } from "@learning-platform/shared";
 import { styles } from "./index.styles";
@@ -34,6 +35,7 @@ export default function ProfileScreen() {
     useUser();
   const { execute: createUserApi } = useCreateUser();
   const { execute: updateUserApi } = useUpdateUser();
+  const { execute: triggerSchedulerTick, isLoading: isTriggeringScheduler } = useTriggerSchedulerTick();
 
 
   // Notification state management
@@ -326,6 +328,27 @@ export default function ProfileScreen() {
     }
   };
 
+  // Dev-only: Trigger scheduler tick manually
+  const handleTriggerSchedulerTick = async () => {
+    if (__DEV__) {
+      try {
+        console.log("[Profile] 🚀 Triggering scheduler tick...");
+        const result = await triggerSchedulerTick();
+        console.log("[Profile] ✅ Scheduler tick result:", result);
+        Alert.alert(
+          "Scheduler Tick",
+          result?.message || "Scheduler tick completed successfully!"
+        );
+      } catch (error) {
+        console.error("[Profile] ❌ Scheduler tick failed:", error);
+        Alert.alert(
+          "Scheduler Tick Failed",
+          error instanceof Error ? error.message : "Unknown error occurred"
+        );
+      }
+    }
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -537,6 +560,30 @@ export default function ProfileScreen() {
           )}
         </View>
       </View>
+
+      {/* Developer Tools Section - Dev Mode Only */}
+      {__DEV__ && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>DEVELOPER TOOLS</Text>
+          <View style={styles.settingsGroup}>
+            <TouchableOpacity
+              style={[styles.devButton, isTriggeringScheduler && styles.devButtonDisabled]}
+              onPress={handleTriggerSchedulerTick}
+              disabled={isTriggeringScheduler}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="play-circle-outline"
+                size={Theme.iconSize.md}
+                color={Theme.colors.text.inverse}
+              />
+              <Text style={styles.devButtonText}>
+                {isTriggeringScheduler ? "Triggering..." : "Trigger Scheduler Tick"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Logout Button */}
       <TouchableOpacity

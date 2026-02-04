@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePathname } from 'expo-router';
 import { Theme } from '@/theme/Theme';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useGetPendingChallenges } from '@/api-routes/getPendingChallenges';
 import { useUser } from '@/contexts/UserContext';
-import { notificationEventEmitter } from '@/utils/notificationEvents';
 import { useGetChallenge } from '@/api-routes/getChallenge';
 import { challengeToMCQQuestion, type Challenge } from '@/types/Quiz';
 import { navigateTo } from '@/navigation/navigation';
@@ -32,51 +32,53 @@ function truncateText(text: string, maxLength: number = 70): string {
  */
 export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOverlay() {
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const { userId } = useUser();
-  const { pendingChallenges, setPendingChallenges, removePendingChallenge } = useNotificationStore();
+  const { pendingChallenges, setPendingChallenges } = useNotificationStore();
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [hasInitialFetchCompleted, setHasInitialFetchCompleted] = useState(false);
   const { execute: fetchPendingChallenges } = useGetPendingChallenges({ clearDataOnCall: false });
   const { execute: fetchChallenge } = useGetChallenge();
+
+  // Hide notification bar on quiz pages
+  const isQuizPage = pathname?.includes('/assessment/quiz');
 
   // Calculate display values
   const count = pendingChallenges.length;
   const displayCount = count > 9 ? '9+' : String(count);
   const showBadge = count > 0;
 
-  // Fetch challenges on mount and when user changes
+  // Fetch challenges only on FIRST mount (not on subsequent userId changes or re-renders)
+  // After initial fetch, the badge updates via local operations only:
+  // - Push notifications add via addPendingChallenge() in notifications.ts
+  // - Quiz completion removes via removePendingChallenge() in the quiz page
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || hasInitialFetchCompleted) return;
 
     const loadChallenges = async () => {
       try {
-        console.log('[NotificationBadgeOverlay] Loading initial challenges...');
+        console.log('[NotificationBadgeOverlay] Loading initial challenges on first mount...');
         const challenges = await fetchPendingChallenges({ userId });
         if (challenges) {
           setPendingChallenges(challenges);
         }
+        setHasInitialFetchCompleted(true);
       } catch (err) {
         console.error('[NotificationBadgeOverlay] Failed to load challenges:', err);
       }
     };
 
     loadChallenges();
-  }, [userId, fetchPendingChallenges, setPendingChallenges]);
+  }, [userId, fetchPendingChallenges, setPendingChallenges, hasInitialFetchCompleted]);
 
-  // Listen for notification events to refresh challenges
-  useEffect(() => {
-    const unsubscribe = notificationEventEmitter.subscribe(() => {
-      console.log('[NotificationBadgeOverlay] Notification event received, refreshing...');
-      if (userId) {
-        fetchPendingChallenges({ userId }).then(challenges => {
-          if (challenges) {
-            setPendingChallenges(challenges);
-          }
-        });
-      }
-    });
-
-    return unsubscribe;
-  }, [userId, fetchPendingChallenges, setPendingChallenges]);
+  // Note: We intentionally do NOT listen for notification events to auto-refresh from server.
+  // Push notifications add challenges directly via addPendingChallenge() in notifications.ts
+  // Quiz completion removes challenges via removePendingChallenge() in the quiz page
+  // Both operations update the local store immediately, so no server re-fetch is needed.
+  // This prevents race conditions where server returns stale data.
+  //
+  // The component will automatically re-render with fresh data when it becomes visible again
+  // (coming back from quiz pages) because useNotificationStore() subscribes to state changes.
 
   const handlePress = useCallback(() => {
     setIsDropdownVisible(prev => !prev);
@@ -105,10 +107,9 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
       // Close dropdown before navigation
       setIsDropdownVisible(false);
 
-      // Remove this challenge from pending since user is about to take it
-      removePendingChallenge(challenge.challengeId);
-
       // Navigate to quiz
+      // Note: Challenge will be removed from pending after successful completion (status 200)
+      // in the quiz page's handleFinish function, not here optimistically
       navigateTo('quiz', {
         skill: challenge.skillName,
         skillId: challenge.skillId,
@@ -119,10 +120,10 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
       console.error('[NotificationBadgeOverlay] Failed to load challenge:', error);
       Alert.alert('Error', 'Failed to load challenge. Please try again.');
     }
-  }, [fetchChallenge, removePendingChallenge]);
+  }, [fetchChallenge]);
 
-  // Don't show notification button if user is not signed in
-  if (!userId) {
+  // Don't show notification button if user is not signed in or on quiz pages
+  if (!userId || isQuizPage) {
     return null;
   }
 

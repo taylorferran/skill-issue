@@ -303,4 +303,27 @@ export const styles = StyleSheet.create({
     color: Theme.colors.primary.main,
   },
 
+  // Dev Button
+  devButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Theme.colors.primary.main,
+    paddingVertical: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
+    borderRadius: Theme.borderRadius.xl,
+    gap: Theme.spacing.sm,
+    shadowColor: Theme.colors.primary.main,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  devButtonDisabled: {
+    opacity: 0.6,
+  },
+  devButtonText: {
+    ...createTextStyle("base", "bold", "inverse"),
+  },
+
 });

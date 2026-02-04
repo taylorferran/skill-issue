@@ -38,6 +38,12 @@ export type QuizState = z.infer<typeof QuizStateSchema>;
 export type Challenge = GetPendingChallengesResponse[number];
 export type FullChallenge = GetChallengeResponse;
 
+// Extended challenge type that includes notification identifier for OS notification management
+// Used when challenge is received via push notification
+export type ChallengeWithNotification = Challenge & {
+  notificationIdentifier?: string;
+};
+
 /**
  * Helper function to convert a Challenge (full or partial) to MCQQuestion format
  * This maps backend Challenge schema to the format MCQQuiz expects

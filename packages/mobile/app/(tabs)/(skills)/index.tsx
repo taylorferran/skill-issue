@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -27,11 +27,23 @@ import type {
   GetSkillsResponse 
 } from "@learning-platform/shared";
 
+// Helper to check if two arrays are deeply equal
+function isArrayEqual<T>(a: T[] | null | undefined, b: T[] | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export default function SkillSelectScreen() {
   const [selectedSegment, setSelectedSegment] = useState<
     "Current Skills" | "New Skills"
   >("Current Skills");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Track initial load state
+  const isFirstMount = useRef(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Get userId from UserContext
   const { userId } = useUser();
@@ -46,63 +58,136 @@ export default function SkillSelectScreen() {
     shouldRefetchAvailableSkills,
   } = useSkillsStore();
   
-  // API hooks
+  // API hooks - clearDataOnCall: false for cache-first behavior
   const { 
     execute: fetchUserSkills, 
-    isLoading: isLoadingUserSkills,
     error: userSkillsError 
   } = useGetUserSkills();
   
   const { 
     execute: fetchAvailableSkills, 
-    isLoading: isLoadingAvailableSkills,
     error: availableSkillsError 
   } = useGetSkills();
   
   const { 
-    execute: deleteSkillApi,
-    isLoading: isDeleting 
+    execute: deleteSkillApi
   } = useDeleteSkill();
   
-  // Fetch data on mount - ALWAYS fetch fresh data (no cache)
+  // Initial load - use cached data immediately if available
   useEffect(() => {
-    loadSkills();
+    if (!userId) {
+      setIsInitialLoading(false);
+      return;
+    }
+    
+    const loadInitialData = async () => {
+      console.log('[Skills] 🔄 Initial load - checking cache...');
+      
+      // Check if we have cached data and if it's fresh
+      const hasCachedUserSkills = userSkills.length > 0;
+      const hasCachedAvailableSkills = availableSkills.length > 0;
+      const needsRefetchUserSkills = shouldRefetchUserSkills();
+      const needsRefetchAvailableSkills = shouldRefetchAvailableSkills();
+      
+      // If we have fresh cached data, don't show loading
+      const hasFreshCache = hasCachedUserSkills && hasCachedAvailableSkills && 
+                           !needsRefetchUserSkills && !needsRefetchAvailableSkills;
+      
+      if (hasFreshCache) {
+        console.log('[Skills] ✅ Using cached data (fresh)');
+        setIsInitialLoading(false);
+        isFirstMount.current = false;
+        
+        // Still do a background refresh
+        refreshSkillsInBackground();
+        return;
+      }
+      
+      // If we have stale cache, show it immediately but fetch in background
+      if (hasCachedUserSkills || hasCachedAvailableSkills) {
+        console.log('[Skills] ⏱️ Using cached data (stale), fetching fresh...');
+        setIsInitialLoading(false);
+        
+        // Fetch fresh data in background
+        try {
+          await refreshSkills();
+        } catch (error) {
+          console.error('[Skills] ❌ Background refresh failed:', error);
+        }
+        
+        isFirstMount.current = false;
+        return;
+      }
+      
+      // No cached data - show loading and fetch
+      console.log('[Skills] ⏳ No cache available, fetching...');
+      setIsInitialLoading(true);
+      
+      try {
+        await refreshSkills();
+      } catch (error) {
+        console.error('[Skills] ❌ Initial load failed:', error);
+        Alert.alert(
+          'Loading Failed',
+          'Could not load skills. Please try again later.',
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setIsInitialLoading(false);
+        isFirstMount.current = false;
+      }
+    };
+    
+    loadInitialData();
   }, [userId]);
   
-  // Refetch skills whenever this screen comes into focus
+  // Background refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      loadSkills();
+      if (!userId || isFirstMount.current) return;
+      
+      console.log('[Skills] 🔄 Background refresh on focus...');
+      refreshSkillsInBackground();
+      
       // Clear search query when returning to this screen
       setSearchQuery("");
     }, [userId])
   );
   
-  const loadSkills = async () => {
-    if (!userId) {
-      console.warn('[Skills] No userId available, skipping fetch');
-      return;
+  const refreshSkills = async () => {
+    if (!userId) return;
+    
+    console.log('[Skills] 🔄 Fetching fresh data from backend...');
+    
+    const [userSkillsResult, availableSkillsResult] = await Promise.all([
+      fetchUserSkills({ userId }),
+      fetchAvailableSkills()
+    ]);
+    
+    // Only update store if data actually changed
+    if (!isArrayEqual(userSkills, userSkillsResult)) {
+      console.log('[Skills] ✅ User skills updated:', userSkillsResult.length);
+      setUserSkills(userSkillsResult);
+    } else {
+      console.log('[Skills] ✅ User skills unchanged');
     }
     
+    if (!isArrayEqual(availableSkills, availableSkillsResult)) {
+      console.log('[Skills] ✅ Available skills updated:', availableSkillsResult.length);
+      setAvailableSkills(availableSkillsResult);
+    } else {
+      console.log('[Skills] ✅ Available skills unchanged');
+    }
+  };
+  
+  const refreshSkillsInBackground = async () => {
+    if (!userId) return;
+    
     try {
-      // ALWAYS fetch fresh data from backend
-      console.log('[Skills] 🔄 Fetching user skills from backend...');
-      const userSkillsData = await fetchUserSkills({ userId });
-      setUserSkills(userSkillsData);
-      console.log('[Skills] ✅ User skills loaded:', userSkillsData.length);
-      
-      console.log('[Skills] 🔄 Fetching available skills from backend...');
-      const availableSkillsData = await fetchAvailableSkills();
-      setAvailableSkills(availableSkillsData);
-      console.log('[Skills] ✅ Available skills loaded:', availableSkillsData.length);
-      
+      await refreshSkills();
     } catch (error) {
-      console.error('[Skills] ❌ Error loading skills:', error);
-      Alert.alert(
-        'Loading Failed',
-        'Could not load skills. Please try again later.',
-        [{ text: 'OK' }]
-      );
+      console.error('[Skills] ❌ Background refresh failed:', error);
+      // Don't show error on background refresh
     }
   };
   
@@ -212,7 +297,8 @@ export default function SkillSelectScreen() {
     return userSkills.length > 0 ? userSkills[0].skillName.split(" ")[0] : "None";
   };
   
-  const isLoading = isLoadingUserSkills || isLoadingAvailableSkills || isDeleting;
+  // Only show initial loading spinner if we have no cached data at all
+  const showInitialLoading = isInitialLoading && userSkills.length === 0 && availableSkills.length === 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -296,7 +382,8 @@ export default function SkillSelectScreen() {
 
               {/* Skills Cards */}
               <View style={styles.cardsContainer}>
-                {isLoadingUserSkills ? (
+                {/* Only show loading spinner if we have NO cached data at all */}
+                {showInitialLoading && selectedSegment === "Current Skills" ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Theme.colors.primary.main} />
                     <Text style={styles.loadingText}>Loading your skills...</Text>
@@ -398,7 +485,8 @@ export default function SkillSelectScreen() {
 
               {/* Skills Grid */}
               <View style={styles.newSkillsGrid}>
-                {isLoadingAvailableSkills ? (
+                {/* Only show loading spinner if we have NO cached data at all */}
+                {showInitialLoading && selectedSegment === "New Skills" ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Theme.colors.primary.main} />
                     <Text style={styles.loadingText}>Loading available skills...</Text>

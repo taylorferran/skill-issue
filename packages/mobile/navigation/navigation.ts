@@ -21,8 +21,8 @@ const pages = {
     path: "/(tabs)/(skills)/assessment" as const,
     params: z.object({
       skill: z.string(),
-      skillId: z.string().uuid().optional(),
-      progress: z.number(),
+      skillId: z.string().uuid(),
+      progress: z.number().optional(),
       isNewSkill: z.boolean().optional(),
       answeredChallenge: z.string().optional(),
     }),
@@ -31,7 +31,7 @@ const pages = {
     path: "/(tabs)/(skills)/assessment/quiz" as const,
     params: z.object({
       skill: z.string(),
-      skillId: z.string().uuid().optional(),
+      skillId: z.string().uuid(),
       data: QuizStateSchema,
       challengeId: z.string().uuid(),
     }),

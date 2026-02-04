@@ -153,7 +153,14 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   };
 
   const handleFinish = async () => {
+    console.log('[MCQQuiz] 🎯 handleFinish called');
+    
     if (!quizSession.confidenceRating || !quizSession.usefulRating || quizSession.selectedAnswerId === null) {
+      console.log('[MCQQuiz] ⛔ Early return - missing ratings or answer:', {
+        hasConfidence: !!quizSession.confidenceRating,
+        hasUseful: !!quizSession.usefulRating,
+        hasAnswer: quizSession.selectedAnswerId !== null
+      });
       return;
     }
 
@@ -161,89 +168,118 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     const responseTime = quizSession.elapsedTime * 1000;
     const userFeedback = `User rated usefulness ${quizSession.usefulRating} out of 5`;
 
+    console.log('[MCQQuiz] 🔍 Checking guard condition:', {
+      hasOnSubmitAnswer: !!onSubmitAnswer,
+      challengeId: challengeId || 'UNDEFINED/EMPTY',
+      userId: userId || 'UNDEFINED/EMPTY',
+      willSubmit: !!(onSubmitAnswer && challengeId && userId)
+    });
+
     if (onSubmitAnswer && challengeId && userId) {
-      await onSubmitAnswer({
+      console.log('[MCQQuiz] 📤 Calling onSubmitAnswer with:', {
         challengeId,
         userId,
         selectedOption: quizSession.selectedAnswerId,
         responseTime,
         confidence: quizSession.confidenceRating,
-        userFeedback,
+      });
+      
+      try {
+        await onSubmitAnswer({
+          challengeId,
+          userId,
+          selectedOption: quizSession.selectedAnswerId,
+          responseTime,
+          confidence: quizSession.confidenceRating,
+          userFeedback,
+        });
+        console.log('[MCQQuiz] ✅ onSubmitAnswer completed successfully');
+      } catch (error) {
+        console.error('[MCQQuiz] ❌ onSubmitAnswer failed:', error);
+        throw error;
+      }
+    } else {
+      console.log('[MCQQuiz] ⚠️ Skipping onSubmitAnswer - guard condition failed:', {
+        hasOnSubmitAnswer: !!onSubmitAnswer,
+        hasChallengeId: !!challengeId,
+        hasUserId: !!userId,
+        challengeIdValue: challengeId,
+        userIdValue: userId
       });
     }
 
+    console.log('[MCQQuiz] 🏁 Calling onFinish()');
     onFinish();
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.mainContent}>
-        <QuestionCard
-          question={currentQuestion}
-          selectedAnswerId={quizSession.selectedAnswerId}
-          onAnswerSelect={handleAnswerSelect}
-          hasAnswered={quizSession.hasAnswered}
-          questionNumber={quizSession.currentQuestionIndex + 1}
-          totalQuestions={questions.length}
-        />
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.mainContent}>
+          <QuestionCard
+            question={currentQuestion}
+            selectedAnswerId={quizSession.selectedAnswerId}
+            onAnswerSelect={handleAnswerSelect}
+            hasAnswered={quizSession.hasAnswered}
+            questionNumber={quizSession.currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+          />
 
-        {/* Confirm Answer Button */}
-        {quizSession.selectedAnswerId !== null && 
-         !quizSession.hasAnswered && (
-          <View style={styles.buttonContainer}>
-            <Pressable style={styles.confirmButton} onPress={handleConfirmAnswer}>
-              <Text style={styles.confirmButtonText}>Confirm Answer</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* SINGLE QUESTION MODE */}
-        {isSingleQuestion && quizSession.hasAnswered && (
-          <View style={styles.buttonContainer}>
-            <QuizResult 
-              isCorrect={quizSession.isCorrect} 
-              explanation={currentQuestion.explanation} 
-            />
-            <StarRating 
-              text='How confident were you?'
-              rating={quizSession.confidenceRating} 
-              onRatingSelect={(rating) => setQuizSession((prev => ({...prev, confidenceRating: rating})))} />
-            <StarRating 
-              rating={quizSession.usefulRating} 
-              text='How useful was this question?'
-              onRatingSelect={(rating) => setQuizSession((prev => ({...prev, usefulRating: rating})))} />
-            {quizSession.usefulRating!== null && quizSession.confidenceRating && (
-              <View style={styles.buttonContainer}>
-                <FinishButton onPress={handleFinish} text={'Finish'} />
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* MULTIPLE QUESTION MODE */}
-        {!isSingleQuestion && quizSession.hasAnswered && (
-          <>
-            <QuizResult 
-              isCorrect={quizSession.isCorrect} 
-              explanation={currentQuestion.explanation} 
-            />
+          {/* Confirm Answer Button */}
+          {quizSession.selectedAnswerId !== null && 
+           !quizSession.hasAnswered && (
             <View style={styles.buttonContainer}>
-              <FinishButton  onPress={handleNext} text={isLastQuestion ? 'Finish' : quizSession.hasAnswered ? 'Next': 'Confirm'} />
+              <Pressable style={styles.confirmButton} onPress={handleConfirmAnswer}>
+                <Text style={styles.confirmButtonText}>Confirm Answer</Text>
+              </Pressable>
             </View>
-          </>
-        )}
+          )}
 
-        {/* Loading Overlay */}
-        {isFinishing && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator 
-              size="large" 
-              color={Theme.colors.primary.main} 
-            />
-            <Text style={styles.loadingText}>We are processing your skill level...</Text>
-          </View>
-        )}
-      </View>
-    </ScrollView>
+          {/* SINGLE QUESTION MODE */}
+          {isSingleQuestion && quizSession.hasAnswered && (
+            <View style={styles.buttonContainer}>
+              <QuizResult 
+                isCorrect={quizSession.isCorrect} 
+                explanation={currentQuestion.explanation} 
+              />
+              <StarRating 
+                text='How confident were you?'
+                rating={quizSession.confidenceRating} 
+                onRatingSelect={(rating) => setQuizSession((prev => ({...prev, confidenceRating: rating})))} />
+              <StarRating 
+                rating={quizSession.usefulRating} 
+                text='How useful was this question?'
+                onRatingSelect={(rating) => setQuizSession((prev => ({...prev, usefulRating: rating})))} />
+              {quizSession.usefulRating!== null && quizSession.confidenceRating && (
+                <View style={styles.buttonContainer}>
+                  <FinishButton onPress={handleFinish} text={'Finish'} />
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* MULTIPLE QUESTION MODE */}
+          {!isSingleQuestion && quizSession.hasAnswered && (
+            <>
+              <QuizResult 
+                isCorrect={quizSession.isCorrect} 
+                explanation={currentQuestion.explanation} 
+              />
+              <View style={styles.buttonContainer}>
+                <FinishButton  onPress={handleNext} text={isLastQuestion ? 'Finish' : quizSession.hasAnswered ? 'Next': 'Confirm'} />
+              </View>
+            </>
+          )}
+        </View>
+      </ScrollView>
+
+      {/* Loading State - Show when processing */}
+      {isFinishing && (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={Theme.colors.primary.main} />
+          <Text style={styles.loadingText}>We are processing your skill level...</Text>
+        </View>
+      )}
+    </View>
   );
 };

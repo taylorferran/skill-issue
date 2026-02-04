@@ -7,6 +7,7 @@ import "react-native-reanimated";
 import { useEffect, useMemo } from "react";
 import { UserProvider } from "@/contexts/UserContext";
 import { QuizProvider } from "@/contexts/QuizContext";
+import { NavigationTitleProvider } from "@/contexts/NavigationTitleContext";
 import {
   configureNotificationHandler,
   setupNotificationListeners,
@@ -62,12 +63,14 @@ function RootLayoutContent() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!isSignedIn}>
-        <Stack.Screen name="sign-in" />
-      </Stack.Protected>
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <NavigationTitleProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={!isSignedIn}>
+          <Stack.Screen name="sign-in" />
+        </Stack.Protected>
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </NavigationTitleProvider>
   );
 }
 

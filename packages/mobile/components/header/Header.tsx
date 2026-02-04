@@ -1,12 +1,14 @@
 import React from "react";
 import { useQuiz } from "@/contexts/QuizContext";
+import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import { Theme } from "@/theme/Theme";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter, usePathname, useLocalSearchParams } from "expo-router";
 import { View, Pressable, Text } from "react-native";
 import { QuizTimer } from "../mcq-quiz/timer/QuizTimer";
 import { styles } from "./Header.styles";
+import { navigateTo } from "@/navigation/navigation";
 
 export function CustomHeader({
   navigation,
@@ -15,7 +17,9 @@ export function CustomHeader({
 }: BottomTabHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useLocalSearchParams();
   const { quizState } = useQuiz();
+  const { title: navigationTitle } = useNavigationTitle();
   const backgroundColor = "white";
 
   // Check if we're at a root tab route by pathname
@@ -28,9 +32,12 @@ export function CustomHeader({
   const canGoBack = !isRootRoute;
 
   const isQuizRoute = pathname?.includes("quiz");
+  const isAssessmentRoute = pathname?.includes("assessment") && !isQuizRoute;
 
   let displayTitle = "Skill Issue";
-  if (quizState) {
+  if (navigationTitle) {
+    displayTitle = navigationTitle;
+  } else if (quizState) {
     if (!quizState.isSingleQuestion && isQuizRoute) {
       displayTitle = `Question ${quizState.currentQuestion} of ${quizState.totalQuestions}`;
     } else {
@@ -45,7 +52,32 @@ export function CustomHeader({
   }
 
   const handleBackPress = () => {
-    if (router.canGoBack()) {
+    if (isQuizRoute) {
+      // When on quiz route, always navigate back to assessment with the skill params
+      const skill = searchParams.skill as string;
+      const skillId = searchParams.skillId as string | undefined;
+      
+      if (skill && skillId) {
+        navigateTo('assessment', {
+          skill,
+          skillId,
+          // Progress will be fetched on assessment screen from API
+        });
+      } else if (skill) {
+        // Fallback: only skill available (shouldn't happen with proper routing)
+        navigateTo('assessment', {
+          skill,
+          skillId: skill, // Use skill name as fallback ID
+        });
+      } else {
+        // Fallback: navigate to skills screen if no skill param available
+        router.navigate('/(tabs)/(skills)');
+      }
+    } else if (isAssessmentRoute) {
+      // When on assessment route, always navigate to parent (skills)
+      // This ensures proper parent-child navigation regardless of entry point
+      navigateTo('skills');
+    } else if (router.canGoBack()) {
       router.back();
     } else {
       // Fallback: navigate to skills screen if can't go back (e.g., from notification)

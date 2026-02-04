@@ -5,7 +5,7 @@ import { Alert, Linking, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { notificationEventEmitter } from './notificationEvents';
 import { useNotificationStore } from '@/stores/notificationStore';
-import type { Challenge } from '@/types/Quiz';
+import type { Challenge, ChallengeWithNotification } from '@/types/Quiz';
 
 /**
  * Configure how notifications are handled when app is in foreground
@@ -179,7 +179,10 @@ function handleNotificationReceived(notification: Notifications.Notification) {
     const { challengeId, skillId, skillName, question, options, difficulty, createdAt } = data;
 
     if (challengeId && question && options) {
-      const challenge: Challenge = {
+      // Include the Expo notification identifier so we can dismiss it later
+      const notificationIdentifier = notification.request.identifier;
+      
+      const challenge: ChallengeWithNotification = {
         challengeId: String(challengeId),
         skillId: skillId ? String(skillId) : '',
         skillName: skillName ? String(skillName) : '',
@@ -187,12 +190,13 @@ function handleNotificationReceived(notification: Notifications.Notification) {
         options: Array.isArray(options) ? options.map((opt: unknown) => String(opt)) : [],
         difficulty: typeof difficulty === 'number' ? difficulty : 5,
         createdAt: createdAt ? String(createdAt) : new Date().toISOString(),
+        notificationIdentifier,
       };
 
       // Add to store immediately for instant badge update
       const { addPendingChallenge } = useNotificationStore.getState();
       addPendingChallenge(challenge);
-      console.log('[Notifications] ➕ Challenge added to store via notification:', challengeId);
+      console.log('[Notifications] ➕ Challenge added to store via notification:', challengeId, 'Notification ID:', notificationIdentifier);
     }
   }
 
@@ -214,6 +218,24 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
     const { challengeId, skillId, skillName, question, options, correctAnswerIndex, explanation } = data;
     
     if (challengeId && question && options) {
+      // Add challenge to notification store so it can be removed after completion
+      // Include the Expo notification identifier for later dismissal
+      const notificationIdentifier = response.notification.request.identifier;
+      
+      const { addPendingChallenge } = useNotificationStore.getState();
+      const challenge: ChallengeWithNotification = {
+        challengeId: String(challengeId),
+        skillId: skillId ? String(skillId) : '',
+        skillName: skillName ? String(skillName) : '',
+        question: String(question),
+        options: Array.isArray(options) ? options.map((opt: unknown) => String(opt)) : [],
+        difficulty: typeof data.difficulty === 'number' ? data.difficulty : 5,
+        createdAt: data.createdAt ? String(data.createdAt) : new Date().toISOString(),
+        notificationIdentifier,
+      };
+      addPendingChallenge(challenge);
+      console.log('[Notifications] ➕ Challenge added to store from notification tap:', challengeId, 'Notification ID:', notificationIdentifier);
+      
       // Format the data as MCQQuestion for the quiz
       const mcqQuestion = {
         id: parseInt(String(challengeId).slice(0, 8), 16) || 0,

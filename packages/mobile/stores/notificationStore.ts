@@ -2,10 +2,12 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Challenge } from '@/types/Quiz';
+import { setAppBadgeCount, clearAllNotifications } from '@/utils/badgeUtils';
 
 /**
  * Notification Store
  * Manages push notification state, Expo Push Token, and pending challenges with persistent storage
+ * Automatically syncs OS-level app icon badge count with pending challenges
  */
 
 export type PermissionStatus = 'granted' | 'denied' | 'undetermined';
@@ -143,3 +145,28 @@ export const useNotificationStore = create<NotificationState>()(
     }
   )
 );
+
+// Store reference for subscriptions
+let previousChallengeCount = 0;
+
+/**
+ * Subscribe to store changes and sync OS-level badge count
+ * This runs whenever the pendingChallenges array changes
+ */
+useNotificationStore.subscribe((state) => {
+  const currentCount = state.pendingChallenges.length;
+  
+  // Only sync if count changed
+  if (currentCount !== previousChallengeCount) {
+    console.log('[NotificationStore] 🔄 Syncing badge count:', currentCount);
+    setAppBadgeCount(currentCount);
+    
+    // If we went from having challenges to having none, clear notification center
+    if (previousChallengeCount > 0 && currentCount === 0) {
+      console.log('[NotificationStore] 🧹 All challenges completed, clearing notification center');
+      clearAllNotifications();
+    }
+    
+    previousChallengeCount = currentCount;
+  }
+});
