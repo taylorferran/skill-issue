@@ -39,6 +39,12 @@ class PushNotificationService {
         skillId: challenge.skillId,
         difficulty: challenge.difficulty,
         type: 'challenge',
+        // Full challenge data for instant quiz load
+        skillName: skillName,
+        question: challenge.question,
+        options: challenge.options,
+        correctAnswerIndex: challenge.correctAnswerIndex,
+        explanation: challenge.explanation,
       },
       badge: 1,
       priority: 'high',

@@ -161,8 +161,10 @@ export default function SignInScreen() {
           }
         }
         
-        // Navigate to skills screen
-        router.replace("/(tabs)/(skills)");
+        // Navigate to skills screen after a short delay to ensure layout is mounted
+        setTimeout(() => {
+          router.replace("/(tabs)/(skills)");
+        }, 100);
       }
     } catch (err: any) {
       console.error("OAuth error", err);
@@ -243,8 +245,10 @@ export default function SignInScreen() {
           }
         }
         
-        // Navigate to skills screen
-        router.replace("/(tabs)/(skills)");
+        // Navigate to skills screen after a short delay to ensure layout is mounted
+        setTimeout(() => {
+          router.replace("/(tabs)/(skills)");
+        }, 100);
       }
     } catch (err: any) {
       console.error("OAuth error", err);

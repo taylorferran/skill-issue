@@ -175,7 +175,7 @@ export const styles = StyleSheet.create({
   // Compact Accuracy Card (for 2x2 grid)
   compactAccuracyCard: {
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     padding: Theme.spacing.lg,
     backgroundColor: Theme.colors.background.secondary,
     borderRadius: Theme.borderRadius.xl,
@@ -183,6 +183,13 @@ export const styles = StyleSheet.create({
     borderColor: Theme.colors.success.light,
     ...Theme.shadows.card,
     flex: 1,
+  },
+
+  accuracyContent: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
   },
 
   compactAccuracyLabel: {

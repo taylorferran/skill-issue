@@ -8,15 +8,8 @@
       "android": {
         "image": "latest"
       },
-      "env": {
-        "EXPO_PUBLIC_API_BEARER_TOKEN": "@api_bearer_token"
-      }
-    },
-    "development": {
-      "extends": "base",
-      "developmentClient": true,
-      "distribution": "internal",
-      "environment": "development"
+      "node": "20.18.0",
+      "pnpm": "9.15.0"
     },
     "preview": {
       "extends": "base",
@@ -24,7 +17,7 @@
       "android": {
         "buildType": "apk"
       },
-      "environment": "preview"
+      "environment": "preview"  // ✅ Keep this for builds
     },
     "production": {
       "extends": "base",
@@ -32,13 +25,14 @@
       "android": {
         "buildType": "app-bundle"
       },
-      "environment": "production"
+      "environment": "production"  // ✅ Keep this for builds
     }
   },
   "submit": {
     "production": {
       "android": {
         "track": "internal"
+        // ❌ No "environment" needed here
       }
     }
   }

@@ -12,6 +12,11 @@ export const styles = StyleSheet.create({
     width: "100%",
   },
 
+  // ScrollView
+  scrollView: {
+    flex: 1,
+  },
+
   // Header with close button and timer
   header: {
     flexDirection: "row",
@@ -277,5 +282,25 @@ export const styles = StyleSheet.create({
   finishButtonText: {
     ...createTextStyle("base", "bold", "primary"),
     color: "#FFFFFF",
+  },
+
+  // Loading State - Simple indicator centered on screen
+  loadingState: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Theme.colors.background.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  loadingText: {
+    color: Theme.colors.text.primary,
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: Theme.spacing.lg,
+    textAlign: "center",
   },
 });

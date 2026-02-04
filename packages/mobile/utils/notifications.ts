@@ -2,6 +2,10 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Alert, Linking, Platform } from 'react-native';
+import { router } from 'expo-router';
+import { notificationEventEmitter } from './notificationEvents';
+import { useNotificationStore } from '@/stores/notificationStore';
+import type { Challenge, ChallengeWithNotification } from '@/types/Quiz';
 
 /**
  * Configure how notifications are handled when app is in foreground
@@ -166,7 +170,38 @@ export function setupNotificationListeners() {
  */
 function handleNotificationReceived(notification: Notifications.Notification) {
   console.log('Notification received in foreground:', notification);
-  // Add custom logic here (e.g., update UI, show badge, etc.)
+
+  // Extract notification data
+  const data = notification.request.content.data;
+
+  // If it's a challenge notification, add it to the store immediately
+  if (data?.type === 'challenge') {
+    const { challengeId, skillId, skillName, question, options, difficulty, createdAt } = data;
+
+    if (challengeId && question && options) {
+      // Include the Expo notification identifier so we can dismiss it later
+      const notificationIdentifier = notification.request.identifier;
+      
+      const challenge: ChallengeWithNotification = {
+        challengeId: String(challengeId),
+        skillId: skillId ? String(skillId) : '',
+        skillName: skillName ? String(skillName) : '',
+        question: String(question),
+        options: Array.isArray(options) ? options.map((opt: unknown) => String(opt)) : [],
+        difficulty: typeof difficulty === 'number' ? difficulty : 5,
+        createdAt: createdAt ? String(createdAt) : new Date().toISOString(),
+        notificationIdentifier,
+      };
+
+      // Add to store immediately for instant badge update
+      const { addPendingChallenge } = useNotificationStore.getState();
+      addPendingChallenge(challenge);
+      console.log('[Notifications] ➕ Challenge added to store via notification:', challengeId, 'Notification ID:', notificationIdentifier);
+    }
+  }
+
+  // Emit notification event to refresh notifications and assessment data
+  notificationEventEmitter.emit();
 }
 
 /**
@@ -178,8 +213,64 @@ function handleNotificationResponse(response: Notifications.NotificationResponse
   // Extract notification data
   const data = response.notification.request.content.data;
   
-  // Add custom navigation logic based on notification data
-  // Example: if (data.screen) { router.push(data.screen); }
+  // Handle challenge notification - navigate to quiz
+  if (data?.type === 'challenge') {
+    const { challengeId, skillId, skillName, question, options, correctAnswerIndex, explanation } = data;
+    
+    if (challengeId && question && options) {
+      // Add challenge to notification store so it can be removed after completion
+      // Include the Expo notification identifier for later dismissal
+      const notificationIdentifier = response.notification.request.identifier;
+      
+      const { addPendingChallenge } = useNotificationStore.getState();
+      const challenge: ChallengeWithNotification = {
+        challengeId: String(challengeId),
+        skillId: skillId ? String(skillId) : '',
+        skillName: skillName ? String(skillName) : '',
+        question: String(question),
+        options: Array.isArray(options) ? options.map((opt: unknown) => String(opt)) : [],
+        difficulty: typeof data.difficulty === 'number' ? data.difficulty : 5,
+        createdAt: data.createdAt ? String(data.createdAt) : new Date().toISOString(),
+        notificationIdentifier,
+      };
+      addPendingChallenge(challenge);
+      console.log('[Notifications] ➕ Challenge added to store from notification tap:', challengeId, 'Notification ID:', notificationIdentifier);
+      
+      // Format the data as MCQQuestion for the quiz
+      const mcqQuestion = {
+        id: parseInt(String(challengeId).slice(0, 8), 16) || 0,
+        question: String(question),
+        answers: Array.isArray(options) ? options.map((text: string, index: number) => ({
+          id: index,
+          text: String(text),
+        })) : [],
+        correctAnswerId: typeof correctAnswerIndex === 'number' ? correctAnswerIndex : 0,
+        explanation: String(explanation || ''),
+      };
+      
+      console.log('[Notifications] Routing to quiz for challenge:', challengeId);
+      
+      // Navigate to quiz screen with all required params
+      const params: Record<string, string> = {
+        skill: String(skillName || ''),
+        challengeId: String(challengeId),
+        data: JSON.stringify(mcqQuestion),
+      };
+      
+      // Include skillId if provided (needed for navigation back to assessment)
+      if (skillId) {
+        params.skillId = String(skillId);
+      }
+      
+      router.push({
+        pathname: '/(tabs)/(skills)/assessment/quiz',
+        params,
+      });
+    } else {
+      console.warn('[Notifications] Challenge notification missing required data:', data);
+    }
+  }
+  
   console.log('Notification data:', data);
 }
 

@@ -4,8 +4,8 @@ import { styles } from "./StatCard.styles";
 
 interface StatCardProps {
   label: string;
-  value: string;
-  subtitle: string;
+  value: string | React.ReactNode;
+  subtitle: string | React.ReactNode;
   subtitleColor?: string;
   iconName: React.ComponentProps<typeof MaterialIcons>["name"];
   iconColor: string;
@@ -29,15 +29,25 @@ const StatCard: React.FC<StatCardProps> = ({
       </View>
 
       <View style={styles.statContent}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text
-          style={[
-            styles.statSubtitle,
-            subtitleColor && { color: subtitleColor },
-          ]}
-        >
-          {subtitle}
-        </Text>
+        {typeof value === 'string' ? (
+          <Text style={styles.statValue}>{value}</Text>
+        ) : (
+          <View>{value}</View>
+        )}
+        {typeof subtitle === 'string' ? (
+          <Text
+            style={[
+              styles.statSubtitle,
+              subtitleColor && { color: subtitleColor },
+            ]}
+          >
+            {subtitle}
+          </Text>
+        ) : (
+          <View style={subtitleColor ? { marginTop: 2 } : undefined}>
+            {subtitle}
+          </View>
+        )}
       </View>
     </View>
   );

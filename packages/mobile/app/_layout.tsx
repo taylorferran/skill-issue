@@ -2,15 +2,30 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ClerkProvider, ClerkLoaded, useAuth } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
+import Constants from "expo-constants";
 import "react-native-reanimated";
 import { useEffect, useMemo } from "react";
 import { UserProvider } from "@/contexts/UserContext";
 import { QuizProvider } from "@/contexts/QuizContext";
+import { NavigationTitleProvider } from "@/contexts/NavigationTitleContext";
 import {
   configureNotificationHandler,
   setupNotificationListeners,
 } from "@/utils/notifications";
 import { ApiProvider } from "@/api/ApiProvider";
+import { NotificationBadgeOverlay } from "@/components/notification-badge-overlay/NotificationBadgeOverlay";
+
+// Get config values from expo-constants (baked in at build time via app.config.ts)
+const clerkPublishableKey = Constants.expoConfig?.extra?.clerkPublishableKey || '';
+const backendUrlFromConfig = Constants.expoConfig?.extra?.backendUrl || 'http://localhost:3000/api';
+
+// Log missing config on startup for debugging
+if (!clerkPublishableKey) {
+  console.error('[RootLayout] ❌ Missing Clerk publishable key! Check EAS environment variables.');
+}
+if (!backendUrlFromConfig || backendUrlFromConfig === 'http://localhost:3000/api') {
+  console.warn('[RootLayout] ⚠️ Backend URL not configured or using localhost fallback.');
+}
 
 const tokenCache = {
   async getToken(key: string) {
@@ -48,12 +63,14 @@ function RootLayoutContent() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={!isSignedIn}>
-        <Stack.Screen name="sign-in" />
-      </Stack.Protected>
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <NavigationTitleProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Protected guard={!isSignedIn}>
+          <Stack.Screen name="sign-in" />
+        </Stack.Protected>
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </NavigationTitleProvider>
   );
 }
 
@@ -61,18 +78,14 @@ export default function RootLayout() {
   // Memoize service URLs to prevent unnecessary re-renders in ApiProvider
   // Uses environment variable with fallback for local development
   const serviceUrls = useMemo(() => {
-    const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:3000/api';
+    const backendUrl = backendUrlFromConfig;
     console.log('[RootLayout] 🌐 Backend URL configured:', backendUrl);
-    console.log('[RootLayout] 📍 Environment variables:', {
-      EXPO_PUBLIC_BACKEND_URL: process.env.EXPO_PUBLIC_BACKEND_URL,
-      NODE_ENV: process.env.NODE_ENV
-    });
     return { backend: backendUrl };
   }, []);
 
   return (
     <ClerkProvider
-      publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY || ''}
+      publishableKey={clerkPublishableKey}
       tokenCache={tokenCache}
     >
       <ClerkLoaded>
@@ -81,6 +94,7 @@ export default function RootLayout() {
             <QuizProvider>
               <RootLayoutContent />
               <StatusBar style="auto" />
+              <NotificationBadgeOverlay />
             </QuizProvider>
           </UserProvider>
         </ApiProvider>

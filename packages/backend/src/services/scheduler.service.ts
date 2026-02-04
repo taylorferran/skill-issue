@@ -1,9 +1,11 @@
-import cron from 'node-cron';
-import { schedulingAgent } from '@/agents/agent1-scheduling';
-import { challengeDesignAgent } from '@/agents/agent2-challenge-design';
-import { getSupabase } from '@/lib/supabase';
-import { opikService } from '@/lib/opik';
-import type { SchedulingDecision } from '@/types';
+import cron from "node-cron";
+import { schedulingAgent } from "@/agents/agent1-scheduling";
+import { challengeDesignAgent } from "@/agents/agent2-challenge-design";
+import { getSupabase } from "@/lib/supabase";
+import { opikService } from "@/lib/opik";
+import type { SchedulingDecision } from "@/types";
+import { UserResponse } from "@supabase/supabase-js";
+import { pushNotificationService } from "./push-notification.service";
 
 /**
  * Scheduler Service
@@ -17,9 +19,9 @@ class SchedulerService {
    * Start the scheduler
    * Runs every 30 minutes by default
    */
-  start(cronExpression: string = '*/30 * * * *'): void {
+  start(cronExpression: string = "*/30 * * * *"): void {
     if (this.scheduledTask) {
-      console.warn('[Scheduler] Already running');
+      console.warn("[Scheduler] Already running");
       return;
     }
 
@@ -29,7 +31,7 @@ class SchedulerService {
       await this.runSchedulingTick();
     });
 
-    console.log('[Scheduler] Started successfully');
+    console.log("[Scheduler] Started successfully");
   }
 
   /**
@@ -39,7 +41,7 @@ class SchedulerService {
     if (this.scheduledTask) {
       this.scheduledTask.stop();
       this.scheduledTask = null;
-      console.log('[Scheduler] Stopped');
+      console.log("[Scheduler] Stopped");
     }
   }
 
@@ -48,23 +50,24 @@ class SchedulerService {
    * Can be called manually for testing
    */
   async runSchedulingTick(): Promise<void> {
-    console.log('[Scheduler] Tick started at', new Date().toISOString());
+    console.log("[Scheduler] Tick started at", new Date().toISOString());
 
     // Create a lightweight trace for the scheduling tick (orchestration only)
     const tickTraceId = await opikService.startTrace({
-      name: 'scheduling_tick',
+      name: "scheduling_tick",
       input: { timestamp: new Date().toISOString() },
-      tags: ['scheduler', 'orchestration'],
+      tags: ["scheduler", "orchestration"],
     });
 
     const challengeTraceIds: string[] = [];
 
     try {
       // Agent 1: Make scheduling decisions (may return multiple)
-      const decisions = await schedulingAgent.makeSchedulingDecisions(tickTraceId);
+      const decisions =
+        await schedulingAgent.makeSchedulingDecisions(tickTraceId);
 
       if (decisions.length === 0) {
-        console.log('[Scheduler] No challenges scheduled this tick');
+        console.log("[Scheduler] No challenges scheduled this tick");
         await opikService.endTrace({
           traceId: tickTraceId,
           output: { decisionsCount: 0, challengeTraceIds: [] },
@@ -72,7 +75,9 @@ class SchedulerService {
         return;
       }
 
-      console.log(`[Scheduler] Processing ${decisions.length} challenge(s) this tick`);
+      console.log(
+        `[Scheduler] Processing ${decisions.length} challenge(s) this tick`,
+      );
 
       // Process each decision - each creates its own trace
       for (const decision of decisions) {
@@ -82,19 +87,22 @@ class SchedulerService {
         }
       }
 
-      console.log('[Scheduler] Tick completed successfully');
+      console.log("[Scheduler] Tick completed successfully");
       await opikService.endTrace({
         traceId: tickTraceId,
         output: {
           decisionsCount: decisions.length,
           challengesCreated: challengeTraceIds.length,
           challengeTraceIds, // Links to individual challenge traces
-          users: decisions.map(d => d.userId),
+          users: decisions.map((d) => d.userId),
         },
       });
     } catch (error) {
-      console.error('[Scheduler] Tick error:', error);
-      await opikService.endTrace({ traceId: tickTraceId, error: error as Error });
+      console.error("[Scheduler] Tick error:", error);
+      await opikService.endTrace({
+        traceId: tickTraceId,
+        error: error as Error,
+      });
     }
   }
 
@@ -106,16 +114,23 @@ class SchedulerService {
    */
   private async processChallenge(
     decision: SchedulingDecision,
-    tickTraceId: string
+    tickTraceId: string,
   ): Promise<{ challengeId: string; traceId: string } | null> {
     try {
-      console.log(`[Scheduler] Processing challenge for user ${decision.userId}, skill ${decision.skillId}`);
+      console.log(
+        `[Scheduler] Processing challenge for user ${decision.userId}, skill ${decision.skillId}`,
+      );
 
       // Agent 2: Design challenge (creates its own trace, linked to tick)
-      const result = await challengeDesignAgent.designChallenge(decision, tickTraceId);
+      const result = await challengeDesignAgent.designChallenge(
+        decision,
+        tickTraceId,
+      );
 
       if (!result) {
-        console.error(`[Scheduler] Failed to design challenge for user ${decision.userId}`);
+        console.error(
+          `[Scheduler] Failed to design challenge for user ${decision.userId}`,
+        );
         return null;
       }
 
@@ -124,28 +139,52 @@ class SchedulerService {
       // Get skill info for logging
       const supabase = getSupabase();
       const { data: skill, error: skillError } = await supabase
-        .from('skills')
-        .select('name')
-        .eq('id', decision.skillId)
+        .from("skills")
+        .select("name")
+        .eq("id", decision.skillId)
         .single();
 
       if (skillError || !skill) {
-        console.error('[Scheduler] Skill not found');
+        console.error("[Scheduler] Skill not found");
         return { challengeId: challenge.id, traceId };
       }
 
       // For now, log that we would send a push notification
       // TODO: Implement actual push token retrieval and sending
       const skillData = skill as any;
-      console.log(`[Scheduler] Challenge ${challenge.id} created (trace: ${traceId})`);
+      console.log(
+        `[Scheduler] Challenge ${challenge.id} created (trace: ${traceId})`,
+      );
       console.log(`[Scheduler]   User: ${decision.userId}`);
       console.log(`[Scheduler]   Skill: ${skillData.name}`);
       console.log(`[Scheduler]   Difficulty: ${decision.difficultyTarget}`);
       console.log(`[Scheduler]   Would send push notification`);
 
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("device_id")
+        .eq("id", decision.userId)
+        .single();
+
+      const userData = user as any;
+      if (userError || !userData) {
+        console.error("[Scheduler] Could not fetch user device_id");
+      } else if (userData.device_id) {
+        // Send push notification
+          await pushNotificationService.sendChallengeNotification(
+            userData.device_id,
+            challenge,
+            skillData.name,
+          );
+        console.log('Pushed Notiifcation')
+      }
+
       return { challengeId: challenge.id, traceId };
     } catch (error) {
-      console.error(`[Scheduler] Error processing challenge for user ${decision.userId}:`, error);
+      console.error(
+        `[Scheduler] Error processing challenge for user ${decision.userId}:`,
+        error,
+      );
       return null;
     }
   }

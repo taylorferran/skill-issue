@@ -229,4 +229,34 @@ export const styles = StyleSheet.create({
   addSkillButtonDisabled: {
     opacity: 0.5,
   },
+
+  // ============= SEARCH INPUT =============
+  searchContainer: {
+    paddingHorizontal: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.md,
+  },
+  searchInputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.gray[200],
+    paddingHorizontal: Theme.spacing.md,
+    height: 44,
+  },
+  searchIcon: {
+    marginRight: Theme.spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.regular,
+    color: Theme.colors.text.primary,
+    height: "100%",
+  },
+  clearButton: {
+    padding: Theme.spacing.xs,
+    marginLeft: Theme.spacing.sm,
+  },
 });

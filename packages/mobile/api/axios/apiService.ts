@@ -5,7 +5,15 @@ import axios, {
   AxiosError,
   CreateAxiosDefaults,
 } from "axios";
+import Constants from "expo-constants";
 import { AuthHandlers } from "../types/apiTypes";
+
+// Get bearer token from expo-constants (baked in at build time via app.config.ts)
+const apiBearerToken = Constants.expoConfig?.extra?.apiBearerToken || "";
+
+if (!apiBearerToken) {
+  console.warn('[apiService] ⚠️ API bearer token not configured. Check EAS environment variables.');
+}
 
 const defaultConfig: CreateAxiosDefaults = {
   headers: {
@@ -26,8 +34,7 @@ export function createAuthenticatedApiClient(
   axiosInstance.interceptors.request.use(async (config) => {
     try {
       config.headers = config.headers || {};
-      const bearerToken = process.env.EXPO_PUBLIC_API_BEARER_TOKEN || "";
-      config.headers["Authorization"] = `Bearer ${bearerToken}`;
+      config.headers["Authorization"] = `Bearer ${apiBearerToken}`;
       console.log("[apiService] ✅ Authorization header added");
     } catch (error) {
       console.error("[apiService] ❌ Error getting access token:", error);
