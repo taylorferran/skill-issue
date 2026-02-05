@@ -2,9 +2,10 @@ import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { initSupabase } from '@/lib/supabase';
+import { initSupabase, getSupabase } from '@/lib/supabase';
 import { initOpik, opikService } from '@/lib/opik';
 import { schedulerService } from '@/services/scheduler.service';
+import { datasetGenerator } from '@/lib/dataset-generator';
 import apiRoutes from '@/api/routes';
 
 // Get __dirname equivalent in ES modules
@@ -115,6 +116,43 @@ app.use((req, res) => {
 });
 
 
+/**
+ * Check all skills and generate datasets for any that are missing.
+ * Runs in background to not block server startup.
+ */
+async function ensureDatasetsExist(): Promise<void> {
+  console.log('[Startup] Checking for skills without datasets...');
+
+  try {
+    const supabase = getSupabase();
+    const { data: skills, error } = await supabase
+      .from('skills')
+      .select('id, name, description')
+      .eq('active', true);
+
+    if (error || !skills) {
+      console.error('[Startup] Failed to fetch skills:', error);
+      return;
+    }
+
+    if (skills.length === 0) {
+      console.log('[Startup] No active skills found');
+      return;
+    }
+
+    const result = await datasetGenerator.ensureAllSkillsHaveDatasets(skills as any[]);
+
+    if (result.generated.length > 0) {
+      console.log(`[Startup] Generated datasets for: ${result.generated.join(', ')}`);
+    }
+    if (result.skipped.length > 0) {
+      console.log(`[Startup] Existing datasets for: ${result.skipped.join(', ')}`);
+    }
+  } catch (err) {
+    console.error('[Startup] Dataset check failed:', err);
+  }
+}
+
 async function start() {
   try {
     console.log('Starting Skill Issue Backend...\n');
@@ -134,6 +172,12 @@ async function start() {
     const cronExpression = process.env.SCHEDULER_CRON || '*/30 * * * *';
     schedulerService.start(cronExpression);
     console.log(`Scheduler started (${cronExpression})\n`);
+
+    // Check for missing datasets in background (don't block startup)
+    // Disabled for manual testing - uncomment to re-enable auto-generation
+    // ensureDatasetsExist().catch(err => {
+    //   console.error('[Startup] Background dataset check failed:', err);
+    // });
 
     // Start Express server
     app.listen(PORT, () => {
