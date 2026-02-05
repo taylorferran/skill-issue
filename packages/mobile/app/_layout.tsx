@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ClerkProvider, ClerkLoaded, useAuth } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
@@ -45,7 +45,24 @@ const tokenCache = {
 };
 
 function RootLayoutContent() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+  
+  // Handle authentication-based routing
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const inAuthGroup = segments[0] === "sign-in";
+
+    if (!isSignedIn && !inAuthGroup) {
+      // Redirect to sign-in if not authenticated
+      router.replace("/sign-in");
+    } else if (isSignedIn && inAuthGroup) {
+      // Redirect away from sign-in if already authenticated
+      router.replace("/");
+    }
+  }, [isSignedIn, isLoaded, segments, router]);
   
   // Notification permissions will be requested after successful sign-in
   // See sign-in.tsx for implementation
@@ -65,11 +82,11 @@ function RootLayoutContent() {
   return (
     <NavigationTitleProvider>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Protected guard={!isSignedIn}>
-          <Stack.Screen name="sign-in" />
-        </Stack.Protected>
+        <Stack.Screen name="sign-in" />
         <Stack.Screen name="(tabs)" />
       </Stack>
+      <StatusBar style="auto" />
+      <NotificationBadgeOverlay />
     </NavigationTitleProvider>
   );
 }
@@ -93,8 +110,6 @@ export default function RootLayout() {
           <UserProvider>
             <QuizProvider>
               <RootLayoutContent />
-              <StatusBar style="auto" />
-              <NotificationBadgeOverlay />
             </QuizProvider>
           </UserProvider>
         </ApiProvider>

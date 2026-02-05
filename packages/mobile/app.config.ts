@@ -1,18 +1,12 @@
 import { ExpoConfig } from 'expo/config';
-import * as fs from 'fs';
-import * as path from 'path';
 
-// Check if google-services.json exists locally
-const googleServicesPath = path.join(__dirname, 'google-services.json');
-const hasGoogleServices = fs.existsSync(googleServicesPath);
-
-const config: ExpoConfig = {
+const config = {
   name: "Skill Issue",
   slug: "skill-issue",
   version: "1.0.0",
   owner: "jmurphy786s-organization",
   orientation: "portrait",
-  icon: "./assets/images/diamond.png",
+  icon: "./assets/images/play_store.png",
   scheme: "mobile",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -27,14 +21,12 @@ const config: ExpoConfig = {
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
+    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
     package: "com.jmurphy.skillissue.mobile",
-    ...(hasGoogleServices && {
-      googleServicesFile: "./google-services.json"
-    })
   },
   web: {
     output: "static",
-    favicon: "./assets/images/diamond.png"
+    favicon: "./assets/images/play_store.png",
   },
   plugins: [
     "expo-router",
@@ -42,12 +34,12 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/diamond.png",
+        image: "./assets/images/play_store.png",
         imageWidth: 200,
         resizeMode: "contain",
         backgroundColor: "#ffffff",
         dark: {
-          image: "./assets/images/diamond.png",
+          image: "./assets/images/play_store.png",
           backgroundColor: "#ffffff"
         }
       }
@@ -59,7 +51,7 @@ const config: ExpoConfig = {
         defaultChannel: "default"
       }
     ]
-  ],
+  ] as const,
   experiments: {
     typedRoutes: true,
     reactCompiler: true
@@ -74,6 +66,6 @@ const config: ExpoConfig = {
     backendUrl: process.env.BACKEND_URL,
     apiBearerToken: process.env.API_BEARER_TOKEN,
   }
-};
+} satisfies ExpoConfig;
 
 export default config;

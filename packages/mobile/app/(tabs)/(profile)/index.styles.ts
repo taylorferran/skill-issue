@@ -326,4 +326,71 @@ export const styles = StyleSheet.create({
     ...createTextStyle("base", "bold", "inverse"),
   },
 
+  // Account Settings
+  accountSettingsCard: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
+    overflow: "hidden",
+    ...Theme.shadows.card,
+  },
+  accountSettingsCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.lg,
+  },
+  accountSettingsCardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.lg,
+    flex: 1,
+    flexShrink: 1,
+  },
+  accountSettingsIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  accountSettingsCardHeaderText: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  accountSettingsCardTitle: {
+    ...createTextStyle("base", "bold", "primary"),
+  },
+  accountSettingsCardSubtitle: {
+    ...createTextStyle("xs", "regular", "secondary"),
+    marginTop: Theme.spacing.xs / 2,
+  },
+  accountSettingsCardDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.primary.light,
+    marginHorizontal: Theme.spacing.lg,
+  },
+  accountSettingsCardContent: {
+    padding: Theme.spacing.lg,
+  },
+  pickerContainer: {
+    backgroundColor: Theme.colors.primary.main,
+    borderRadius: Theme.borderRadius.lg,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.main,
+  },
+  picker: {
+    height: 52,
+    color: Theme.colors.text.inverse,
+    fontSize: Theme.typography.fontSize.sm,
+  },
+  pickerItem: {
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.medium,
+    color: Theme.colors.text.inverse,
+    height: 52,
+  },
+
 });

@@ -76,7 +76,7 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
           disabled={disabled}
           trackColor={{
             false: Theme.colors.gray[200],
-            true: Theme.colors.success.light,
+            true: Theme.colors.primary.main,
           }}
           thumbColor={Theme.colors.background.secondary}
           ios_backgroundColor={Theme.colors.gray[200]}

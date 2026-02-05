@@ -25,6 +25,7 @@ import * as Localization from "expo-localization";
 import { useCreateUser } from "@/api-routes/createUser";
 import { useUpdateUser } from "@/api-routes/updateUser";
 import { useTriggerSchedulerTick } from "@/api-routes/triggerSchedulerTick";
+import { Picker } from "@react-native-picker/picker";
 
 import type { CreateUserRequest } from "@learning-platform/shared";
 import { styles } from "./index.styles";
@@ -53,6 +54,30 @@ export default function ProfileScreen() {
   const quietHoursDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const QUIET_HOURS_DEBOUNCE_MS = 1000; // 1 second debounce
 
+  // Account settings state
+  const [timezone, setTimezone] = useState(Localization.getCalendars()[0]?.timeZone || "UTC");
+  const [maxChallengesPerDay, setMaxChallengesPerDay] = useState(5);
+
+  // Debounce ref for account settings API calls
+  const accountSettingsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ACCOUNT_SETTINGS_DEBOUNCE_MS = 1000; // 1 second debounce
+
+  // Timezone options
+  const timezoneOptions = [
+    { label: "UTC", value: "UTC" },
+    { label: "Eastern Time", value: "America/New_York" },
+    { label: "London", value: "Europe/London" },
+    { label: "Tokyo", value: "Asia/Tokyo" },
+  ];
+
+  // Max challenges options (increments of 5 up to 20)
+  const maxChallengesOptions = [
+    { label: "5 challenges", value: 5 },
+    { label: "10 challenges", value: 10 },
+    { label: "15 challenges", value: 15 },
+    { label: "20 challenges", value: 20 },
+  ];
+
   // Check current notification permission status when screen comes into focus
   // This ensures the toggle updates when user returns from system settings
   useFocusEffect(
@@ -78,6 +103,23 @@ export default function ProfileScreen() {
         }
       };
       loadQuietHours();
+
+      // Load account settings
+      const loadAccountSettings = async () => {
+        try {
+          const savedTimezone = await AsyncStorage.getItem("@account_settings_timezone");
+          const savedMaxChallenges = await AsyncStorage.getItem("@account_settings_max_challenges");
+          if (savedTimezone) {
+            setTimezone(savedTimezone);
+          }
+          if (savedMaxChallenges) {
+            setMaxChallengesPerDay(parseInt(savedMaxChallenges, 10));
+          }
+        } catch (error) {
+          console.error("[Profile] Error loading account settings:", error);
+        }
+      };
+      loadAccountSettings();
     }, [setPermissionStatus])
   );
 
@@ -135,6 +177,49 @@ export default function ProfileScreen() {
       syncQuietHoursToBackend(enabled, start, end);
     }, QUIET_HOURS_DEBOUNCE_MS);
   }, [userId, updateUserApi, syncQuietHoursToBackend]);
+
+  // Sync account settings to backend API
+  const syncAccountSettingsToBackend = useCallback(async (newTimezone: string, newMaxChallenges: number) => {
+    if (!userId) {
+      console.log("[Profile] ⚠️ Cannot sync account settings - no userId available");
+      return;
+    }
+
+    try {
+      const updatePayload = {
+        userId,
+        timezone: newTimezone,
+        maxChallengesPerDay: newMaxChallenges,
+      };
+
+      console.log("[Profile] 📤 Syncing account settings to backend:", updatePayload);
+      await updateUserApi(updatePayload);
+      console.log("[Profile] ✅ Account settings synced successfully");
+    } catch (error) {
+      console.error("[Profile] ❌ Failed to sync account settings:", error);
+    }
+  }, [userId, updateUserApi]);
+
+  // Save account settings with debounced API sync
+  const saveAccountSettings = useCallback((newTimezone: string, newMaxChallenges: number) => {
+    // Save to local storage immediately
+    AsyncStorage.setItem("@account_settings_timezone", newTimezone).catch((error) => {
+      console.error("[Profile] Error saving timezone to storage:", error);
+    });
+    AsyncStorage.setItem("@account_settings_max_challenges", newMaxChallenges.toString()).catch((error) => {
+      console.error("[Profile] Error saving max challenges to storage:", error);
+    });
+
+    // Clear any pending debounced call
+    if (accountSettingsDebounceRef.current) {
+      clearTimeout(accountSettingsDebounceRef.current);
+    }
+
+    // Debounce the API call
+    accountSettingsDebounceRef.current = setTimeout(() => {
+      syncAccountSettingsToBackend(newTimezone, newMaxChallenges);
+    }, ACCOUNT_SETTINGS_DEBOUNCE_MS);
+  }, [syncAccountSettingsToBackend]);
 
   // Format time for display (24h to 12h format)
   const formatTime = (hour: number) => {
@@ -452,7 +537,7 @@ export default function ProfileScreen() {
                 }}
                 trackColor={{
                   false: Theme.colors.gray[200],
-                  true: Theme.colors.success.light,
+                  true: Theme.colors.primary.main,
                 }}
                 thumbColor={Theme.colors.background.secondary}
                 ios_backgroundColor={Theme.colors.gray[200]}
@@ -558,6 +643,83 @@ export default function ProfileScreen() {
               </View>
             </View>
           )}
+        </View>
+      </View>
+
+      {/* Account Settings Section */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>ACCOUNT SETTINGS</Text>
+
+        {/* Timezone Setting Card */}
+        <View style={styles.accountSettingsCard}>
+          <View style={styles.accountSettingsCardHeader}>
+            <View style={styles.accountSettingsCardHeaderLeft}>
+              <View style={[styles.accountSettingsIconContainer, { backgroundColor: Theme.colors.primary.medium }]}>
+                <Ionicons name="globe-outline" size={Theme.iconSize.md} color={Theme.colors.primary.main} />
+              </View>
+              <View style={styles.accountSettingsCardHeaderText}>
+                <Text style={styles.accountSettingsCardTitle}>Timezone</Text>
+                <Text style={styles.accountSettingsCardSubtitle}>Set your local timezone</Text>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.accountSettingsCardDivider} />
+          
+          <View style={styles.accountSettingsCardContent}>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={timezone}
+                onValueChange={(itemValue) => {
+                  setTimezone(itemValue);
+                  saveAccountSettings(itemValue, maxChallengesPerDay);
+                }}
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+                mode="dropdown"
+              >
+                {timezoneOptions.map((option) => (
+                  <Picker.Item key={option.value} label={option.label} value={option.value} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        </View>
+
+        {/* Max Challenges Per Day Setting Card */}
+        <View style={[styles.accountSettingsCard, { marginTop: Theme.spacing.md }]}>
+          <View style={styles.accountSettingsCardHeader}>
+            <View style={styles.accountSettingsCardHeaderLeft}>
+              <View style={[styles.accountSettingsIconContainer, { backgroundColor: Theme.colors.primary.medium }]}>
+                <Ionicons name="trophy-outline" size={Theme.iconSize.md} color={Theme.colors.primary.main} />
+              </View>
+              <View style={styles.accountSettingsCardHeaderText}>
+                <Text style={styles.accountSettingsCardTitle}>Daily Challenge Limit</Text>
+                <Text style={styles.accountSettingsCardSubtitle}>Maximum challenges per day</Text>
+              </View>
+            </View>
+          </View>
+          
+          <View style={styles.accountSettingsCardDivider} />
+          
+          <View style={styles.accountSettingsCardContent}>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={maxChallengesPerDay}
+                onValueChange={(itemValue) => {
+                  setMaxChallengesPerDay(itemValue);
+                  saveAccountSettings(timezone, itemValue);
+                }}
+                style={styles.picker}
+                itemStyle={styles.pickerItem}
+                mode="dropdown"
+              >
+                {maxChallengesOptions.map((option) => (
+                  <Picker.Item key={option.value} label={option.label} value={option.value} />
+                ))}
+              </Picker>
+            </View>
+          </View>
         </View>
       </View>
 

@@ -11,9 +11,11 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import { SkillCard } from "@/components/skill-card/SkillCard";
 import { StatsCard } from "@/components/stats-card/StatsCard";
 import { navigateTo } from "@/navigation/navigation";
+import { router } from "expo-router";
 import { styles } from "./_index.styles";
 import { spacing } from "@/theme/ThemeUtils";
 import { Theme } from "@/theme/Theme";
@@ -153,6 +155,14 @@ export default function SkillSelectScreen() {
       setSearchQuery("");
     }, [userId])
   );
+
+  // Reset navigation title when skills screen comes into focus
+  const { setTitle } = useNavigationTitle();
+  useFocusEffect(
+    useCallback(() => {
+      setTitle(null);
+    }, [setTitle])
+  );
   
   const refreshSkills = async () => {
     if (!userId) return;
@@ -190,7 +200,7 @@ export default function SkillSelectScreen() {
       // Don't show error on background refresh
     }
   };
-  
+
   // Handle skill selection (navigate to assessment)
   const handleSkillSelect = (skill: GetUserSkillsResponse[number]) => {
     navigateTo("assessment", {
@@ -440,13 +450,27 @@ export default function SkillSelectScreen() {
           {/* New Skills View */}
           {selectedSegment === "New Skills" && (
             <>
-              {/* Section Header */}
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Discover Skills</Text>
-                <View style={styles.sortBadge}>
-                  <Text style={styles.sortBadgeText}>RECOMMENDED</Text>
+              {/* Create New Skill Button */}
+              <TouchableOpacity
+                style={styles.createSkillButton}
+                onPress={() => router.push("/(tabs)/(skills)/create")}
+                activeOpacity={0.7}
+              >
+                <View style={styles.createSkillIconContainer}>
+                  <Ionicons name="add" size={20} color="#ffffff" />
                 </View>
-              </View>
+                <View style={styles.createSkillTextContainer}>
+                  <Text style={styles.createSkillTitle}>Create New Skill</Text>
+                  <Text style={styles.createSkillSubtitle}>
+                    Can&apos;t find what you&apos;re looking for? Create your own
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={Theme.colors.text.secondary}
+                />
+              </TouchableOpacity>
 
               {/* Search Input */}
               <View style={styles.searchContainer}>
@@ -529,6 +553,8 @@ export default function SkillSelectScreen() {
             </>
           )}
         </ScrollView>
+
+
       </View>
     </SafeAreaView>
   );

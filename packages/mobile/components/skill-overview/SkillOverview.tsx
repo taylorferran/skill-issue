@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import SkillLevelRating from "../skill-level-rating/SkillLevelRating";
 import { styles } from "./SkillsOverview.styles";
 import StatCard from "../stat-card/StatCard";
 import CircularProgress from "../circular-progress/CircularProgress";
@@ -22,11 +21,8 @@ interface SkillOverviewProps {
   // Whether user needs to rate (determined by parent)
   needsRating: boolean;
 
-  // Callback when user submits rating
-  onRatingSubmit: (rating: number) => void;
-
-  // Loading state for enrollment
-  isEnrolling?: boolean;
+  // Callback when user starts calibration
+  onStartCalibration: () => void;
 
   // Pending challenges from backend
   pendingChallenges: Challenge[];
@@ -44,8 +40,7 @@ interface SkillOverviewProps {
 const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
   skillData,
   needsRating,
-  onRatingSubmit,
-  isEnrolling = false,
+  onStartCalibration,
   pendingChallenges,
   onChallengeSelect,
   skillName,
@@ -139,13 +134,25 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Show rating component if user needs to set level */}
+        {/* Show calibration card if user needs to set level */}
         {needsRating && (
-          <SkillLevelRating 
-            skillName={skillName}
-            onRatingSubmit={onRatingSubmit}
-            isSubmitting={isEnrolling}
-          />
+          <View style={styles.calibrationCard}>
+            <View style={styles.calibrationHeader}>
+              <MaterialIcons name="psychology" size={24} color={Theme.colors.primary.main} />
+              <Text style={styles.calibrationTitle}>Skill Calibration</Text>
+            </View>
+            <Text style={styles.calibrationDescription}>
+              Complete a 10-question assessment to determine your starting difficulty level for {skillName}.
+            </Text>
+            <TouchableOpacity 
+              style={styles.startCalibrationButton}
+              onPress={onStartCalibration}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.startCalibrationButtonText}>Start Calibration</Text>
+              <MaterialIcons name="arrow-forward" size={20} color={Theme.colors.text.inverse} />
+            </TouchableOpacity>
+          </View>
         )}
         
         {/* Stats Grid - Row 1: Hot Streak + Answered */}

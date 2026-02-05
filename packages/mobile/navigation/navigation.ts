@@ -36,6 +36,13 @@ const pages = {
       challengeId: z.string().uuid(),
     }),
   },
+  calibration: {
+    path: "/(tabs)/(skills)/assessment/calibration" as const,
+    params: z.object({
+      skill: z.string(),
+      skillId: z.string().uuid(),
+    }),
+  },
   
   // Profile Tab Route
   profile: {

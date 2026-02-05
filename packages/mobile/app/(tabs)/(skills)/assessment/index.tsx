@@ -5,23 +5,28 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } fr
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { styles } from "./_index.styles";
 import SkillOverviewScreen from "@/components/skill-overview/SkillOverview";
-import SkillLevelRating from "@/components/skill-level-rating/SkillLevelRating";
 import { challengeToMCQQuestion, type Challenge } from "@/types/Quiz";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useGetUserSkills } from "@/api-routes/getUserSkills";
 import { useGetPendingChallenges } from "@/api-routes/getPendingChallenges";
 import { useGetChallengeHistory } from "@/api-routes/getChallengeHistory";
 import { useGetChallenge } from "@/api-routes/getChallenge";
-import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useUser } from "@/contexts/UserContext";
 import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import { useSkillsStore } from "@/stores/skillsStore";
 import type { GetChallengeHistoryResponse } from "@learning-platform/shared";
-import { hasAssessedSkill, markSkillAssessed } from "@/utils/assessmentStorage";
+import { hasAssessedSkill } from "@/utils/assessmentStorage";
 import { ChallengeHistoryCard } from "@/components/challenge-history-card/ChallengeHistoryCard";
 import { notificationEventEmitter } from "@/utils/notificationEvents";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const CHALLENGES_PER_PAGE = 10;
+
+// Helper to truncate title text to max characters with ellipsis
+const truncateTitle = (text: string, maxLength: number = 20): string => {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + '...';
+};
 
 // Helper to check if two arrays are deeply equal (for preventing unnecessary updates)
 function isArrayEqual<T>(a: T[] | null | undefined, b: T[] | null | undefined): boolean {
@@ -44,9 +49,9 @@ const ReviewHistoryScreen = () => {
   // Track if this is the first mount (for animation control)
   const isFirstMount = useRef(true);
 
-  // Set header title to skill name
+  // Set header title to skill name (truncated to prevent overflow)
   useEffect(() => {
-    setTitle(skill);
+    setTitle(truncateTitle(skill));
     return () => setTitle(null);
   }, [skill, setTitle]);
 
@@ -76,7 +81,6 @@ const ReviewHistoryScreen = () => {
     data: challengeHistoryData, 
     isFetching: isFetchingHistory 
   } = useGetChallengeHistory({ clearDataOnCall: false });
-  const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
   const { execute: fetchChallenge } = useGetChallenge();
 
   // UI state
@@ -358,49 +362,14 @@ const ReviewHistoryScreen = () => {
     setExpandedChallengeId(prev => prev === answerId ? null : answerId);
   };
 
-  // Handler when user submits difficulty rating
-  const handleRatingSubmit = async (rating: number) => {
-    if (!userId || !skillId) {
-      Alert.alert('Error', 'Missing user or skill information');
+  // Handler to start calibration quiz
+  const handleStartCalibration = () => {
+    if (!skill || !skillId) {
+      Alert.alert('Error', 'Missing skill information');
       return;
     }
 
-    try {
-      console.log('[Assessment] 📝 Enrolling in skill with difficulty:', rating);
-
-      // Mark as assessed locally (optimistic update)
-      await markSkillAssessed(skillId, rating);
-      setHasLocalAssessment(true);
-
-      // Enroll in skill
-      await enrollSkill({ userId, skillId, difficultyTarget: rating });
-
-      // Refetch all data
-      const [updatedSkills] = await Promise.all([
-        fetchUserSkills({ userId }),
-        fetchPendingChallenges({ userId })
-      ]);
-
-      setUserSkills(updatedSkills);
-
-      Alert.alert(
-        'Enrollment Complete!',
-        `You're now learning ${skill} at level ${rating}. View your progress in the Overview tab.`,
-        [
-          { 
-            text: 'View Overview',
-            onPress: () => setSelectedSegment('overview')
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('[Assessment] ❌ Enrollment failed:', error);
-      Alert.alert(
-        'Enrollment Failed',
-        'Your assessment was saved locally, but we could not sync with the server. Your progress will sync when connection is restored.',
-        [{ text: 'OK' }]
-      );
-    }
+    navigateTo('calibration', { skill, skillId });
   };
 
   // Handler when user selects a challenge
@@ -484,8 +453,7 @@ const ReviewHistoryScreen = () => {
         <SkillOverviewScreen 
           skillData={skillData}
           needsRating={needsRating}
-          onRatingSubmit={handleRatingSubmit}
-          isEnrolling={isEnrolling}
+          onStartCalibration={handleStartCalibration}
           pendingChallenges={pendingChallenges}
           onChallengeSelect={handleChallengeSelect}
           skillName={skill}
@@ -496,13 +464,25 @@ const ReviewHistoryScreen = () => {
       {/* Review Tab */}
       {selectedSegment === "review" && (
         <View style={styles.historyList}>
-          {/* Skill Level Rating - Only show if needs rating */}
+          {/* Start Calibration - Only show if needs rating */}
           {needsRating && (
-            <SkillLevelRating 
-              skillName={skill}
-              onRatingSubmit={handleRatingSubmit}
-              isSubmitting={isEnrolling}
-            />
+            <View style={styles.calibrationCard}>
+              <View style={styles.calibrationHeader}>
+                <MaterialIcons name="psychology" size={24} color={Theme.colors.primary.main} />
+                <Text style={styles.calibrationTitle}>Skill Calibration</Text>
+              </View>
+              <Text style={styles.calibrationDescription}>
+                Complete a 10-question assessment to determine your starting difficulty level for {skill}.
+              </Text>
+              <TouchableOpacity 
+                style={styles.startCalibrationButton}
+                onPress={handleStartCalibration}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.startCalibrationButtonText}>Start Calibration</Text>
+                <MaterialIcons name="arrow-forward" size={20} color={Theme.colors.text.inverse} />
+              </TouchableOpacity>
+            </View>
           )}
           
           {/* Challenge History Cards */}
@@ -524,7 +504,7 @@ const ReviewHistoryScreen = () => {
               ))}
               
               {/* Load More Button */}
-              {hasMoreHistory && (
+              {hasMoreHistory && displayHistory.length >= 10 && (
                 <TouchableOpacity
                   style={styles.loadMoreButton}
                   onPress={handleLoadMore}

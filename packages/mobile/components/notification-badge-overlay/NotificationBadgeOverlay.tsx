@@ -40,8 +40,9 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
   const { execute: fetchPendingChallenges } = useGetPendingChallenges({ clearDataOnCall: false });
   const { execute: fetchChallenge } = useGetChallenge();
 
-  // Hide notification bar on quiz pages
+  // Hide notification bar on quiz and calibration pages
   const isQuizPage = pathname?.includes('/assessment/quiz');
+  const isCalibrationPage = pathname?.includes('/assessment/calibration');
 
   // Calculate display values
   const count = pendingChallenges.length;
@@ -122,8 +123,8 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
     }
   }, [fetchChallenge]);
 
-  // Don't show notification button if user is not signed in or on quiz pages
-  if (!userId || isQuizPage) {
+  // Don't show notification button if user is not signed in or on quiz/calibration pages
+  if (!userId || isQuizPage || isCalibrationPage) {
     return null;
   }
 

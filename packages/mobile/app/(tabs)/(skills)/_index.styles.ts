@@ -259,4 +259,41 @@ export const styles = StyleSheet.create({
     padding: Theme.spacing.xs,
     marginLeft: Theme.spacing.sm,
   },
+
+  // ============= CREATE SKILL BUTTON =============
+  createSkillButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.card.border,
+    padding: Theme.spacing.md,
+    marginHorizontal: Theme.spacing.lg,
+    marginBottom: Theme.spacing.lg,
+    ...Theme.shadows.subtle,
+  },
+  createSkillIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: Theme.borderRadius.lg,
+    backgroundColor: Theme.colors.primary.main,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: Theme.spacing.md,
+  },
+  createSkillTextContainer: {
+    flex: 1,
+  },
+  createSkillTitle: {
+    fontSize: Theme.typography.fontSize.base,
+    fontWeight: Theme.typography.fontWeight.bold,
+    color: Theme.colors.text.primary,
+    marginBottom: Theme.spacing.xs,
+  },
+  createSkillSubtitle: {
+    fontSize: Theme.typography.fontSize.sm,
+    fontWeight: Theme.typography.fontWeight.regular,
+    color: Theme.colors.text.secondary,
+  },
 });
