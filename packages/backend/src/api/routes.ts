@@ -89,10 +89,11 @@ router.post('/answer', async (req: Request, res: Response) => {
       await opikService.createSpan({
         traceId,
         name: 'load_challenge',
-        type: 'general',
+        type: 'tool',
         input: { challengeId: body.challengeId },
         output: { found: false },
         durationMs: Date.now() - lookupStart,
+        metadata: { operation: 'select', table: 'challenges' },
       });
       await opikService.endTrace({ traceId, error: new Error('Challenge not found') });
       return res.status(404).json({ error: 'Challenge not found' });
@@ -109,10 +110,11 @@ router.post('/answer', async (req: Request, res: Response) => {
     await opikService.createSpan({
       traceId,
       name: 'load_challenge',
-      type: 'general',
+      type: 'tool',
       input: { challengeId: body.challengeId },
       output: { found: true, alreadyAnswered: !!existingAnswer },
       durationMs: Date.now() - lookupStart,
+      metadata: { operation: 'select', table: 'challenges' },
     });
 
     if (existingAnswer) {
@@ -150,10 +152,11 @@ router.post('/answer', async (req: Request, res: Response) => {
     await opikService.createSpan({
       traceId,
       name: 'store_answer',
-      type: 'general',
-      input: { challengeId: body.challengeId },
+      type: 'tool',
+      input: { challengeId: body.challengeId, userId: body.userId },
       output: { isCorrect },
       durationMs: Date.now() - storeStartTime,
+      metadata: { operation: 'insert', table: 'answers' },
     });
 
     // Track metrics with Opik — creates a span under the root trace

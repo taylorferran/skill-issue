@@ -411,11 +411,11 @@ class OpikService {
     }>;
   }): Promise<void> {
     if (params.traceId) {
-      // Create a general span under the existing trace
+      // Create a tool span under the existing trace (agents perform DB operations)
       const agentSpanId = await this.createSpan({
         traceId: params.traceId,
         name: `agent_${params.agentName}`,
-        type: 'general',
+        type: 'tool',
         input: params.input,
         output: params.output,
         metadata: { ...params.metadata, agent: params.agentName, success: params.success },

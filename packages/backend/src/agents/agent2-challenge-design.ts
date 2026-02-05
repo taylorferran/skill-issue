@@ -122,6 +122,7 @@ export class ChallengeDesignAgent {
           explanation: poolResult.poolQuestion.explanation,
         };
 
+        const poolDbStartTime = Date.now();
         const { data: challenge, error: insertError } = await supabase
           .from('challenges')
           // @ts-expect-error - Supabase type inference issue
@@ -133,19 +134,54 @@ export class ChallengeDesignAgent {
           throw new Error(`Failed to store pool challenge: ${insertError?.message}`);
         }
 
+        // Track challenge storage as tool span
+        await opikService.createSpan({
+          traceId,
+          name: 'db_store_challenge',
+          type: 'tool',
+          input: { table: 'challenges', challengeId, source: 'pool' },
+          output: { success: true },
+          durationMs: Date.now() - poolDbStartTime,
+          metadata: { operation: 'insert', poolId: poolResult.poolId },
+        });
+
         // Create push event
+        const poolPushStartTime = Date.now();
         await supabase
           .from('push_events')
           // @ts-expect-error - Supabase type inference issue
           .insert({ challenge_id: challenge.id, status: 'sent' });
 
+        // Track push event creation as tool span
+        await opikService.createSpan({
+          traceId,
+          name: 'db_create_push_event',
+          type: 'tool',
+          input: { table: 'push_events', challengeId: challenge.id },
+          output: { success: true, status: 'sent' },
+          durationMs: Date.now() - poolPushStartTime,
+          metadata: { operation: 'insert' },
+        });
+
         // Update user_skill_state last_challenged_at
+        const poolUpdateStartTime = Date.now();
         await supabase
           .from('user_skill_state')
           // @ts-expect-error - Supabase type inference issue
           .update({ last_challenged_at: new Date().toISOString() })
           .eq('user_id', decision.userId)
           .eq('skill_id', decision.skillId);
+
+        // Track last_challenged_at update as tool span
+        await opikService.createSpan({
+          traceId,
+          name: 'db_update_last_challenged',
+          type: 'tool',
+          input: { table: 'user_skill_state', userId: decision.userId, skillId: decision.skillId },
+          output: { success: true, updated: 'last_challenged_at' },
+          durationMs: Date.now() - poolUpdateStartTime,
+          metadata: { operation: 'update' },
+        });
 
         // Track pool usage in Opik
         await opikService.createSpan({
@@ -315,11 +351,11 @@ export class ChallengeDesignAgent {
         // Validate challenge
         const validation = this.validateChallenge(challenge);
 
-        // Track validation step as a span with attempt number
+        // Track validation step as a guardrail span
         const validationSpanId = await opikService.createSpan({
           traceId,
           name: 'validate_challenge',
-          type: 'general',
+          type: 'guardrail',
           input: { question: challenge.question, optionCount: challenge.options?.length },
           output: { isValid: validation.isValid, errors: validation.errors },
           metadata: { qualityAttempt },
@@ -550,6 +586,7 @@ export class ChallengeDesignAgent {
         explanation: finalChallenge.explanation,
       };
 
+      const dbStartTime = Date.now();
       const { data: challenge, error: insertError } = await supabase
         .from('challenges')
         // @ts-expect-error - Supabase type inference issue with Insert types
@@ -561,6 +598,17 @@ export class ChallengeDesignAgent {
         throw new Error(`Failed to store challenge: ${insertError?.message}`);
       }
 
+      // Track challenge storage as tool span
+      await opikService.createSpan({
+        traceId,
+        name: 'db_store_challenge',
+        type: 'tool',
+        input: { table: 'challenges', challengeId },
+        output: { success: true },
+        durationMs: Date.now() - dbStartTime,
+        metadata: { operation: 'insert' },
+      });
+
       console.log(`[Agent 2] Challenge created: ${challenge.id}`);
 
       // Create push event record
@@ -569,12 +617,25 @@ export class ChallengeDesignAgent {
         status: 'sent',
       };
 
+      const pushStartTime = Date.now();
       await supabase
         .from('push_events')
         // @ts-expect-error - Supabase type inference issue with Insert types
         .insert(pushEventData);
 
+      // Track push event creation as tool span
+      await opikService.createSpan({
+        traceId,
+        name: 'db_create_push_event',
+        type: 'tool',
+        input: { table: 'push_events', challengeId: challenge.id },
+        output: { success: true, status: 'sent' },
+        durationMs: Date.now() - pushStartTime,
+        metadata: { operation: 'insert' },
+      });
+
       // Update user_skill_state last_challenged_at
+      const updateStartTime = Date.now();
       await supabase
         .from('user_skill_state')
         // @ts-expect-error - Supabase type inference issue
@@ -583,6 +644,17 @@ export class ChallengeDesignAgent {
         })
         .eq('user_id', decision.userId)
         .eq('skill_id', decision.skillId);
+
+      // Track last_challenged_at update as tool span
+      await opikService.createSpan({
+        traceId,
+        name: 'db_update_last_challenged',
+        type: 'tool',
+        input: { table: 'user_skill_state', userId: decision.userId, skillId: decision.skillId },
+        output: { success: true, updated: 'last_challenged_at' },
+        durationMs: Date.now() - updateStartTime,
+        metadata: { operation: 'update' },
+      });
 
       // End trace with success
       await opikService.endTrace({
