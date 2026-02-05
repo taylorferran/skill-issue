@@ -1,0 +1,17 @@
+{
+  "prompts": {
+    "34e55db2-0265-4a2c-b9af-d26d88e62692": {
+      "prompt": "You are generating a multiple-choice challenge to test knowledge and competence.\n\nSKILL: {{skill_name}}\nDESCRIPTION: {{skill_description}}\nDIFFICULTY LEVEL: {{difficulty}}/10\n\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\n\nRULES:\n- Difficulty {{difficulty}} means: {{difficulty_description}}\n- Question must be answerable in under 30 seconds\n- 4 options, only 1 correct\n- Randomly shuffle the order of correct answer among the options\n- Don't repeat questions you've generated before - each challenge must be unique try to make it unique\n- Distractors should be plausible but clearly wrong to someone who knows the subject\n- Include a brief explanation of why the answer is correct\n- Tailor the question specifically to the skill described above\n- Make sure the correct answer is not ambiguous or debatable\n\nBREVITY REQUIREMENTS (CRITICAL):\n- Question: 15-25 words maximum, no unnecessary words\n- Options: 3-8 words each, direct answers only\n- Explanation: 20-30 words maximum, concise reasoning\n- Avoid: storytelling, excessive context, verbose setups, filler words\n- Focus: Test the concept directly and efficiently\n\nExamples of good brevity:\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\n\n\u2713 \"What is the capital of France?\"\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\n\nOUTPUT FORMAT (strict JSON):\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": {{difficulty}}\n}\n\nGenerate the challenge now:\n",
+      "baseline_score": 0.8172500000000001,
+      "best_score": 0.818,
+      "improvement": 0.0007499999999998064,
+      "improvement_percent": 0.09177118384824794,
+      "refinements": 5,
+      "optimized_at": "2026-02-05T08:50:40.825529"
+    }
+  },
+  "metadata": {
+    "created_at": "2026-02-05T08:33:51.565113",
+    "last_updated": "2026-02-05T08:50:40.825538"
+  }
+}

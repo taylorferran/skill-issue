@@ -17,7 +17,7 @@ from anthropic import Anthropic
 
 from config import (
     ANTHROPIC_API_KEY,
-    JUDGE_MODEL,
+    JUDGE_MODEL_ANTHROPIC,
     EVALUATION_WEIGHTS,
     QUALITY_THRESHOLD,
 )
@@ -102,7 +102,7 @@ class ChallengeEvaluator:
 
         try:
             message = self.client.messages.create(
-                model=JUDGE_MODEL,
+                model=JUDGE_MODEL_ANTHROPIC,
                 max_tokens=1024,
                 temperature=0.3,  # Lower temperature for consistent evaluation
                 messages=[{"role": "user", "content": prompt}],

@@ -20,10 +20,13 @@ if not env_path.exists():
 OPIK_API_KEY = os.getenv("OPIK_API_KEY")
 OPIK_WORKSPACE = os.getenv("OPIK_WORKSPACE")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # Used by optimizer for reasoning
 
-# Model configuration (matches TypeScript backend)
-CHALLENGE_MODEL = "claude-haiku-4-5-20251001"
-JUDGE_MODEL = "claude-haiku-4-5-20251001"
+# Model configuration
+# LiteLLM format (with anthropic/ prefix) - used by opik-optimizer
+CHALLENGE_MODEL_LITELLM = "anthropic/claude-haiku-4-5-20251001"
+# Direct Anthropic SDK format (no prefix) - used by evaluator
+JUDGE_MODEL_ANTHROPIC = "claude-haiku-4-5-20251001"
 
 # Evaluation weights (must match TypeScript config/evaluation.ts)
 EVALUATION_WEIGHTS = {
@@ -36,6 +39,9 @@ EVALUATION_WEIGHTS = {
 
 # Quality threshold
 QUALITY_THRESHOLD = 0.7
+
+# Opik project name (must match TypeScript backend)
+OPIK_PROJECT_NAME = "skill-issue"
 
 # Paths
 PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -53,6 +59,8 @@ def validate_config():
         missing.append("OPIK_WORKSPACE")
     if not ANTHROPIC_API_KEY:
         missing.append("ANTHROPIC_API_KEY")
+    if not OPENAI_API_KEY:
+        missing.append("OPENAI_API_KEY (needed for optimizer reasoning model)")
 
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")

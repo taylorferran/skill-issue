@@ -25,11 +25,11 @@ BREVITY REQUIREMENTS (CRITICAL):
 - Focus: Test the concept directly and efficiently
 
 Examples of good brevity:
-"Which sorting algorithm has O(n log n) average time complexity?"
-NOT: "When implementing a search on a large dataset, which algorithm would be best?"
+✓ "Which sorting algorithm has O(n log n) average time complexity?"
+✗ "When implementing a search on a large dataset, which algorithm would be best?"
 
-"What is the capital of France?"
-NOT: "If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?"
+✓ "What is the capital of France?"
+✗ "If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?"
 
 OUTPUT FORMAT (strict JSON):
 {

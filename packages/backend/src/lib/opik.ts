@@ -73,8 +73,16 @@ interface TraceContext {
   creationPromise?: Promise<void>;  // Wait for trace to be created before updating
 }
 
+interface SpanContext {
+  spanId: string;
+  creationPromise: Promise<void>;  // Wait for span to be created before adding feedback
+}
+
 // Active trace contexts (for nested span support)
 const activeTraces = new Map<string, TraceContext>();
+
+// Active span contexts (for feedback score support)
+const activeSpans = new Map<string, SpanContext>();
 
 class OpikService {
   private apiKey: string | null = null;
@@ -354,16 +362,26 @@ class OpikService {
 
     // Get the trace context to wait for trace creation
     const traceContext = activeTraces.get(params.traceId);
-    const creationPromise = traceContext?.creationPromise;
+    const traceCreationPromise = traceContext?.creationPromise;
 
     // Wait for trace creation before creating span
-    const promise = (async () => {
-      if (creationPromise) {
-        await creationPromise;
+    const spanCreationPromise = (async () => {
+      try {
+        if (traceCreationPromise) {
+          await traceCreationPromise;
+        }
+        await this.request('POST', '/spans/batch', { spans: [spanData] });
+      } catch (error) {
+        console.error(`[Opik] Span creation failed for ${spanId}:`, error);
       }
-      await this.request('POST', '/spans/batch', { spans: [spanData] });
     })();
-    this.pendingRequests.push(promise);
+    this.pendingRequests.push(spanCreationPromise);
+
+    // Track span creation promise so feedback can wait for it
+    activeSpans.set(spanId, {
+      spanId,
+      creationPromise: spanCreationPromise,
+    });
 
     return spanId;
   }
@@ -958,6 +976,90 @@ class OpikService {
     const promises = scores.map((score) =>
       this.addFeedbackScore({
         traceId,
+        name: score.name,
+        value: score.value,
+        source,
+        reason: score.reason,
+      })
+    );
+
+    await Promise.all(promises);
+  }
+
+  /**
+   * Add a feedback score to a span
+   * Useful for attaching evaluation scores directly to LLM call spans
+   */
+  async addSpanFeedbackScore(params: {
+    spanId: string;
+    name: string;
+    value: number; // 0-1
+    source: 'ui' | 'sdk' | 'online_scoring';
+    reason?: string;
+  }): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(
+        `[Opik] Span Feedback: ${params.name}=${params.value} for span ${params.spanId}`
+      );
+      return;
+    }
+
+    const feedbackData = {
+      name: params.name,
+      value: params.value,
+      source: params.source,
+      reason: params.reason,
+    };
+
+    // Get span context to wait for span creation
+    const spanContext = activeSpans.get(params.spanId);
+    const spanCreationPromise = spanContext?.creationPromise;
+
+    const promise = (async () => {
+      try {
+        // Wait for span to be created before adding feedback
+        if (spanCreationPromise) {
+          await spanCreationPromise;
+        }
+        await this.request(
+          'PUT',
+          `/spans/${params.spanId}/feedback-scores`,
+          feedbackData
+        );
+      } catch (error) {
+        console.error(`[Opik] Span feedback failed for ${params.spanId}:`, error);
+      }
+    })();
+    this.pendingRequests.push(promise);
+  }
+
+  /**
+   * Add multiple feedback scores to a span at once.
+   * Convenience method for attaching LLM-as-Judge scores to evaluation spans.
+   */
+  async addSpanFeedbackScores(
+    spanId: string,
+    scores: Array<{
+      name: string;
+      value: number;
+      reason?: string;
+    }>,
+    source: 'ui' | 'sdk' | 'online_scoring' = 'online_scoring'
+  ): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(
+        `[Opik] Batch span feedback: ${scores.length} scores for span ${spanId}`
+      );
+      for (const score of scores) {
+        console.log(`  - ${score.name}=${score.value.toFixed(2)}`);
+      }
+      return;
+    }
+
+    // Add all scores in parallel
+    const promises = scores.map((score) =>
+      this.addSpanFeedbackScore({
+        spanId,
         name: score.name,
         value: score.value,
         source,
