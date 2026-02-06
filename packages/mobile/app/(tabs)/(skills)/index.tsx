@@ -36,6 +36,8 @@ import {
   SkillSortDropdown,
   type SortOption,
 } from "@/components/skill-sort-dropdown/SkillSortDropdown";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { requestNotificationPermissions } from "@/utils/notifications";
 
 export default function SkillSelectScreen() {
   // Read tab parameter from navigation
@@ -52,7 +54,15 @@ export default function SkillSelectScreen() {
   const queryClient = useQueryClient();
 
   // Get userId from UserContext
-  const { userId } = useUser();
+  const { userId, user, updateLocalUserData } = useUser();
+
+  // Notification store
+  const { 
+    hasPromptedUser, 
+    setHasPromptedUser, 
+    setExpoPushToken,
+    permissionStatus 
+  } = useNotificationStore();
 
   // TanStack Query for user skills
   const {
@@ -145,6 +155,45 @@ export default function SkillSelectScreen() {
   useEffect(() => {
     setTitle(null);
   }, [setTitle]);
+
+  // Show notification prompt on first visit after sign-in
+  useEffect(() => {
+    // Only request if:
+    // 1. User is authenticated (has userId)
+    // 2. We haven't prompted the user yet
+    // 3. Notifications are not already granted
+    if (userId && !hasPromptedUser && permissionStatus !== 'granted') {
+      // Small delay to let the screen load first
+      const timer = setTimeout(async () => {
+        console.log('[Skills] 🔔 Requesting notification permissions via native dialog');
+        
+        try {
+          const { success, token } = await requestNotificationPermissions();
+          
+          if (success && token) {
+            // Save token to notification store
+            setExpoPushToken(token);
+            console.log('[Skills] ✅ Push token saved to notification store');
+            
+            // Update user with deviceId (push token)
+            if (user && updateLocalUserData) {
+              await updateLocalUserData({ deviceId: token });
+              console.log('[Skills] ✅ User updated with deviceId');
+            }
+          } else {
+            console.log('[Skills] ⚠️ Notification permission denied or failed');
+          }
+        } catch (error) {
+          console.error('[Skills] ❌ Error requesting notification permissions:', error);
+        } finally {
+          // Mark as prompted so we don't show again
+          setHasPromptedUser(true);
+        }
+      }, 1500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [userId, hasPromptedUser, permissionStatus, setExpoPushToken, setHasPromptedUser, user, updateLocalUserData]);
 
   // Handle skill selection (navigate to assessment)
   const handleSkillSelect = (skill: GetUserSkillsResponse[number]) => {
@@ -258,6 +307,8 @@ export default function SkillSelectScreen() {
     ]);
   };
 
+
+
   // Render grid item for new skills
   const renderNewSkillCard = (skill: GetSkillsResponse[number]) => {
     // Generate color based on skill name
@@ -328,9 +379,6 @@ export default function SkillSelectScreen() {
         return skills;
     }
   }, [userSkills, currentSort]);
-
-  // Only show initial loading spinner if we have no cached data at all
-  const showInitialLoading = isLoadingUserSkills && userSkills.length === 0;
 
   const sortedSkills = getSortedSkills();
 
@@ -416,19 +464,6 @@ export default function SkillSelectScreen() {
   // Memoized ListEmptyComponent to prevent recreation on every render
   const ListEmptyComponent = useMemo(() => {
     const Component = () => {
-      if (showInitialLoading) {
-        return (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator
-              size="large"
-              color={Theme.colors.primary.main}
-            />
-            <Text style={styles.loadingText}>
-              Loading available skills...
-            </Text>
-          </View>
-        );
-      }
       if (availableSkillsError) {
         return (
           <View style={styles.errorContainer}>
@@ -448,7 +483,7 @@ export default function SkillSelectScreen() {
     };
     Component.displayName = "SkillsListEmpty";
     return Component;
-  }, [showInitialLoading, availableSkillsError]);
+  }, [availableSkillsError]);
 
   // Memoized ListFooterComponent to prevent recreation on every render
   const ListFooterComponent = useMemo(() => {
@@ -556,16 +591,7 @@ export default function SkillSelectScreen() {
 
             {/* Skills Cards */}
             <View style={styles.cardsContainer}>
-              {/* Only show loading spinner if we have NO cached data at all */}
-              {showInitialLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator
-                    size="large"
-                    color={Theme.colors.primary.main}
-                  />
-                  <Text style={styles.loadingText}>Loading your skills...</Text>
-                </View>
-              ) : userSkillsError ? (
+              {userSkillsError ? (
                 <View style={styles.errorContainer}>
                   <Text style={styles.errorText}>Failed to load skills</Text>
                 </View>
