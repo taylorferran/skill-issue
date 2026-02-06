@@ -6,7 +6,7 @@ const config = {
   version: "1.0.0",
   owner: "jmurphy786s-organization",
   orientation: "portrait",
-  icon: "./assets/images/play_store.png",
+  icon: "./assets/images/splash_screen.png",
   scheme: "mobile",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
@@ -17,7 +17,7 @@ const config = {
   android: {
     adaptiveIcon: {
       backgroundColor: "#ffffff",
-      foregroundImage: "./assets/images/play_store.png"
+      foregroundImage: "./assets/images/splash_screen.png"
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
@@ -26,7 +26,7 @@ const config = {
   },
   web: {
     output: "static",
-    favicon: "./assets/images/play_store.png",
+    favicon: "./assets/images/splash_screen.png",
   },
   plugins: [
     "expo-router",
@@ -34,12 +34,12 @@ const config = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/play_store.png",
+        image: "./assets/images/splash_screen.png",
         imageWidth: 200,
         resizeMode: "contain",
         backgroundColor: "#ffffff",
         dark: {
-          image: "./assets/images/play_store.png",
+          image: "./assets/images/splash_screen.png",
           backgroundColor: "#ffffff"
         }
       }

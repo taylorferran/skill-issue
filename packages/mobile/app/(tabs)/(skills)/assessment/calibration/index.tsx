@@ -8,6 +8,7 @@ import { CalibrationQuestion } from "@learning-platform/shared";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { useState, useEffect, useRef } from "react";
+import { useIsFocused } from "@react-navigation/native";
 import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Theme } from "@/theme/Theme";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -16,7 +17,7 @@ import { QuestionCard } from "@/components/mcq-quiz/question-card/QuestionCard";
 import { markSkillAssessed } from "@/utils/assessmentStorage";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { quizTimerEmitter } from "@/utils/quizTimerEmitter";
-import { styles } from "./_layout.styles";
+import { styles } from "./_index.styles";
 import type { MCQQuestion } from "@/types/Quiz";
 
 interface CalibrationAnswer {
@@ -51,6 +52,9 @@ export default function CalibrationQuizScreen() {
   const { userId } = useUser();
   const { setUserSkills } = useSkillsStore();
   
+  // Track if screen is focused - pause timer when not visible
+  const isFocused = useIsFocused();
+   
   // Generate unique ID for this calibration instance
   const calibrationInstanceId = useRef(`calibration-${++calibrationInstanceCounter}-${Date.now()}`);
   
@@ -141,10 +145,10 @@ export default function CalibrationQuizScreen() {
   
   // Timer effect - resets for each question
   useEffect(() => {
-    // Don't start timer if component unmounted, answered, finished, or no question
-    if (!isMountedRef.current || hasAnswered || isFinished || !currentQuestion) {
+    // Don't start timer if component unmounted, answered, finished, no question, or not focused
+    if (!isMountedRef.current || hasAnswered || isFinished || !currentQuestion || !isFocused) {
       if (timerIntervalRef.current) {
-        console.log('[Calibration] 🛑 Timer stopped (answered/finished/no question)');
+        console.log('[Calibration] 🛑 Timer stopped (answered/finished/no question/unfocused)');
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
@@ -183,7 +187,7 @@ export default function CalibrationQuizScreen() {
         timerIntervalRef.current = null;
       }
     };
-  }, [currentQuestionIndex, hasAnswered, isFinished, currentQuestion]);
+  }, [currentQuestionIndex, hasAnswered, isFinished, currentQuestion, isFocused]);
   
   const handleOptionSelect = (index: number) => {
     if (hasAnswered) return;

@@ -6,50 +6,42 @@ import type {
   GetSkillsResponse,
   GetChallengeHistoryResponse 
 } from '@learning-platform/shared';
-import type { Challenge } from '@/types/Quiz';
 
-// Per-skill assessment cache structure
-interface SkillAssessmentCache {
-  pendingChallenges: Challenge[];
-  challengeHistory: GetChallengeHistoryResponse;
-  lastFetchedPending: number;
-  lastFetchedHistory: number;
+// Generic cache entry structure
+interface CacheEntry {
+  data: any;
+  timestamp: number;
 }
 
 interface SkillsState {
-  // Current user skills (enrolled)
+  // Current user skills (enrolled) - last known data
   userSkills: GetUserSkillsResponse;
   setUserSkills: (skills: GetUserSkillsResponse) => void;
   
-  // All available skills (catalog)
+  // All available skills (catalog) - last known data
   availableSkills: GetSkillsResponse;
   setAvailableSkills: (skills: GetSkillsResponse) => void;
   
-  // Last fetch timestamps (for cache invalidation)
-  lastFetchedUserSkills: number | null;
-  lastFetchedAvailableSkills: number | null;
+  // Generic cache storage for all API responses
+  apiCache: Record<string, CacheEntry>;
   
-  // Per-skill assessment cache
-  skillAssessmentCache: Record<string, SkillAssessmentCache>;
+  // Hydration state (for AsyncStorage sync)
+  hasHydrated: boolean;
+  setHasHydrated: (value: boolean) => void;
   
-  // Cache duration (5 minutes)
-  CACHE_DURATION: number;
+  // Generic cache methods (required by buildCachedApiHook)
+  getCacheData: (key: string) => any | null;
+  setCacheData: (key: string, data: any) => void;
+  clearCacheData: (key?: string) => void;
   
-  // Assessment cache duration (2 minutes - shorter for more freshness)
-  ASSESSMENT_CACHE_DURATION: number;
-  
-  // Helpers
-  shouldRefetchUserSkills: () => boolean;
-  shouldRefetchAvailableSkills: () => boolean;
-  
-  // Assessment cache helpers
+  // Legacy methods for backward compatibility during migration
   getCachedPendingChallenges: (skillId: string) => Challenge[] | null;
   getCachedChallengeHistory: (skillId: string) => GetChallengeHistoryResponse | null;
-  shouldRefetchPendingChallenges: (skillId: string) => boolean;
-  shouldRefetchChallengeHistory: (skillId: string) => boolean;
   setSkillPendingChallenges: (skillId: string, challenges: Challenge[]) => void;
   setSkillChallengeHistory: (skillId: string, history: GetChallengeHistoryResponse) => void;
   clearSkillAssessmentCache: (skillId?: string) => void;
+  
+  // Legacy clear all
   clearCache: () => void;
 }
 
@@ -59,102 +51,83 @@ export const useSkillsStore = create<SkillsState>()(
       // State
       userSkills: [],
       availableSkills: [],
-      lastFetchedUserSkills: null,
-      lastFetchedAvailableSkills: null,
-      skillAssessmentCache: {},
-      CACHE_DURATION: 5 * 60 * 1000, // 5 minutes in milliseconds
-      ASSESSMENT_CACHE_DURATION: 2 * 60 * 1000, // 2 minutes in milliseconds
+      apiCache: {},
+      hasHydrated: false,
       
-      // Actions
+      // Hydration state
+      setHasHydrated: (value: boolean) => {
+        set({ hasHydrated: value });
+      },
+      
+      // Generic cache methods (new system)
+      getCacheData: (key: string) => {
+        const { apiCache } = get();
+        const entry = apiCache[key];
+        return entry ? entry.data : null;
+      },
+      
+      setCacheData: (key: string, data: any) => {
+        set((state) => ({
+          apiCache: {
+            ...state.apiCache,
+            [key]: {
+              data,
+              timestamp: Date.now(),
+            }
+          }
+        }));
+      },
+      
+      clearCacheData: (key?: string) => {
+        if (key) {
+          set((state) => {
+            const newCache = { ...state.apiCache };
+            delete newCache[key];
+            return { apiCache: newCache };
+          });
+        } else {
+          set({ apiCache: {} });
+        }
+      },
+      
+      // Legacy user skills methods
       setUserSkills: (skills) => {
-        set({ 
-          userSkills: skills,
-          lastFetchedUserSkills: Date.now() 
-        });
+        set({ userSkills: skills });
       },
       
       setAvailableSkills: (skills) => {
-        set({ 
-          availableSkills: skills,
-          lastFetchedAvailableSkills: Date.now() 
-        });
+        set({ availableSkills: skills });
       },
       
-      // Check if cache is stale
-      shouldRefetchUserSkills: () => {
-        const { lastFetchedUserSkills, CACHE_DURATION } = get();
-        if (!lastFetchedUserSkills) return true;
-        return Date.now() - lastFetchedUserSkills > CACHE_DURATION;
-      },
-      
-      shouldRefetchAvailableSkills: () => {
-        const { lastFetchedAvailableSkills, CACHE_DURATION } = get();
-        if (!lastFetchedAvailableSkills) return true;
-        return Date.now() - lastFetchedAvailableSkills > CACHE_DURATION;
-      },
-      
-      // Assessment cache helpers
+      // Legacy assessment cache methods (using new generic cache)
       getCachedPendingChallenges: (skillId: string) => {
-        const { skillAssessmentCache } = get();
-        const cache = skillAssessmentCache[skillId];
-        return cache ? cache.pendingChallenges : null;
+        return get().getCacheData(`pendingChallenges:${skillId}`);
       },
       
       getCachedChallengeHistory: (skillId: string) => {
-        const { skillAssessmentCache } = get();
-        const cache = skillAssessmentCache[skillId];
-        return cache ? cache.challengeHistory : null;
-      },
-      
-      shouldRefetchPendingChallenges: (skillId: string) => {
-        const { skillAssessmentCache, ASSESSMENT_CACHE_DURATION } = get();
-        const cache = skillAssessmentCache[skillId];
-        if (!cache || !cache.pendingChallenges) return true;
-        return Date.now() - cache.lastFetchedPending > ASSESSMENT_CACHE_DURATION;
-      },
-      
-      shouldRefetchChallengeHistory: (skillId: string) => {
-        const { skillAssessmentCache, ASSESSMENT_CACHE_DURATION } = get();
-        const cache = skillAssessmentCache[skillId];
-        if (!cache || !cache.challengeHistory) return true;
-        return Date.now() - cache.lastFetchedHistory > ASSESSMENT_CACHE_DURATION;
+        return get().getCacheData(`challengeHistory:${skillId}`);
       },
       
       setSkillPendingChallenges: (skillId: string, challenges: Challenge[]) => {
-        set((state) => ({
-          skillAssessmentCache: {
-            ...state.skillAssessmentCache,
-            [skillId]: {
-              ...state.skillAssessmentCache[skillId],
-              pendingChallenges: challenges,
-              lastFetchedPending: Date.now(),
-            }
-          }
-        }));
+        get().setCacheData(`pendingChallenges:${skillId}`, challenges);
       },
       
       setSkillChallengeHistory: (skillId: string, history: GetChallengeHistoryResponse) => {
-        set((state) => ({
-          skillAssessmentCache: {
-            ...state.skillAssessmentCache,
-            [skillId]: {
-              ...state.skillAssessmentCache[skillId],
-              challengeHistory: history,
-              lastFetchedHistory: Date.now(),
-            }
-          }
-        }));
+        get().setCacheData(`challengeHistory:${skillId}`, history);
       },
       
       clearSkillAssessmentCache: (skillId?: string) => {
         if (skillId) {
-          set((state) => {
-            const newCache = { ...state.skillAssessmentCache };
-            delete newCache[skillId];
-            return { skillAssessmentCache: newCache };
-          });
+          get().clearCacheData(`pendingChallenges:${skillId}`);
+          get().clearCacheData(`challengeHistory:${skillId}`);
         } else {
-          set({ skillAssessmentCache: {} });
+          // Clear all skill-related caches
+          const { apiCache } = get();
+          Object.keys(apiCache).forEach(key => {
+            if (key.startsWith('pendingChallenges:') || key.startsWith('challengeHistory:')) {
+              get().clearCacheData(key);
+            }
+          });
         }
       },
       
@@ -162,15 +135,19 @@ export const useSkillsStore = create<SkillsState>()(
         set({
           userSkills: [],
           availableSkills: [],
-          lastFetchedUserSkills: null,
-          lastFetchedAvailableSkills: null,
-          skillAssessmentCache: {},
+          apiCache: {},
         });
       },
     }),
     {
       name: 'skills-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: (state) => {
+        // Called when AsyncStorage has finished loading
+        // Set hasHydrated to true so hooks know cache is ready
+        console.log('[SkillsStore] ✅ AsyncStorage rehydrated');
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { View, ScrollView, Text, Pressable, ActivityIndicator } from "react-native";
+import { useIsFocused } from "@react-navigation/native";
 import { styles } from "./MCQQuiz.styles";
 import { Theme } from "@/theme/Theme";
 import { QuestionCard } from "../question-card/QuestionCard";
@@ -59,6 +60,9 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   // Store timer interval in a ref so we can always access and clear it
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Track if screen is focused - pause timer when not visible
+  const isFocused = useIsFocused();
+
   // Consolidated state
   const [quizSession, setQuizSession] = useState<QuizSessionState>({
     currentQuestionIndex: 0,
@@ -76,9 +80,11 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
   
   // Store quiz key to detect when we switch to a completely different quiz
   const quizKeyRef = useRef<string | null>(null);
-  const currentQuizKey = isSingleQuestion 
-    ? (data as any).id 
-    : (data as any[]).map(q => q.id).join('-');
+  const currentQuizKey = useMemo(() => {
+    return isSingleQuestion
+      ? (data as any).id
+      : (data as any[]).map(q => q.id).join('-');
+  }, [data]);
 
   // Emit time updates via event emitter with quiz instance ID
   useEffect(() => {
@@ -147,10 +153,11 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
     // - Component is unmounted
     // - User has answered
     // - Quiz is finished
-    if (!isMountedRef.current || quizSession.hasAnswered || quizSession.isFinished) {
+    // - Screen is not focused (navigated away)
+    if (!isMountedRef.current || quizSession.hasAnswered || quizSession.isFinished || !isFocused) {
       // Clear any existing timer
       if (timerIntervalRef.current) {
-        console.log(`[MCQQuiz] 🛑 Timer stopped (answered/finished)`);
+        console.log(`[MCQQuiz] 🛑 Timer stopped (answered/finished/unfocused)`);
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
@@ -197,7 +204,7 @@ export const MCQQuiz: React.FC<MCQQuizProps> = ({
         timerIntervalRef.current = null;
       }
     };
-  }, [quizSession.hasAnswered, quizSession.isFinished, quizSession.currentQuestionIndex, currentQuizKey]);
+  }, [quizSession.hasAnswered, quizSession.isFinished, quizSession.currentQuestionIndex, currentQuizKey, isFocused]);
 
   const handleAnswerSelect = (answerId: number) => {
     if (quizSession.hasAnswered) return;

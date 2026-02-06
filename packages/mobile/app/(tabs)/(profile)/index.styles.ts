@@ -375,22 +375,4 @@ export const styles = StyleSheet.create({
   accountSettingsCardContent: {
     padding: Theme.spacing.lg,
   },
-  pickerContainer: {
-    backgroundColor: Theme.colors.primary.main,
-    borderRadius: Theme.borderRadius.lg,
-    borderWidth: Theme.borderWidth.thin,
-    borderColor: Theme.colors.primary.main,
-  },
-  picker: {
-    height: 52,
-    color: Theme.colors.text.inverse,
-    fontSize: Theme.typography.fontSize.sm,
-  },
-  pickerItem: {
-    fontSize: Theme.typography.fontSize.base,
-    fontWeight: Theme.typography.fontWeight.medium,
-    color: Theme.colors.text.inverse,
-    height: 52,
-  },
-
 });

@@ -16,6 +16,7 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { useGetPendingChallenges } from '@/api-routes/getPendingChallenges';
 import { useUser } from '@/contexts/UserContext';
 import { useGetChallenge } from '@/api-routes/getChallenge';
+import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import { challengeToMCQQuestion, type Challenge } from '@/types/Quiz';
 import { navigateTo } from '@/navigation/navigation';
 
@@ -34,6 +35,7 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { userId } = useUser();
+  const { isSignedIn } = useClerkAuth();
   const { pendingChallenges, setPendingChallenges } = useNotificationStore();
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [hasInitialFetchCompleted, setHasInitialFetchCompleted] = useState(false);
@@ -124,7 +126,7 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
   }, [fetchChallenge]);
 
   // Don't show notification button if user is not signed in or on quiz/calibration pages
-  if (!userId || isQuizPage || isCalibrationPage) {
+  if (!userId || !isSignedIn || isQuizPage || isCalibrationPage) {
     return null;
   }
 

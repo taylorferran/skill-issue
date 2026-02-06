@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { use, useCallback, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiOptions, RequestOptions } from '../../types/apiTypes';
 import { ApiContext } from '../../ApiProvider';
 import { SendRequest } from '../../axios/apiFetch';
@@ -48,12 +48,34 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
     error: null,
   });
   const [isFetching, setIsFetching] = useState(false);
+  
+  // AbortController ref for request cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const apiInstances = use(ApiContext);
+
+  // Ref to track if initial autoFetch has been called
+  const hasFetchedRef = useRef(false);
+
+  // Memoize the clearDataOnCall option value to stabilize dependencies
+  const clearDataOnCall = options?.clearDataOnCall;
 
   const execute = useCallback(
     async (data?: any) => {
       if (!apiInstances) throw new Error("Axios Instances haven't been setup");
+
+      // Cancel any existing request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('[useApiHook] 🛑 Cancelled previous request:', {
+          method: config.method,
+          url: config.url,
+        });
+      }
+
+      // Create new AbortController for this request
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
 
       console.log('[useApiHook] 🚀 API Request:', {
         method: config.method,
@@ -92,6 +114,11 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
           status: 'success'
         });
 
+        // Clear the abort controller ref since request completed
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
+
         // Always update data and clear loading/fetching states
         setState((prev) => ({
           ...prev,
@@ -103,6 +130,11 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
 
         return response;
       } catch (error) {
+        // Clear the abort controller ref on error
+        if (abortControllerRef.current === abortController) {
+          abortControllerRef.current = null;
+        }
+
         if (axios.isAxiosError(error)) {
           console.error('[useApiHook] ❌ API Error:', {
             method: config.method,
@@ -120,18 +152,30 @@ export function useApiHook<TRequest extends z.Schema | null = null, TResponse ex
         throw error;
       }
     },
-    [config, apiInstances, options?.clearDataOnCall],
+    [config, apiInstances, clearDataOnCall],
   );
 
   const reset = useCallback(() => {
     setState({ data: null, isLoading: false, error: null });
   }, []);
 
+  // Cleanup: Cancel any pending requests when component unmounts
   useEffect(() => {
-    if (options?.autoFetch) {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        console.log('[useApiHook] 🧹 Cleanup: Cancelled pending request on unmount');
+      }
+    };
+  }, []);
+
+  // Auto-fetch effect - only runs once when autoFetch becomes true
+  useEffect(() => {
+    if (options?.autoFetch && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       execute(options.requestData);
     }
-  }, [options?.autoFetch, execute, options?.requestData]);
+  }, [options?.autoFetch, execute]);
 
   return {
     data: state.data as ApiHookReturnType<TResponse>,

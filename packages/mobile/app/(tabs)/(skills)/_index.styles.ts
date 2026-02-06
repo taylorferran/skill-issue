@@ -18,7 +18,8 @@ export const styles = StyleSheet.create({
   },
   // Segmented Control
   segmentedContainer: {
-    paddingVertical: Theme.spacing.md,
+    paddingTop: Theme.spacing.md,
+    paddingBottom: Theme.spacing["2xl"],
   },
   segmentedControl: {
     flexDirection: "row",
@@ -50,7 +51,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
     paddingVertical: Theme.spacing.lg,
     paddingBottom: Theme.spacing.sm,
     backgroundColor: `${Theme.colors.background.primary}CC`,
@@ -77,7 +78,7 @@ export const styles = StyleSheet.create({
   },
   // Stats Section
   statsSection: {
-    paddingHorizontal: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
     paddingVertical: Theme.spacing["2xl"],
   },
   statsContainer: {
@@ -88,14 +89,14 @@ export const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: Theme.colors.gray[100],
-    marginHorizontal: Theme.spacing.lg,
+    marginHorizontal: Theme.spacing["2xl"],
   },
   // Section Header
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
     paddingTop: Theme.spacing["2xl"],
     paddingBottom: Theme.spacing.sm,
   },
@@ -119,7 +120,7 @@ export const styles = StyleSheet.create({
   },
   // Cards Container (Current Skills)
   cardsContainer: {
-    paddingHorizontal: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
     paddingTop: Theme.spacing.lg,
     gap: Theme.spacing.lg,
   },
@@ -128,7 +129,7 @@ export const styles = StyleSheet.create({
   newSkillsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    paddingHorizontal: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
     justifyContent: "flex-start", // Keeps items left-aligned
     gap: Theme.spacing.lg,
     paddingBottom: Theme.spacing["3xl"],
@@ -217,7 +218,7 @@ export const styles = StyleSheet.create({
     padding: Theme.spacing["2xl"],
     backgroundColor: Theme.colors.background.tertiary,
     borderRadius: Theme.borderRadius.md,
-    margin: Theme.spacing.lg,
+    margin: Theme.spacing["2xl"],
   },
   errorText: {
     ...createTextStyle("base", "bold", "primary"),
@@ -232,7 +233,7 @@ export const styles = StyleSheet.create({
 
   // ============= SEARCH INPUT =============
   searchContainer: {
-    paddingHorizontal: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing["2xl"],
     paddingBottom: Theme.spacing.md,
   },
   searchInputWrapper: {
@@ -269,7 +270,7 @@ export const styles = StyleSheet.create({
     borderWidth: Theme.borderWidth.thin,
     borderColor: Theme.colors.card.border,
     padding: Theme.spacing.md,
-    marginHorizontal: Theme.spacing.lg,
+    marginHorizontal: Theme.spacing["2xl"],
     marginBottom: Theme.spacing.lg,
     ...Theme.shadows.subtle,
   },
@@ -295,5 +296,43 @@ export const styles = StyleSheet.create({
     fontSize: Theme.typography.fontSize.sm,
     fontWeight: Theme.typography.fontWeight.regular,
     color: Theme.colors.text.secondary,
+  },
+
+  // ============= INFINITE SCROLL LOADING STATES =============
+  loadingMoreContainer: {
+    ...flex.center,
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.sm,
+    width: "100%",
+    flexDirection: "row",
+  },
+  loadingMoreText: {
+    ...createTextStyle("sm", "medium", "secondary"),
+    marginLeft: Theme.spacing.sm,
+  },
+  endOfListContainer: {
+    ...flex.center,
+    padding: Theme.spacing.lg,
+    width: "100%",
+  },
+  endOfListText: {
+    ...createTextStyle("sm", "medium", "secondary"),
+    opacity: 0.7,
+  },
+
+  // ============= FLATLIST STYLES =============
+  flatListColumnWrapper: {
+    justifyContent: "flex-start",
+    paddingHorizontal: Theme.spacing["2xl"],
+    gap: Theme.spacing.lg,
+    paddingBottom: Theme.spacing.lg,
+  },
+  flatListContent: {
+    paddingBottom: Theme.spacing["5xl"] + 32,
+  },
+
+  // ============= NEW SKILLS CONTAINER =============
+  newSkillsContainer: {
+    flex: 1,
   },
 });

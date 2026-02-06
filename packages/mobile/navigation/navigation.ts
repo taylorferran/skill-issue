@@ -25,6 +25,11 @@ const pages = {
       progress: z.number().optional(),
       isNewSkill: z.boolean().optional(),
       answeredChallenge: z.string().optional(),
+      initialData: z.object({
+        userSkills: z.any().optional(),
+        pending: z.any().optional(),
+        history: z.any().optional(),
+      }).optional(),
     }),
   },
   quiz: {

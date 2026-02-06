@@ -96,6 +96,9 @@ export const styles = StyleSheet.create({
     letterSpacing: -0.2,
     lineHeight: 14,
   },
+  badgeContainer: {
+    marginTop: Theme.spacing.sm,
+  },
   iconContainer: {
     backgroundColor: Theme.colors.primary.main,
     width: 64,

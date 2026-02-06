@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Skill } from '@/types/Skill';
 import { Theme } from '@/theme/Theme';
 import { ProgressBar } from '@/components/progress-bar/ProgressBar';
+import { NeedsCalibrationBadge } from '@/components/needs-calibration-badge/NeedsCalibrationBadge';
 import { styles } from './SkillCard.styles';
 
 const DELETE_THRESHOLD = -60; // Swipe left threshold to show delete mode
@@ -128,6 +129,11 @@ export function SkillCard({ skill, onSelect, onDelete }: SkillCardProps) {
               <View style={styles.info}>
                 <Text style={styles.name}>{skill.name}</Text>
                 <Text style={styles.category}>{skill.category}</Text>
+                {skill.needsCalibration && (
+                  <View style={styles.badgeContainer}>
+                    <NeedsCalibrationBadge />
+                  </View>
+                )}
               </View>
 
               {/* Skill/Delete Icon Container */}

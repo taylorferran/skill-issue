@@ -60,7 +60,7 @@ function RootLayoutContent() {
       router.replace("/sign-in");
     } else if (isSignedIn && inAuthGroup) {
       // Redirect away from sign-in if already authenticated
-      router.replace("/");
+      router.replace("/(tabs)/(skills)");
     }
   }, [isSignedIn, isLoaded, segments, router]);
   
@@ -85,7 +85,7 @@ function RootLayoutContent() {
         <Stack.Screen name="sign-in" />
         <Stack.Screen name="(tabs)" />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
       <NotificationBadgeOverlay />
     </NavigationTitleProvider>
   );

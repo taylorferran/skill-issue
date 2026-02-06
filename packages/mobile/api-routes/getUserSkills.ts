@@ -1,4 +1,5 @@
 import { buildApiEndpointHook } from "@/api/hooks/buildGenericApiHook";
+import { useSkillsStore } from "@/stores/skillsStore";
 import { GetUserSkillsResponseSchema } from "@learning-platform/shared";
 import { z } from "zod";
 
@@ -8,20 +9,31 @@ const GetUserSkillsPathSchema = z.object({
 });
 
 /**
- * Hook for fetching user's enrolled skills
+ * Hook for fetching user's enrolled skills with automatic caching
  * GET /users/:userId/skills
  * 
- * @example
- * const { execute, data, isLoading, error } = useGetUserSkills();
+ * Data is automatically cached and returned immediately while fresh data is fetched in background.
  * 
- * // Call with userId as path parameter
- * const skills = await execute({ userId: "uuid-here" });
+ * @example
+ * const { data, isLoading, error, execute, clearCache } = useGetUserSkills();
+ * 
+ * // On mount: returns cached data immediately, fetches fresh data in background
+ * // data = cached data initially, auto-updates when API returns
+ * 
+ * // Manual refresh
+ * await execute({ userId: "uuid-here" });
  */
-export const useGetUserSkills = buildApiEndpointHook({
-  method: 'GET',
-  apiInstance: 'backend',
-  url: '/users/:userId/skills',
-  requestSchema: GetUserSkillsPathSchema,
-  responseSchema: GetUserSkillsResponseSchema,
-  paramType: "Path" // Only has path params, no query params needed (could use PathAndQuery for future filtering)
-});
+export const useGetUserSkills = buildApiEndpointHook(
+  {
+    method: 'GET',
+    apiInstance: 'backend',
+    url: '/users/:userId/skills',
+    requestSchema: GetUserSkillsPathSchema,
+    responseSchema: GetUserSkillsResponseSchema,
+    paramType: "Path"
+  },
+  {
+    useStore: useSkillsStore,
+    storageKey: (params) => `userSkills:${params?.userId || 'default'}`,
+  }
+);

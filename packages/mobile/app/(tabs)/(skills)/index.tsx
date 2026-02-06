@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   ScrollView,
+  FlatList,
   Text,
   SafeAreaView,
   TouchableOpacity,
@@ -13,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import { SkillCard } from "@/components/skill-card/SkillCard";
-import { StatsCard } from "@/components/stats-card/StatsCard";
+import SkillsMetricsCard from "@/components/skills-metrics-card/SkillsMetricsCard";
 import { navigateTo } from "@/navigation/navigation";
 import { router } from "expo-router";
 import { styles } from "./_index.styles";
@@ -22,12 +23,14 @@ import { Theme } from "@/theme/Theme";
 import { useGetUserSkills } from "@/api-routes/getUserSkills";
 import { useGetSkills } from "@/api-routes/getSkills";
 import { useDeleteSkill } from "@/api-routes/deleteSkill";
+import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { useUser } from "@/contexts/UserContext";
-import type { 
+import type {
   GetUserSkillsResponse,
-  GetSkillsResponse 
+  GetSkillsResponse
 } from "@learning-platform/shared";
+import { SkillSortDropdown, type SortOption } from "@/components/skill-sort-dropdown/SkillSortDropdown";
 
 // Helper to check if two arrays are deeply equal
 function isArrayEqual<T>(a: T[] | null | undefined, b: T[] | null | undefined): boolean {
@@ -42,9 +45,11 @@ export default function SkillSelectScreen() {
     "Current Skills" | "New Skills"
   >("Current Skills");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentSort, setCurrentSort] = useState<SortOption>("level");
+  const [displayCount, setDisplayCount] = useState(10);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   
-  // Track initial load state
-  const isFirstMount = useRef(true);
+  // Track initial loading state (only show spinner on first load with no cache)
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   // Get userId from UserContext
@@ -56,8 +61,6 @@ export default function SkillSelectScreen() {
     availableSkills,
     setUserSkills,
     setAvailableSkills,
-    shouldRefetchUserSkills,
-    shouldRefetchAvailableSkills,
   } = useSkillsStore();
   
   // API hooks - clearDataOnCall: false for cache-first behavior
@@ -74,8 +77,12 @@ export default function SkillSelectScreen() {
   const { 
     execute: deleteSkillApi
   } = useDeleteSkill();
+
+  const {
+    execute: enrollSkillApi
+  } = useEnrollSkill();
   
-  // Initial load - use cached data immediately if available
+  // Initial load - always fetch fresh data while showing cached data
   useEffect(() => {
     if (!userId) {
       setIsInitialLoading(false);
@@ -83,72 +90,45 @@ export default function SkillSelectScreen() {
     }
     
     const loadInitialData = async () => {
-      console.log('[Skills] 🔄 Initial load - checking cache...');
+      const hasCachedData = userSkills.length > 0 || availableSkills.length > 0;
       
-      // Check if we have cached data and if it's fresh
-      const hasCachedUserSkills = userSkills.length > 0;
-      const hasCachedAvailableSkills = availableSkills.length > 0;
-      const needsRefetchUserSkills = shouldRefetchUserSkills();
-      const needsRefetchAvailableSkills = shouldRefetchAvailableSkills();
-      
-      // If we have fresh cached data, don't show loading
-      const hasFreshCache = hasCachedUserSkills && hasCachedAvailableSkills && 
-                           !needsRefetchUserSkills && !needsRefetchAvailableSkills;
-      
-      if (hasFreshCache) {
-        console.log('[Skills] ✅ Using cached data (fresh)');
+      if (!hasCachedData) {
+        // No cached data - show loading spinner
+        console.log('[Skills] ⏳ No cache available, showing loading...');
+        setIsInitialLoading(true);
+      } else {
+        // Have cached data - show it immediately
+        console.log('[Skills] ✅ Using cached data, fetching fresh in background...');
         setIsInitialLoading(false);
-        isFirstMount.current = false;
-        
-        // Still do a background refresh
-        refreshSkillsInBackground();
-        return;
       }
-      
-      // If we have stale cache, show it immediately but fetch in background
-      if (hasCachedUserSkills || hasCachedAvailableSkills) {
-        console.log('[Skills] ⏱️ Using cached data (stale), fetching fresh...');
-        setIsInitialLoading(false);
-        
-        // Fetch fresh data in background
-        try {
-          await refreshSkills();
-        } catch (error) {
-          console.error('[Skills] ❌ Background refresh failed:', error);
-        }
-        
-        isFirstMount.current = false;
-        return;
-      }
-      
-      // No cached data - show loading and fetch
-      console.log('[Skills] ⏳ No cache available, fetching...');
-      setIsInitialLoading(true);
       
       try {
+        // Always fetch fresh data
         await refreshSkills();
       } catch (error) {
         console.error('[Skills] ❌ Initial load failed:', error);
-        Alert.alert(
-          'Loading Failed',
-          'Could not load skills. Please try again later.',
-          [{ text: 'OK' }]
-        );
+        if (!hasCachedData) {
+          // Only show error if we have no cached data to display
+          Alert.alert(
+            'Loading Failed',
+            'Could not load skills. Please try again later.',
+            [{ text: 'OK' }]
+          );
+        }
       } finally {
         setIsInitialLoading(false);
-        isFirstMount.current = false;
       }
     };
     
     loadInitialData();
   }, [userId]);
   
-  // Background refresh when screen comes into focus
+  // Refresh when screen comes into focus (always fetch)
   useFocusEffect(
     useCallback(() => {
-      if (!userId || isFirstMount.current) return;
+      if (!userId) return;
       
-      console.log('[Skills] 🔄 Background refresh on focus...');
+      console.log('[Skills] 🔄 Focus refresh - fetching fresh data...');
       refreshSkillsInBackground();
       
       // Clear search query when returning to this screen
@@ -203,23 +183,48 @@ export default function SkillSelectScreen() {
 
   // Handle skill selection (navigate to assessment)
   const handleSkillSelect = (skill: GetUserSkillsResponse[number]) => {
+    // Get cached data synchronously and pass as initialData to prevent flicker
+    const store = useSkillsStore.getState();
+    const initialData = {
+      userSkills: store.getCacheData(`userSkills:${userId}`),
+      pending: store.getCacheData(`assessment-${skill.skillId}-pending`),
+      history: store.getCacheData(`assessment-${skill.skillId}-history`),
+    };
+
     navigateTo("assessment", {
       skill: skill.skillName,
       skillId: skill.skillId,
       progress: skill.accuracy * 100, // Convert 0-1 to 0-100
       isNewSkill: false,
+      initialData,
     });
   };
 
-  // Handle add skill (navigate to assessment for enrollment)
-  const handleAddSkill = (skill: GetSkillsResponse[number]) => {
-    // Navigate to assessment page where user will set their difficulty level
-    navigateTo("assessment", {
-      skill: skill.name,
-      skillId: skill.id,
-      progress: 0,
-      isNewSkill: true, // Flag to indicate this is enrollment flow
-    });
+  // Handle add skill - enroll immediately then navigate to assessment
+  const handleAddSkill = async (skill: GetSkillsResponse[number]) => {
+    if (!userId) {
+      Alert.alert('Error', 'User not found. Please try signing in again.');
+      return;
+    }
+
+    try {
+      console.log('[Skills] ➕ Enrolling in skill:', skill.name);
+
+      // Enroll user in the skill with default difficulty
+      await enrollSkillApi({ userId, skillId: skill.id, difficultyTarget: 2 });
+
+      console.log('[Skills] ✅ Successfully enrolled in skill:', skill.name);
+
+      // Refresh user skills to show the new skill with calibration flag
+      const updatedSkills = await fetchUserSkills({ userId });
+      setUserSkills(updatedSkills);
+
+      // Switch to Current Skills tab to show the newly added skill
+      setSelectedSegment("Current Skills");
+    } catch (error) {
+      console.error('[Skills] ❌ Failed to enroll in skill:', error);
+      Alert.alert('Error', 'Failed to add skill. Please try again.');
+    }
   };
   
   // Handle delete skill
@@ -300,15 +305,154 @@ export default function SkillSelectScreen() {
     );
   };
 
-  const calculateTotalSkills = () => userSkills.length;
+  // Sorting logic for user skills
+  const getSortedSkills = useCallback((): GetUserSkillsResponse => {
+    const skills = [...userSkills];
 
-  const getActivePath = () => {
-    // Just use the first skill as active, or "None" if no skills
-    return userSkills.length > 0 ? userSkills[0].skillName.split(" ")[0] : "None";
-  };
-  
+    switch (currentSort) {
+      case "level":
+        return skills.sort((a, b) => b.difficultyTarget - a.difficultyTarget);
+      case "a-z":
+        return skills.sort((a, b) => a.skillName.localeCompare(b.skillName));
+      case "z-a":
+        return skills.sort((a, b) => b.skillName.localeCompare(a.skillName));
+      case "date":
+        // Sort by lastChallengedAt (most recent first), nulls at bottom
+        return skills.sort((a, b) => {
+          if (!a.lastChallengedAt && !b.lastChallengedAt) return 0;
+          if (!a.lastChallengedAt) return 1;
+          if (!b.lastChallengedAt) return -1;
+          return new Date(b.lastChallengedAt).getTime() - new Date(a.lastChallengedAt).getTime();
+        });
+      default:
+        return skills;
+    }
+  }, [userSkills, currentSort]);
+
   // Only show initial loading spinner if we have no cached data at all
   const showInitialLoading = isInitialLoading && userSkills.length === 0 && availableSkills.length === 0;
+
+  const sortedSkills = getSortedSkills();
+
+  // Get filtered skills for New Skills tab
+  const getFilteredNewSkills = useCallback((): GetSkillsResponse => {
+    return availableSkills.filter(skill => {
+      if (!skill.active) return false;
+      const isEnrolled = userSkills.some(userSkill => userSkill.skillId === skill.id);
+      if (isEnrolled) return false;
+      if (searchQuery.trim() === "") return true;
+      const query = searchQuery.toLowerCase().trim();
+      return skill.name.toLowerCase().includes(query) || 
+             skill.description?.toLowerCase().includes(query);
+    });
+  }, [availableSkills, userSkills, searchQuery]);
+
+  // Handle FlatList end reached
+  const handleEndReached = useCallback(() => {
+    const filteredSkills = getFilteredNewSkills();
+    
+    if (displayCount < filteredSkills.length && !isLoadingMore) {
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setDisplayCount(prev => Math.min(prev + 10, filteredSkills.length));
+        setIsLoadingMore(false);
+      }, 300);
+    }
+  }, [displayCount, getFilteredNewSkills, isLoadingMore]);
+
+  // Reset pagination when search query changes or tab changes
+  useEffect(() => {
+    setDisplayCount(10);
+  }, [searchQuery, selectedSegment]);
+
+  // Memoized filtered skills for New Skills tab to prevent recalculation on every render
+  const filteredSkills = useMemo(() => getFilteredNewSkills(), [getFilteredNewSkills]);
+  const paginatedSkills = useMemo(() => filteredSkills.slice(0, displayCount), [filteredSkills, displayCount]);
+
+  // Memoized ListHeaderComponent - only contains static content
+  const ListHeaderComponent = useMemo(() => {
+    const Component = () => (
+      <>
+        {/* Create New Skill Button */}
+        <TouchableOpacity
+          style={styles.createSkillButton}
+          onPress={() => router.push("/(tabs)/(skills)/create")}
+          activeOpacity={0.7}
+        >
+          <View style={styles.createSkillIconContainer}>
+            <Ionicons name="add" size={20} color="#ffffff" />
+          </View>
+          <View style={styles.createSkillTextContainer}>
+            <Text style={styles.createSkillTitle}>Create New Skill</Text>
+            <Text style={styles.createSkillSubtitle}>
+              Can&apos;t find what you&apos;re looking for? Create your own
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={Theme.colors.text.secondary}
+          />
+        </TouchableOpacity>
+      </>
+    );
+    Component.displayName = 'SkillsListHeader';
+    return Component;
+  }, []);
+
+  // Memoized ListEmptyComponent to prevent recreation on every render
+  const ListEmptyComponent = useMemo(() => {
+    const Component = () => {
+      if (showInitialLoading) {
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Theme.colors.primary.main} />
+            <Text style={styles.loadingText}>Loading available skills...</Text>
+          </View>
+        );
+      }
+      if (availableSkillsError) {
+        return (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Failed to load available skills</Text>
+          </View>
+        );
+      }
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>
+            All skills have been added!
+          </Text>
+        </View>
+      );
+    };
+    Component.displayName = 'SkillsListEmpty';
+    return Component;
+  }, [showInitialLoading, availableSkillsError]);
+
+  // Memoized ListFooterComponent to prevent recreation on every render
+  const ListFooterComponent = useMemo(() => {
+    const Component = () => {
+      if (isLoadingMore) {
+        return (
+          <View style={styles.loadingMoreContainer}>
+            <ActivityIndicator size="small" color={Theme.colors.primary.main} />
+            <Text style={styles.loadingMoreText}>Loading more skills...</Text>
+          </View>
+        );
+      }
+      if (paginatedSkills.length > 0 && displayCount >= filteredSkills.length && filteredSkills.length > 10) {
+        return (
+          <View style={styles.endOfListContainer}>
+            <Text style={styles.endOfListText}>No more skills to show</Text>
+          </View>
+        );
+      }
+      return null;
+    };
+    Component.displayName = 'SkillsListFooter';
+    return Component;
+  }, [isLoadingMore, paginatedSkills.length, displayCount, filteredSkills.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -360,40 +504,32 @@ export default function SkillSelectScreen() {
             </View>
           </View>
 
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Current Skills View */}
-            {selectedSegment === "Current Skills" && (
-            <>
-              {/* Stats Cards Section */}
-              <View style={styles.statsSection}>
-                <View style={styles.statsContainer}>
-                  <StatsCard
-                    label="TOTAL SKILLS"
-                    value={calculateTotalSkills()}
-                  />
-                  <StatsCard label="ACTIVE PATH" value={getActivePath()} />
-                </View>
-              </View>
-
-              {/* Divider */}
-              <View style={styles.divider} />
+          {/* Tab Content - Conditional rendering based on selected tab */}
+          {selectedSegment === "Current Skills" ? (
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Expandable Metrics Card - Always visible */}
+              <SkillsMetricsCard
+                userSkills={userSkills}
+                defaultExpanded={false}
+              />
 
               {/* Section Header */}
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Professional Mastery</Text>
-                <View style={styles.sortBadge}>
-                  <Text style={styles.sortBadgeText}>SORT BY LEVEL</Text>
-                </View>
+                <SkillSortDropdown
+                  currentSort={currentSort}
+                  onSortChange={setCurrentSort}
+                />
               </View>
 
               {/* Skills Cards */}
               <View style={styles.cardsContainer}>
                 {/* Only show loading spinner if we have NO cached data at all */}
-                {showInitialLoading && selectedSegment === "Current Skills" ? (
+                {showInitialLoading ? (
                   <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={Theme.colors.primary.main} />
                     <Text style={styles.loadingText}>Loading your skills...</Text>
@@ -409,15 +545,7 @@ export default function SkillSelectScreen() {
                     </Text>
                   </View>
                 ) : (
-                  userSkills.map((skill) => {
-                    // Generate random color for visual distinction
-                    const skillColors = [
-                      '#eb8b47', '#ff6b9d', '#4a9eff', '#00d4aa', '#ffd93d', '#a78bfa'
-                    ];
-                    const randomColor = skillColors[
-                      skill.skillName.charCodeAt(0) % skillColors.length
-                    ];
-                    
+                  sortedSkills.map((skill) => {
                     // Calculate progress based on difficulty level (1-10 scale to 0-100%)
                     const difficultyProgress = skill.difficultyTarget 
                       ? Math.round((skill.difficultyTarget / 10) * 100)
@@ -436,6 +564,7 @@ export default function SkillSelectScreen() {
                           isPrimary: false,
                           subtopics: skill.attemptsTotal,
                           aiPowered: true,
+                          needsCalibration: skill.needsCalibration,
                         }}
                         onSelect={() => handleSkillSelect(skill)}
                         onDelete={() => handleDeleteSkill(skill.skillId, skill.skillName)}
@@ -444,35 +573,11 @@ export default function SkillSelectScreen() {
                   })
                 )}
               </View>
-            </>
-          )}
-
-          {/* New Skills View */}
-          {selectedSegment === "New Skills" && (
-            <>
-              {/* Create New Skill Button */}
-              <TouchableOpacity
-                style={styles.createSkillButton}
-                onPress={() => router.push("/(tabs)/(skills)/create")}
-                activeOpacity={0.7}
-              >
-                <View style={styles.createSkillIconContainer}>
-                  <Ionicons name="add" size={20} color="#ffffff" />
-                </View>
-                <View style={styles.createSkillTextContainer}>
-                  <Text style={styles.createSkillTitle}>Create New Skill</Text>
-                  <Text style={styles.createSkillSubtitle}>
-                    Can&apos;t find what you&apos;re looking for? Create your own
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color={Theme.colors.text.secondary}
-                />
-              </TouchableOpacity>
-
-              {/* Search Input */}
+            </ScrollView>
+          ) : (
+            /* New Skills View - Search + FlatList */
+            <View style={styles.newSkillsContainer}>
+              {/* Search Input - Outside FlatList to prevent focus loss */}
               <View style={styles.searchContainer}>
                 <View style={styles.searchInputWrapper}>
                   <Ionicons
@@ -507,52 +612,22 @@ export default function SkillSelectScreen() {
                 </View>
               </View>
 
-              {/* Skills Grid */}
-              <View style={styles.newSkillsGrid}>
-                {/* Only show loading spinner if we have NO cached data at all */}
-                {showInitialLoading && selectedSegment === "New Skills" ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={Theme.colors.primary.main} />
-                    <Text style={styles.loadingText}>Loading available skills...</Text>
-                  </View>
-                ) : availableSkillsError ? (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>Failed to load available skills</Text>
-                  </View>
-                ) : availableSkills.length > 0 ? (
-                  availableSkills
-                    .filter(skill => {
-                      // 1. Skill must be active
-                      if (!skill.active) return false;
-
-                      // 2. Skill must NOT be already enrolled by user
-                      const isEnrolled = userSkills.some(
-                        userSkill => userSkill.skillId === skill.id
-                      );
-
-                      if (isEnrolled) return false;
-
-                      // 3. Filter by search query
-                      if (searchQuery.trim() === "") return true;
-
-                      const query = searchQuery.toLowerCase().trim();
-                      const nameMatch = skill.name.toLowerCase().includes(query);
-                      const descriptionMatch = skill.description?.toLowerCase().includes(query);
-
-                      return nameMatch || descriptionMatch;
-                    })
-                    .map(renderNewSkillCard)
-                ) : (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyStateText}>
-                      All skills have been added!
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </>
+              <FlatList
+                data={paginatedSkills}
+                renderItem={({ item }) => renderNewSkillCard(item)}
+                keyExtractor={(item) => item.id}
+                numColumns={2}
+                columnWrapperStyle={styles.flatListColumnWrapper}
+                contentContainerStyle={styles.flatListContent}
+                showsVerticalScrollIndicator={false}
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.5}
+                ListHeaderComponent={ListHeaderComponent}
+                ListEmptyComponent={ListEmptyComponent}
+                ListFooterComponent={ListFooterComponent}
+              />
+            </View>
           )}
-        </ScrollView>
 
 
       </View>

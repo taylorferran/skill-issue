@@ -8,9 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { styles } from "./SkillsOverview.styles";
-import StatCard from "../stat-card/StatCard";
-import CircularProgress from "../circular-progress/CircularProgress";
-import { AnimatedNumber, AnimatedText } from "../animated";
+import SkillMetricsGrid from "../skill-metrics-grid/SkillMetricsGrid";
 import type { GetUserSkillsResponse } from "@learning-platform/shared";
 import type { Challenge } from "@/types/Quiz";
 
@@ -48,85 +46,11 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
 }) => {
   // Extract data from backend response (with defaults to show immediately)
   const currentLevel = skillData?.difficultyTarget ?? 0;
-  const maxLevel = 10;
   const hotStreak = skillData?.streakCorrect ?? 0;
   const questionsAnswered = skillData?.attemptsTotal ?? 0;
   const accuracy = skillData?.accuracy ?? 0;
   const correctTotal = skillData?.correctTotal ?? 0;
-  const hasAnsweredQuestions = questionsAnswered > 0;
-  const hasHotStreak = hotStreak > 0;
-  
-  // Styles for stat values (matching original statValue style)
-  const statValueStyle = {
-    fontSize: Theme.typography.fontSize["2xl"],
-    fontWeight: Theme.typography.fontWeight.bold,
-    color: Theme.colors.text.primary,
-    lineHeight: Theme.typography.lineHeight.normal,
-  };
 
-  // Styles for stat subtitles (matching original statSubtitle style)
-  const statSubtitleStyle = {
-    fontSize: Theme.typography.fontSize.xs,
-    fontWeight: Theme.typography.fontWeight.bold,
-    marginTop: Theme.spacing.xs / 2,
-  };
-
-  // Create animated value components with proper styling
-  // These will animate from 0 to actual values on first load only
-  const hotStreakValue = (
-    <AnimatedNumber
-      value={hotStreak}
-      suffix=" Days"
-      style={statValueStyle}
-      skipAnimation={hasAnimated}
-    />
-  );
-
-  const hotStreakSubtitle = hasHotStreak ? (
-    <AnimatedText 
-      value={`${hotStreak} correct in a row!`} 
-      style={[statSubtitleStyle, { color: "#07880b" }]}
-    />
-  ) : (
-    <AnimatedText value="Starting fresh" style={[statSubtitleStyle, { color: Theme.colors.text.secondary }]} />
-  );
-
-  const answeredValue = (
-    <AnimatedNumber
-      value={questionsAnswered}
-      suffix=" Qs"
-      style={statValueStyle}
-      skipAnimation={hasAnimated}
-    />
-  );
-
-  const answeredSubtitle = hasAnsweredQuestions ? (
-    <AnimatedText 
-      value={`${Math.round(accuracy * 100)}% accuracy`}
-      style={[statSubtitleStyle, { color: Theme.colors.text.secondary }]}
-    />
-  ) : (
-    <AnimatedText value="Starting fresh" style={[statSubtitleStyle, { color: Theme.colors.text.secondary }]} />
-  );
-
-  const accuracyValue = hasAnsweredQuestions ? (
-    <AnimatedText 
-      value={`${Math.round(accuracy * 100)}%`}
-      style={styles.compactAccuracyValue}
-    />
-  ) : (
-    <AnimatedText value="0%" style={[styles.compactAccuracyValue, { color: Theme.colors.text.secondary }]} />
-  );
-
-  const accuracySubtext = hasAnsweredQuestions ? (
-    <AnimatedText 
-      value={`${correctTotal} / ${questionsAnswered} correct`}
-      style={styles.compactAccuracySubtext}
-    />
-  ) : (
-    <AnimatedText value="Start answering!" style={styles.compactAccuracySubtext} />
-  );
-  
   return (
     <View style={styles.container}>
       <ScrollView
@@ -144,7 +68,7 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
             <Text style={styles.calibrationDescription}>
               Complete a 10-question assessment to determine your starting difficulty level for {skillName}.
             </Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.startCalibrationButton}
               onPress={onStartCalibration}
               activeOpacity={0.8}
@@ -154,58 +78,18 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
             </TouchableOpacity>
           </View>
         )}
-        
-        {/* Stats Grid - Row 1: Hot Streak + Answered */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCardWrapper}>
-            <StatCard
-              label="HOT STREAK"
-              value={hotStreakValue}
-              subtitle={hotStreakSubtitle}
-              subtitleColor={(hotStreak ?? 0) > 0 ? "#07880b" : Theme.colors.text.secondary}
-              iconName="local-fire-department"
-              iconColor="#ff4d4d"
-              iconFilled={true}
-            />
-          </View>
 
-          <View style={styles.statCardWrapper}>
-            <StatCard
-              label="ANSWERED"
-              value={answeredValue}
-              subtitle={answeredSubtitle}
-              iconName="task-alt"
-              iconColor="#3B82F6"
-            />
-          </View>
-        </View>
-
-        {/* Stats Grid - Row 2: Difficulty Level + Accuracy */}
-        <View style={styles.statsGrid}>
-          {/* Difficulty Level Gauge (compact) */}
-          <View style={styles.statCardWrapper}>
-            <View style={styles.compactProgressCard}>
-              <Text style={styles.compactProgressHeader}>YOUR DIFFICULTY LEVEL</Text>
-              <CircularProgress
-                current={currentLevel}
-                total={maxLevel}
-                compact={true}
-                skipAnimation={hasAnimated}
-              />
-            </View>
-          </View>
-
-          {/* Accuracy Card (compact) */}
-          <View style={styles.statCardWrapper}>
-            <View style={styles.compactAccuracyCard}>
-              <Text style={styles.compactAccuracyLabel}>ACCURACY</Text>
-              <View style={styles.accuracyContent}>
-                {accuracyValue}
-                {accuracySubtext}
-              </View>
-            </View>
-          </View>
-        </View>
+        {/* Metrics Grid - Reusable component */}
+        <SkillMetricsGrid
+          hotStreak={hotStreak}
+          questionsAnswered={questionsAnswered}
+          currentLevel={currentLevel}
+          accuracy={accuracy}
+          correctTotal={correctTotal}
+          maxLevel={10}
+          hasAnimated={hasAnimated}
+          compact={true}
+        />
 
         {/* Pro Tip Card */}
         <View style={styles.proTipCard}>
@@ -229,7 +113,7 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
         {!needsRating && skillData && (
           <View style={styles.challengesSection}>
             <Text style={styles.challengesHeader}>PENDING CHALLENGES</Text>
-            
+
             {pendingChallenges.length === 0 ? (
               <View style={styles.emptyChallengesCard}>
                 <MaterialIcons
@@ -267,11 +151,11 @@ const SkillOverviewScreen: React.FC<SkillOverviewProps> = ({
                         </Text>
                       </View>
                     </View>
-                    
+
                     <Text style={styles.challengeQuestion} numberOfLines={2}>
                       {challenge.question}
                     </Text>
-                    
+
                     <View style={styles.challengeFooter}>
                       <Text style={styles.challengeDate}>
                         {new Date(challenge.createdAt).toLocaleDateString()}

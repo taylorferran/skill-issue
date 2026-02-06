@@ -1,4 +1,5 @@
 import { buildApiEndpointHook } from "@/api/hooks/buildGenericApiHook";
+import { useSkillsStore } from "@/stores/skillsStore";
 import { GetPendingChallengesResponseSchema } from "@learning-platform/shared";
 import { z } from "zod";
 
@@ -7,21 +8,39 @@ const GetPendingChallengesPathSchema = z.object({
   userId: z.string().uuid(),
 });
 
+// Storage key parameters - separate from API request
+interface PendingChallengesStorageParams {
+  skillId: string | null | undefined;
+}
+
 /**
- * Hook for fetching user's pending challenges
+ * Hook for fetching user's pending challenges with per-skill caching
  * GET /users/:userId/challenges/pending
  * 
- * @example
- * const { execute, data, isLoading, isFetching, error } = useGetPendingChallenges();
+ * Each skill assessment page has its own isolated cache.
+ * Pass storageProps on hook initialization for instant cache loading:
  * 
- * // Call with userId as path parameter
+ * @example
+ * const { execute, data, isLoading, isFetching, error } = useGetPendingChallenges({
+ *   storageProps: { skillId: 'skill-uuid' }  // Type-safe cache key
+ * });
+ * 
+ * // Call with userId as path parameter - returns cached data first, then updates
  * const challenges = await execute({ userId: "uuid-here" });
  */
-export const useGetPendingChallenges = buildApiEndpointHook({
-  method: 'GET',
-  apiInstance: 'backend',
-  url: '/users/:userId/challenges/pending',
-  requestSchema: GetPendingChallengesPathSchema,
-  responseSchema: GetPendingChallengesResponseSchema,
-  paramType: "Path"
-});
+export const useGetPendingChallenges = buildApiEndpointHook(
+  {
+    method: 'GET',
+    apiInstance: 'backend',
+    url: '/users/:userId/challenges/pending',
+    requestSchema: GetPendingChallengesPathSchema,
+    responseSchema: GetPendingChallengesResponseSchema,
+    paramType: "Path",
+  },
+  {
+    useStore: useSkillsStore,
+    // Type-safe storage key function - handles null/undefined skillId gracefully
+    storageKey: (params: PendingChallengesStorageParams) =>
+      `assessment-${params?.skillId || 'default'}-pending`,
+  }
+);

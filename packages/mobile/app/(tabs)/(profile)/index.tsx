@@ -25,9 +25,8 @@ import * as Localization from "expo-localization";
 import { useCreateUser } from "@/api-routes/createUser";
 import { useUpdateUser } from "@/api-routes/updateUser";
 import { useTriggerSchedulerTick } from "@/api-routes/triggerSchedulerTick";
-import { Picker } from "@react-native-picker/picker";
-
 import type { CreateUserRequest } from "@learning-platform/shared";
+import { SelectDropdown, type SelectOption } from "@/components/select-dropdown/SelectDropdown";
 import { styles } from "./index.styles";
 import Slider from "@react-native-community/slider";
 
@@ -63,19 +62,19 @@ export default function ProfileScreen() {
   const ACCOUNT_SETTINGS_DEBOUNCE_MS = 1000; // 1 second debounce
 
   // Timezone options
-  const timezoneOptions = [
-    { label: "UTC", value: "UTC" },
-    { label: "Eastern Time", value: "America/New_York" },
-    { label: "London", value: "Europe/London" },
-    { label: "Tokyo", value: "Asia/Tokyo" },
+  const timezoneOptions: SelectOption[] = [
+    { label: "UTC", value: "UTC", icon: "time-outline" },
+    { label: "Eastern Time", value: "America/New_York", icon: "time-outline" },
+    { label: "London", value: "Europe/London", icon: "time-outline" },
+    { label: "Tokyo", value: "Asia/Tokyo", icon: "time-outline" },
   ];
 
   // Max challenges options (increments of 5 up to 20)
-  const maxChallengesOptions = [
-    { label: "5 challenges", value: 5 },
-    { label: "10 challenges", value: 10 },
-    { label: "15 challenges", value: 15 },
-    { label: "20 challenges", value: 20 },
+  const maxChallengesOptions: SelectOption[] = [
+    { label: "5 challenges", value: 5, icon: "trophy-outline" },
+    { label: "10 challenges", value: 10, icon: "trophy-outline" },
+    { label: "15 challenges", value: 15, icon: "trophy-outline" },
+    { label: "20 challenges", value: 20, icon: "trophy-outline" },
   ];
 
   // Check current notification permission status when screen comes into focus
@@ -667,22 +666,16 @@ export default function ProfileScreen() {
           <View style={styles.accountSettingsCardDivider} />
           
           <View style={styles.accountSettingsCardContent}>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={timezone}
-                onValueChange={(itemValue) => {
-                  setTimezone(itemValue);
-                  saveAccountSettings(itemValue, maxChallengesPerDay);
-                }}
-                style={styles.picker}
-                itemStyle={styles.pickerItem}
-                mode="dropdown"
-              >
-                {timezoneOptions.map((option) => (
-                  <Picker.Item key={option.value} label={option.label} value={option.value} />
-                ))}
-              </Picker>
-            </View>
+            <SelectDropdown
+              options={timezoneOptions}
+              value={timezone}
+              onChange={(itemValue) => {
+                setTimezone(itemValue as string);
+                saveAccountSettings(itemValue as string, maxChallengesPerDay);
+              }}
+              icon="globe-outline"
+              placeholder="Select timezone..."
+            />
           </View>
         </View>
 
@@ -703,22 +696,16 @@ export default function ProfileScreen() {
           <View style={styles.accountSettingsCardDivider} />
           
           <View style={styles.accountSettingsCardContent}>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={maxChallengesPerDay}
-                onValueChange={(itemValue) => {
-                  setMaxChallengesPerDay(itemValue);
-                  saveAccountSettings(timezone, itemValue);
-                }}
-                style={styles.picker}
-                itemStyle={styles.pickerItem}
-                mode="dropdown"
-              >
-                {maxChallengesOptions.map((option) => (
-                  <Picker.Item key={option.value} label={option.label} value={option.value} />
-                ))}
-              </Picker>
-            </View>
+            <SelectDropdown
+              options={maxChallengesOptions}
+              value={maxChallengesPerDay}
+              onChange={(itemValue) => {
+                setMaxChallengesPerDay(itemValue as number);
+                saveAccountSettings(timezone, itemValue as number);
+              }}
+              icon="trophy-outline"
+              placeholder="Select limit..."
+            />
           </View>
         </View>
       </View>

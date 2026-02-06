@@ -4,7 +4,6 @@ import { MCQQuiz } from "@/components/mcq-quiz/quiz/MCQQuiz";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { useSubmitAnswer } from "@/api-routes/submitAnswer";
-import { useGetUserSkills } from "@/api-routes/getUserSkills";
 import { Alert } from "react-native";
 import type { AnswerChallengeResponse } from "@learning-platform/shared";
 import type { MCQQuestion, Challenge, ChallengeWithNotification } from "@/types/Quiz";
@@ -56,12 +55,14 @@ const SkillAssessmentScreen = () => {
   }
   
   const { execute: submitAnswer, isLoading: isSubmitting } = useSubmitAnswer();
-  const { execute: fetchUserSkills, isLoading: isFetchingSkills } = useGetUserSkills();
   const { removePendingChallenge } = useNotificationStore();
-  const { setSkillPendingChallenges, getCachedPendingChallenges } = useSkillsStore();
+  const { 
+    getCachedChallengeHistory,
+    setSkillChallengeHistory 
+  } = useSkillsStore();
     
-  // Combined loading state for the entire finish flow
-  const isProcessing = isSubmitting || isFetchingSkills;
+  // Loading state for submission
+  const isProcessing = isSubmitting;
     
   // Store quiz result for optimistic update
   const [quizResult, setQuizResult] = useState<QuizResultData | null>(null);
@@ -142,15 +143,15 @@ const SkillAssessmentScreen = () => {
       });
 
       // Store result for optimistic update
-      setQuizResult({
+      const quizResultData: QuizResultData = {
         ...result,
         selectedOption: answerData.selectedOption,
         responseTime: answerData.responseTime,
         confidence: answerData.confidence,
-      });
+      };
+      setQuizResult(quizResultData);
 
       // Remove the challenge from pending notifications immediately after successful submission
-      // This updates the badge count while the loading spinner is still visible for skill progress fetching
       if (answerData.challengeId) {
         // Get the challenge from the store to find its notification identifier (if from push notification)
         const { pendingChallenges } = useNotificationStore.getState();
@@ -164,11 +165,36 @@ const SkillAssessmentScreen = () => {
         
         removePendingChallenge(answerData.challengeId);
         
-        // Also remove from skillsStore cache to ensure assessment page is updated
+        // Note: Pending challenges are now managed exclusively in notificationStore
+        // No need to update skillsStore cache - the subscription in Assessment screen
+        // automatically updates when notificationStore changes
         if (skillId) {
-          const currentPending = getCachedPendingChallenges(skillId) || [];
-          const updatedPending = currentPending.filter(c => c.challengeId !== answerData.challengeId);
-          setSkillPendingChallenges(skillId, updatedPending);
+          // Optimistically add the answer to history cache
+          // This ensures the assessment page shows the answer immediately
+          if (questionData) {
+            const answeredChallenge = {
+              answerId: `temp-${Date.now()}`,
+              challengeId: answerData.challengeId,
+              skillId: skillId,
+              skillName: skill || '',
+              difficulty: 5,
+              question: questionData.question,
+              options: questionData.answers.map((a: { text: string }) => a.text),
+              selectedOption: answerData.selectedOption,
+              correctOption: result.correctOption,
+              isCorrect: result.isCorrect,
+              explanation: result.explanation,
+              responseTime: answerData.responseTime,
+              confidence: answerData.confidence,
+              answeredAt: new Date().toISOString(),
+              createdAt: new Date().toISOString(),
+            };
+            
+            const currentHistory = getCachedChallengeHistory(skillId) || [];
+            const updatedHistory = [answeredChallenge, ...currentHistory];
+            setSkillChallengeHistory(skillId, updatedHistory);
+            console.log('[Quiz] ✅ Optimistically updated history cache');
+          }
         }
         // Emit notification event to refresh badge count immediately
         notificationEventEmitter.emit();
@@ -194,7 +220,7 @@ const SkillAssessmentScreen = () => {
         skillName: skill,
         difficulty: 5, // Default, could be passed in params
         question: questionData.question,
-        options: questionData.answers.map(a => a.text),
+        options: questionData.answers.map((a: { text: string }) => a.text),
         selectedOption: quizResult.selectedOption,
         correctOption: quizResult.correctOption,
         isCorrect: quizResult.isCorrect,
@@ -206,25 +232,40 @@ const SkillAssessmentScreen = () => {
       };
 
       try {
-        // Fetch current skill progress from API
-        console.log('[Quiz] 🔄 Fetching skill progress for navigation...');
-        const userSkills = await fetchUserSkills({ userId });
-        const skillData = userSkills?.find(s => s.skillId === skillId);
+        // Get updated cache data synchronously - no blocking API calls
+        const store = useSkillsStore.getState();
+        const cachedUserSkills = store.userSkills;
+        const cachedHistory = getCachedChallengeHistory(skillId) || [];
+        
+        // Get pending challenges from notificationStore (single source of truth)
+        const notificationState = useNotificationStore.getState();
+        const pendingCount = notificationState.pendingChallenges.filter(c => c.skillId === skillId).length;
+        
+        // Calculate progress from cached data
+        const skillData = cachedUserSkills?.find((s: { skillId: string }) => s.skillId === skillId);
         const progress = skillData ? skillData.accuracy * 100 : 0;
         
-        console.log('[Quiz] ✅ Navigating to assessment with progress:', progress);
+        console.log('[Quiz] ✅ Navigating to assessment with cached data:', {
+          progress,
+          pendingCount,
+          historyCount: cachedHistory.length,
+        });
         
-        // Challenge already removed from pending in handleSubmitAnswer
-        // Navigate explicitly to assessment with all required params
+        // Navigate with initialData to prevent flicker
+        // Note: pending challenges are now read from notificationStore (not passed in initialData)
         navigateTo('assessment', { 
           skill, 
           skillId, 
           progress,
           answeredChallenge: JSON.stringify(answeredChallenge),
+          initialData: {
+            userSkills: cachedUserSkills,
+            history: cachedHistory,
+          },
         });
       } catch (error) {
-        console.error('[Quiz] ❌ Failed to fetch skill progress:', error);
-        // Fallback: navigate without progress data
+        console.error('[Quiz] ❌ Failed to navigate with cached data:', error);
+        // Fallback: navigate without initialData (will fetch on assessment page)
         navigateTo('assessment', { 
           skill, 
           skillId, 
