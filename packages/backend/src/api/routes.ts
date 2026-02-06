@@ -18,7 +18,7 @@ import {
 } from '@shared/schemas';
 import { calibrationService } from '@/services/calibration.service';
 import { createLLMProvider } from '@/lib/llm-provider';
-import { datasetGenerator } from '@/lib/dataset-generator';
+import { datasetGenerator, createDatasetGenerator } from '@/lib/dataset-generator';
 import { experimentRunner } from '@/lib/experiment-runner';
 const router = express.Router();
 
@@ -1356,11 +1356,28 @@ router.get('/users/:userId/skills/:skillId/calibration/status', async (req: Requ
 
 /**
  * POST /api/datasets/generate
- * Generate dataset for a specific skill or all skills without datasets
+ * Generate dataset for a specific skill, optionally at a specific level.
+ *
+ * Body:
+ * - skillId: string (optional) - Generate for specific skill. If omitted, generates for all skills.
+ * - level: number (optional) - Generate level-specific dataset (1-10). Creates skill_{id}_level_{level}_scenarios.
+ * - provider: 'anthropic' | 'openai' (optional) - Which LLM to use for generation. Default: 'anthropic'.
+ *   Using 'openai' creates datasets with '_openai_scenarios' suffix, useful for breaking circularity.
+ *
+ * Without level: Creates mixed-level dataset (skill_{id}_scenarios) with 2 scenarios per level (20 total)
+ * With level: Creates level-specific dataset (skill_{id}_level_{level}_scenarios) with 5 scenarios
  */
 router.post('/datasets/generate', async (req: Request, res: Response) => {
   try {
-    const { skillId } = req.body;
+    const { skillId, level, provider = 'anthropic' } = req.body;
+
+    // Validate provider
+    if (provider !== 'anthropic' && provider !== 'openai') {
+      return res.status(400).json({ error: 'Provider must be "anthropic" or "openai"' });
+    }
+
+    // Create generator with specified provider
+    const generator = createDatasetGenerator(provider);
     const supabase = getSupabase();
 
     if (skillId) {
@@ -1376,13 +1393,41 @@ router.post('/datasets/generate', async (req: Request, res: Response) => {
       }
 
       const skillData = skill as any;
-      const result = await datasetGenerator.generateDatasetForSkill({
+
+      // If level is specified, generate level-specific dataset
+      if (level !== undefined) {
+        const levelNum = parseInt(level);
+        if (isNaN(levelNum) || levelNum < 1 || levelNum > 10) {
+          return res.status(400).json({ error: 'Level must be between 1 and 10' });
+        }
+
+        const result = await generator.generateDatasetForSkillLevel({
+          skillId: skillData.id,
+          skillName: skillData.name,
+          skillDescription: skillData.description,
+          level: levelNum,
+        });
+
+        return res.json({
+          ...result,
+          level: levelNum,
+          type: 'level-specific',
+          provider,
+        });
+      }
+
+      // Otherwise, generate standard mixed-level dataset
+      const result = await generator.generateDatasetForSkill({
         skillId: skillData.id,
         skillName: skillData.name,
         skillDescription: skillData.description,
       });
 
-      return res.json(result);
+      return res.json({
+        ...result,
+        type: 'mixed-level',
+        provider,
+      });
     }
 
     // Generate for all skills without datasets
@@ -1395,11 +1440,74 @@ router.post('/datasets/generate', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Failed to fetch skills' });
     }
 
-    const result = await datasetGenerator.ensureAllSkillsHaveDatasets(skills as any[]);
-    res.json(result);
+    const result = await generator.ensureAllSkillsHaveDatasets(skills as any[]);
+    res.json({ ...result, provider });
   } catch (error) {
     console.error('Dataset generation error:', error);
     res.status(500).json({ error: 'Failed to generate dataset' });
+  }
+});
+
+/**
+ * POST /api/datasets/generate-all-levels
+ * Generate level-specific datasets for all 10 difficulty levels of a skill.
+ * Creates datasets: skill_{id}_level_1_scenarios through skill_{id}_level_10_scenarios
+ * Each dataset contains 5 scenarios.
+ *
+ * Body:
+ * - skillId: string (required) - The skill ID to generate datasets for
+ * - provider: 'anthropic' | 'openai' (optional) - Which LLM to use. Default: 'anthropic'.
+ *   Using 'openai' creates datasets with '_openai_scenarios' suffix.
+ */
+router.post('/datasets/generate-all-levels', async (req: Request, res: Response) => {
+  try {
+    const { skillId, provider = 'anthropic' } = req.body;
+
+    if (!skillId) {
+      return res.status(400).json({ error: 'skillId is required' });
+    }
+
+    // Validate provider
+    if (provider !== 'anthropic' && provider !== 'openai') {
+      return res.status(400).json({ error: 'Provider must be "anthropic" or "openai"' });
+    }
+
+    const supabase = getSupabase();
+
+    const { data: skill, error } = await supabase
+      .from('skills')
+      .select('id, name, description')
+      .eq('id', skillId)
+      .single();
+
+    if (error || !skill) {
+      return res.status(404).json({ error: 'Skill not found' });
+    }
+
+    const skillData = skill as any;
+    const generator = createDatasetGenerator(provider);
+
+    console.log(`[API] Generating all-levels datasets for skill: ${skillData.name} (provider: ${provider})`);
+
+    const result = await generator.generateAllLevelDatasetsForSkill({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      skillDescription: skillData.description,
+    });
+
+    res.json({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      provider,
+      generated: result.generated,
+      skipped: result.skipped,
+      errors: result.errors,
+      totalLevels: 10,
+      message: `Generated ${result.generated.length} level datasets (${provider}), skipped ${result.skipped.length} (already exist), ${result.errors.length} errors`,
+    });
+  } catch (error) {
+    console.error('Generate all-levels dataset error:', error);
+    res.status(500).json({ error: 'Failed to generate level datasets' });
   }
 });
 

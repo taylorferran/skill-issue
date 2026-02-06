@@ -1,9 +1,12 @@
-import { createLLMProvider } from './llm-provider';
+import { createLLMProvider, createOpenAIProvider, OpenAIProvider, AnthropicProvider } from './llm-provider';
 import { opikService } from './opik';
 import type { ChallengeScenario, DatasetGenerationResult, DatasetItem } from '@/types';
 
 const SCENARIOS_PER_DIFFICULTY = 2;
+const SCENARIOS_PER_LEVEL_DATASET = 5;  // For per-skill-per-level datasets
 const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+export type LLMProviderType = 'anthropic' | 'openai';
 
 /**
  * Dataset Generator Service
@@ -11,9 +14,18 @@ const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
  * Generates synthetic datasets for skills to enable prompt evaluation and experimentation.
  * Each dataset contains scenarios across all difficulty levels (1-10), with multiple
  * scenarios per difficulty to ensure diversity.
+ *
+ * Supports both Anthropic (Claude) and OpenAI providers. Using OpenAI for dataset
+ * generation breaks the circularity when optimizing Claude-based prompts.
  */
 export class DatasetGenerator {
-  private llmProvider = createLLMProvider();
+  private llmProvider: AnthropicProvider | OpenAIProvider;
+  private providerType: LLMProviderType;
+
+  constructor(provider: LLMProviderType = 'anthropic') {
+    this.providerType = provider;
+    this.llmProvider = provider === 'openai' ? createOpenAIProvider() : createLLMProvider();
+  }
 
   /**
    * Generate a complete dataset for a skill.
@@ -143,6 +155,169 @@ export class DatasetGenerator {
       });
       throw error;
     }
+  }
+
+  /**
+   * Generate a level-specific dataset for a skill.
+   * Creates 5 scenarios for a single difficulty level.
+   * Used for per-skill-per-level prompt optimization.
+   *
+   * Dataset naming:
+   * - Anthropic: skill_{id}_level_{level}_scenarios
+   * - OpenAI: skill_{id}_level_{level}_openai_scenarios
+   */
+  async generateDatasetForSkillLevel(params: {
+    skillId: string;
+    skillName: string;
+    skillDescription: string;
+    level: number;
+  }): Promise<DatasetGenerationResult> {
+    // Include provider in dataset name for OpenAI to distinguish from Claude-generated
+    const suffix = this.providerType === 'openai' ? '_openai_scenarios' : '_scenarios';
+    const datasetName = `skill_${params.skillId}_level_${params.level}${suffix}`;
+    const startTime = Date.now();
+
+    // Check if dataset already exists
+    const existing = await opikService.findDataset(datasetName);
+    if (existing) {
+      console.log(`[DatasetGenerator] Dataset already exists: ${datasetName}`);
+      return {
+        datasetName,
+        itemsCreated: 0,
+        scenarios: [],
+      };
+    }
+
+    // Start trace for this dataset generation
+    const traceId = await opikService.startTrace({
+      name: 'dataset_generation_level',
+      input: {
+        skillId: params.skillId,
+        skillName: params.skillName,
+        skillDescription: params.skillDescription,
+        level: params.level,
+        scenariosPerLevel: SCENARIOS_PER_LEVEL_DATASET,
+      },
+      tags: [
+        'dataset',
+        'per-level',
+        `skill:${params.skillName}`,
+        `level:${params.level}`,
+        `provider:${this.providerType}`,
+      ],
+    });
+
+    console.log(`[DatasetGenerator] Generating level-specific dataset: ${datasetName}`);
+
+    try {
+      // Create the dataset in Opik
+      await opikService.createDataset({
+        name: datasetName,
+        description: `Challenge scenarios for ${params.skillName} at difficulty level ${params.level}`,
+      });
+
+      // Generate scenarios for this specific level
+      const { scenarios, usage, prompt, rawResponse, durationMs } = await this.generateScenariosForDifficulty({
+        skillName: params.skillName,
+        skillDescription: params.skillDescription,
+        difficulty: params.level,
+        count: SCENARIOS_PER_LEVEL_DATASET,
+      });
+
+      // Create LLM span for this generation
+      const modelName = this.providerType === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001';
+      await opikService.createSpan({
+        traceId,
+        name: `generate_scenarios_level_${params.level}`,
+        type: 'llm',
+        model: modelName,
+        provider: this.providerType,
+        input: { prompt },
+        output: {
+          scenarios: scenarios.length,
+          rawResponse: rawResponse.substring(0, 500) + (rawResponse.length > 500 ? '...' : ''),
+        },
+        promptTokens: usage.inputTokens,
+        completionTokens: usage.outputTokens,
+        durationMs,
+      });
+
+      // Convert scenarios to dataset items
+      const datasetItems: DatasetItem[] = scenarios.map(scenario =>
+        this.scenarioToDatasetItem({
+          skillId: params.skillId,
+          skillName: params.skillName,
+          skillDescription: params.skillDescription,
+          scenario,
+        })
+      );
+
+      // Add items to Opik dataset
+      await opikService.addDatasetItems(datasetName, datasetItems);
+
+      const totalDuration = Date.now() - startTime;
+      console.log(`[DatasetGenerator] Created ${datasetItems.length} scenarios for ${params.skillName} level ${params.level}`);
+
+      // End trace with success
+      await opikService.endTrace({
+        traceId,
+        output: {
+          datasetName,
+          itemsCreated: datasetItems.length,
+          totalInputTokens: usage.inputTokens,
+          totalOutputTokens: usage.outputTokens,
+          durationMs: totalDuration,
+        },
+      });
+
+      return {
+        datasetName,
+        itemsCreated: datasetItems.length,
+        scenarios,
+      };
+    } catch (error) {
+      // End trace with error
+      await opikService.endTrace({
+        traceId,
+        output: { error: String(error) },
+        error: error as Error,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Generate level-specific datasets for all levels of a skill.
+   * Creates 10 datasets (one per level) with 5 scenarios each.
+   */
+  async generateAllLevelDatasetsForSkill(params: {
+    skillId: string;
+    skillName: string;
+    skillDescription: string;
+  }): Promise<{ generated: number[]; skipped: number[]; errors: number[] }> {
+    const generated: number[] = [];
+    const skipped: number[] = [];
+    const errors: number[] = [];
+
+    for (const level of DIFFICULTY_LEVELS) {
+      try {
+        const result = await this.generateDatasetForSkillLevel({
+          ...params,
+          level,
+        });
+
+        if (result.itemsCreated > 0) {
+          generated.push(level);
+        } else {
+          skipped.push(level);
+        }
+      } catch (error) {
+        console.error(`[DatasetGenerator] Error generating level ${level}:`, error);
+        errors.push(level);
+      }
+    }
+
+    return { generated, skipped, errors };
   }
 
   /**
@@ -320,5 +495,10 @@ Generate ${params.count} diverse, non-overlapping scenarios.`;
   }
 }
 
-// Export singleton instance
+// Export factory function to create generator with specific provider
+export function createDatasetGenerator(provider: LLMProviderType = 'anthropic'): DatasetGenerator {
+  return new DatasetGenerator(provider);
+}
+
+// Default singleton instance (uses Anthropic)
 export const datasetGenerator = new DatasetGenerator();

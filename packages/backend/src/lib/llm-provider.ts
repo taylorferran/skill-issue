@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import type {
   LLMProvider,
@@ -6,6 +7,7 @@ import type {
   GeneratedChallenge,
   GeneratedChallengeWithUsage,
 } from '@/types';
+import { getPromptForChallenge } from './prompt-loader';
 
 dotenv.config();
 /**
@@ -122,50 +124,14 @@ Generate the challenge now:`;
         .replace(/\{\{difficulty_description\}\}/g, this.getDifficultyDescription(difficulty));
     }
 
-    // Default template
-    return `You are generating a multiple-choice challenge to test knowledge and competence.
-
-SKILL: ${skillName || skillId}
-DESCRIPTION: ${skillDescription || 'General knowledge challenge'}
-DIFFICULTY LEVEL: ${difficulty}/10
-
-Generate a single multiple choice challenge that tests real competence in this skill at this difficulty level.
-
-RULES:
-- Difficulty ${difficulty} means: ${this.getDifficultyDescription(difficulty)}
-- Question must be answerable in under 30 seconds
-- 4 options, only 1 correct
-- Randomly shuffle the order of correct answer among the options
-- Don't repeat questions you've generated before - each challenge must be unique try to make it unique
-- Distractors should be plausible but clearly wrong to someone who knows the subject
-- Include a brief explanation of why the answer is correct
-- Tailor the question specifically to the skill described above
-- Make sure the correct answer is not ambiguous or debatable
-
-BREVITY REQUIREMENTS (CRITICAL):
-- Question: 15-25 words maximum, no unnecessary words
-- Options: 3-8 words each, direct answers only
-- Explanation: 20-30 words maximum, concise reasoning
-- Avoid: storytelling, excessive context, verbose setups, filler words
-- Focus: Test the concept directly and efficiently
-
-Examples of good brevity:
-✓ "Which sorting algorithm has O(n log n) average time complexity?"
-✗ "When implementing a search on a large dataset, which algorithm would be best?"
-
-✓ "What is the capital of France?"
-✗ "If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?"
-
-OUTPUT FORMAT (strict JSON):
-{
-  "question": "...",
-  "options": ["A...", "B...", "C...", "D..."],
-  "correctAnswerIndex": 0,
-  "explanation": "...",
-  "actualDifficulty": ${difficulty}
-}
-
-Generate the challenge now:`;
+    // Use prompt loader to get the best available prompt
+    // This checks for optimized prompts first, then falls back to base template
+    return getPromptForChallenge(
+      skillId,
+      skillName || skillId,
+      skillDescription || 'General knowledge challenge',
+      difficulty
+    );
   }
 
   private getDifficultyDescription(difficulty: number): string {
@@ -347,15 +313,58 @@ Generate the response now:`;
   }
 }
 
-// Factory function to create provider
-// Todo: Allow switching between multiple providers in future
+/**
+ * OpenAI Provider for dataset generation (breaks Claude circularity)
+ */
+export class OpenAIProvider {
+  private client: OpenAI;
+
+  constructor(apiKey: string) {
+    this.client = new OpenAI({ apiKey });
+  }
+
+  /**
+   * Generate raw text from OpenAI (for dataset generation)
+   */
+  async generateRaw(
+    prompt: string,
+    options: { maxTokens?: number; temperature?: number } = {}
+  ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
+    const response = await this.client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      max_tokens: options.maxTokens || 1000,
+      temperature: options.temperature ?? 0.7,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const text = response.choices[0]?.message?.content || '';
+
+    return {
+      text,
+      usage: {
+        inputTokens: response.usage?.prompt_tokens || 0,
+        outputTokens: response.usage?.completion_tokens || 0,
+      },
+    };
+  }
+}
+
+// Factory function to create Anthropic provider (default, backwards compatible)
 export function createLLMProvider(): AnthropicProvider {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-
   if (!apiKey) {
     throw new Error('Missing ANTHROPIC_API_KEY environment variable');
   }
-
   console.log('[LLM Provider] Initializing Anthropic Claude API');
   return new AnthropicProvider(apiKey);
+}
+
+// Factory function to create OpenAI provider (for dataset generation to break circularity)
+export function createOpenAIProvider(): OpenAIProvider {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing OPENAI_API_KEY environment variable');
+  }
+  console.log('[LLM Provider] Initializing OpenAI API');
+  return new OpenAIProvider(apiKey);
 }
