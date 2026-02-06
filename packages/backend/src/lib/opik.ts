@@ -1126,6 +1126,13 @@ class OpikService {
 
   /**
    * Add items to a dataset
+   *
+   * For example-based datasets:
+   * - input: {} (empty)
+   * - expected_output: { question, options, correctAnswerIndex, explanation }
+   *
+   * Opik expects `input` and `expected_output` as top-level fields in `data`.
+   * Do NOT flatten - the Python optimizer reads via dataset_item.get("expected_output", {})
    */
   async addDatasetItems(
     datasetName: string,
@@ -1142,35 +1149,16 @@ class OpikService {
 
     // Format items according to Opik API spec:
     // - Use PUT method (not POST)
-    // - All fields must be inside a 'data' object
-    // - Flatten nested objects so Opik displays clean columns
+    // - Preserve nested structure in 'data' object
     // - 'source' field is required
-    const formattedItems = items.map(item => {
-      const input = item.input as Record<string, unknown>;
-      const expectedOutput = item.expected_output as Record<string, unknown>;
-      const metadata = item.metadata as Record<string, unknown> | undefined;
-      const difficultyRange = expectedOutput.difficulty_range as [number, number] | undefined;
-
-      return {
-        id: generateUUIDv7(),
-        source: 'sdk',
-        data: {
-          // Flattened input fields (skill_id omitted - same for all items in dataset)
-          skill_name: input.skill_name,
-          skill_description: input.skill_description,
-          difficulty: input.difficulty,
-          scenario: input.scenario,
-          expected_concepts: input.expected_concepts,
-          // Flattened expected_output fields
-          difficulty_range_min: difficultyRange?.[0],
-          difficulty_range_max: difficultyRange?.[1],
-          required_concepts: expectedOutput.required_concepts,
-          // Flattened metadata fields (created_at omitted - not useful for analysis)
-          source_type: metadata?.source,
-          item_id: metadata?.item_id,
-        },
-      };
-    });
+    const formattedItems = items.map(item => ({
+      id: generateUUIDv7(),
+      source: 'sdk',
+      data: {
+        input: item.input,                    // Preserve as nested object
+        expected_output: item.expected_output, // Preserve as nested object
+      },
+    }));
 
     // Batch in groups of 50
     for (let i = 0; i < formattedItems.length; i += 50) {

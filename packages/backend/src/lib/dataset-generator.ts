@@ -1,9 +1,8 @@
 import { createLLMProvider, createOpenAIProvider, OpenAIProvider, AnthropicProvider } from './llm-provider';
 import { opikService } from './opik';
-import type { ChallengeScenario, DatasetGenerationResult, DatasetItem } from '@/types';
+import type { GeneratedChallenge, DatasetGenerationResult, DatasetItem } from '@/types';
 
-const SCENARIOS_PER_DIFFICULTY = 2;
-const SCENARIOS_PER_LEVEL_DATASET = 5;  // For per-skill-per-level datasets
+const EXAMPLES_PER_LEVEL = 5;  // Number of example challenges per difficulty level
 const DIFFICULTY_LEVELS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 export type LLMProviderType = 'anthropic' | 'openai';
@@ -11,170 +10,42 @@ export type LLMProviderType = 'anthropic' | 'openai';
 /**
  * Dataset Generator Service
  *
- * Generates synthetic datasets for skills to enable prompt evaluation and experimentation.
- * Each dataset contains scenarios across all difficulty levels (1-10), with multiple
- * scenarios per difficulty to ensure diversity.
+ * Generates example-based datasets for prompt optimization.
+ * Each dataset contains high-quality example challenges that serve as
+ * benchmarks for evaluating generated challenge quality.
  *
- * Supports both Anthropic (Claude) and OpenAI providers. Using OpenAI for dataset
- * generation breaks the circularity when optimizing Claude-based prompts.
+ * Key design: Uses GPT-4o to generate examples (breaks Claude circularity).
+ * Dataset items have empty `input` and example challenges in `expected_output`.
  */
 export class DatasetGenerator {
   private llmProvider: AnthropicProvider | OpenAIProvider;
   private providerType: LLMProviderType;
 
-  constructor(provider: LLMProviderType = 'anthropic') {
+  constructor(provider: LLMProviderType = 'openai') {
     this.providerType = provider;
+    // Default to OpenAI for example generation (breaks circularity)
     this.llmProvider = provider === 'openai' ? createOpenAIProvider() : createLLMProvider();
   }
 
   /**
-   * Generate a complete dataset for a skill.
-   * Creates 2 scenarios per difficulty level = 20 items total.
-   * Traces the entire operation with nested LLM spans for each difficulty.
-   */
-  async generateDatasetForSkill(params: {
-    skillId: string;
-    skillName: string;
-    skillDescription: string;
-  }): Promise<DatasetGenerationResult> {
-    const datasetName = `skill_${params.skillId}_scenarios`;
-    const startTime = Date.now();
-
-    // Check if dataset already exists
-    const existing = await opikService.findDataset(datasetName);
-    if (existing) {
-      console.log(`[DatasetGenerator] Dataset already exists: ${datasetName}`);
-      return {
-        datasetName,
-        itemsCreated: 0,
-        scenarios: [],
-      };
-    }
-
-    // Start trace for this dataset generation
-    const traceId = await opikService.startTrace({
-      name: 'dataset_generation',
-      input: {
-        skillId: params.skillId,
-        skillName: params.skillName,
-        skillDescription: params.skillDescription,
-        scenariosPerDifficulty: SCENARIOS_PER_DIFFICULTY,
-        difficultyLevels: DIFFICULTY_LEVELS.length,
-      },
-      tags: [
-        'dataset',
-        `skill:${params.skillName}`,
-      ],
-    });
-
-    console.log(`[DatasetGenerator] Generating dataset for skill: ${params.skillName}`);
-
-    try {
-      // Create the dataset in Opik
-      await opikService.createDataset({
-        name: datasetName,
-        description: `Challenge scenarios for ${params.skillName}`,
-      });
-
-      // Generate scenarios for each difficulty level
-      const allScenarios: ChallengeScenario[] = [];
-      const datasetItems: DatasetItem[] = [];
-      let totalInputTokens = 0;
-      let totalOutputTokens = 0;
-
-      for (const difficulty of DIFFICULTY_LEVELS) {
-        console.log(`[DatasetGenerator] Generating scenarios for difficulty ${difficulty}...`);
-
-        const { scenarios, usage, prompt, rawResponse, durationMs } = await this.generateScenariosForDifficulty({
-          skillName: params.skillName,
-          skillDescription: params.skillDescription,
-          difficulty,
-          count: SCENARIOS_PER_DIFFICULTY,
-        });
-
-        // Create LLM span for this difficulty level
-        await opikService.createSpan({
-          traceId,
-          name: `generate_scenarios_d${difficulty}`,
-          type: 'llm',
-          model: 'claude-haiku-4-5-20251001',
-          provider: 'anthropic',
-          input: { prompt },
-          output: {
-            scenarios: scenarios.length,
-            rawResponse: rawResponse.substring(0, 500) + (rawResponse.length > 500 ? '...' : ''),
-          },
-          promptTokens: usage.inputTokens,
-          completionTokens: usage.outputTokens,
-          durationMs,
-        });
-
-        totalInputTokens += usage.inputTokens;
-        totalOutputTokens += usage.outputTokens;
-
-        for (const scenario of scenarios) {
-          allScenarios.push(scenario);
-          datasetItems.push(this.scenarioToDatasetItem({
-            skillId: params.skillId,
-            skillName: params.skillName,
-            skillDescription: params.skillDescription,
-            scenario,
-          }));
-        }
-      }
-
-      // Add items to Opik dataset
-      await opikService.addDatasetItems(datasetName, datasetItems);
-
-      const totalDuration = Date.now() - startTime;
-      console.log(`[DatasetGenerator] Created ${datasetItems.length} scenarios for ${params.skillName}`);
-
-      // End trace with success
-      await opikService.endTrace({
-        traceId,
-        output: {
-          datasetName,
-          itemsCreated: datasetItems.length,
-          totalInputTokens,
-          totalOutputTokens,
-          durationMs: totalDuration,
-        },
-      });
-
-      return {
-        datasetName,
-        itemsCreated: datasetItems.length,
-        scenarios: allScenarios,
-      };
-    } catch (error) {
-      // End trace with error
-      await opikService.endTrace({
-        traceId,
-        output: { error: String(error) },
-        error: error as Error,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Generate a level-specific dataset for a skill.
-   * Creates 5 scenarios for a single difficulty level.
-   * Used for per-skill-per-level prompt optimization.
+   * Generate a level-specific dataset with example challenges.
+   * Creates 5 high-quality example challenges for a single difficulty level.
    *
-   * Dataset naming:
-   * - Anthropic: skill_{id}_level_{level}_scenarios
-   * - OpenAI: skill_{id}_level_{level}_openai_scenarios
+   * Dataset structure:
+   * - input: {} (empty - no hints for generation)
+   * - expected_output: { question, options, correctAnswerIndex, explanation }
+   *
+   * Dataset naming: skill_{id}_level_{level}_examples
    */
-  async generateDatasetForSkillLevel(params: {
+  async generateDatasetForLevel(params: {
     skillId: string;
     skillName: string;
     skillDescription: string;
     level: number;
+    count?: number;
   }): Promise<DatasetGenerationResult> {
-    // Include provider in dataset name for OpenAI to distinguish from Claude-generated
-    const suffix = this.providerType === 'openai' ? '_openai_scenarios' : '_scenarios';
-    const datasetName = `skill_${params.skillId}_level_${params.level}${suffix}`;
+    const count = params.count || EXAMPLES_PER_LEVEL;
+    const datasetName = `skill_${params.skillId}_level_${params.level}_examples`;
     const startTime = Date.now();
 
     // Check if dataset already exists
@@ -184,57 +55,56 @@ export class DatasetGenerator {
       return {
         datasetName,
         itemsCreated: 0,
-        scenarios: [],
+        examples: [],
       };
     }
 
     // Start trace for this dataset generation
     const traceId = await opikService.startTrace({
-      name: 'dataset_generation_level',
+      name: 'dataset_generation_examples',
       input: {
         skillId: params.skillId,
         skillName: params.skillName,
         skillDescription: params.skillDescription,
         level: params.level,
-        scenariosPerLevel: SCENARIOS_PER_LEVEL_DATASET,
+        examplesPerLevel: count,
       },
       tags: [
         'dataset',
-        'per-level',
+        'examples',
         `skill:${params.skillName}`,
         `level:${params.level}`,
         `provider:${this.providerType}`,
       ],
     });
 
-    console.log(`[DatasetGenerator] Generating level-specific dataset: ${datasetName}`);
+    console.log(`[DatasetGenerator] Generating example dataset: ${datasetName}`);
 
     try {
       // Create the dataset in Opik
       await opikService.createDataset({
         name: datasetName,
-        description: `Challenge scenarios for ${params.skillName} at difficulty level ${params.level}`,
+        description: `Example challenges for ${params.skillName} at difficulty level ${params.level}`,
       });
 
-      // Generate scenarios for this specific level
-      const { scenarios, usage, prompt, rawResponse, durationMs } = await this.generateScenariosForDifficulty({
+      // Generate example challenges using GPT-4o
+      const { examples, usage, prompt, rawResponse, durationMs } = await this.generateExampleChallenges({
         skillName: params.skillName,
         skillDescription: params.skillDescription,
         difficulty: params.level,
-        count: SCENARIOS_PER_LEVEL_DATASET,
+        count,
       });
 
       // Create LLM span for this generation
-      const modelName = this.providerType === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001';
       await opikService.createSpan({
         traceId,
-        name: `generate_scenarios_level_${params.level}`,
+        name: `generate_examples_level_${params.level}`,
         type: 'llm',
-        model: modelName,
-        provider: this.providerType,
+        model: 'gpt-4o',
+        provider: 'openai',
         input: { prompt },
         output: {
-          scenarios: scenarios.length,
+          examplesGenerated: examples.length,
           rawResponse: rawResponse.substring(0, 500) + (rawResponse.length > 500 ? '...' : ''),
         },
         promptTokens: usage.inputTokens,
@@ -242,21 +112,16 @@ export class DatasetGenerator {
         durationMs,
       });
 
-      // Convert scenarios to dataset items
-      const datasetItems: DatasetItem[] = scenarios.map(scenario =>
-        this.scenarioToDatasetItem({
-          skillId: params.skillId,
-          skillName: params.skillName,
-          skillDescription: params.skillDescription,
-          scenario,
-        })
+      // Convert examples to dataset items with empty input
+      const datasetItems: DatasetItem[] = examples.map((example, i) =>
+        this.exampleToDatasetItem(example, i + 1)
       );
 
       // Add items to Opik dataset
       await opikService.addDatasetItems(datasetName, datasetItems);
 
       const totalDuration = Date.now() - startTime;
-      console.log(`[DatasetGenerator] Created ${datasetItems.length} scenarios for ${params.skillName} level ${params.level}`);
+      console.log(`[DatasetGenerator] Created ${datasetItems.length} examples for ${params.skillName} level ${params.level}`);
 
       // End trace with success
       await opikService.endTrace({
@@ -273,7 +138,7 @@ export class DatasetGenerator {
       return {
         datasetName,
         itemsCreated: datasetItems.length,
-        scenarios,
+        examples,
       };
     } catch (error) {
       // End trace with error
@@ -287,10 +152,10 @@ export class DatasetGenerator {
   }
 
   /**
-   * Generate level-specific datasets for all levels of a skill.
-   * Creates 10 datasets (one per level) with 5 scenarios each.
+   * Generate example datasets for all levels of a skill.
+   * Creates 10 datasets (one per level) with 5 examples each.
    */
-  async generateAllLevelDatasetsForSkill(params: {
+  async generateAllLevelDatasets(params: {
     skillId: string;
     skillName: string;
     skillDescription: string;
@@ -301,7 +166,7 @@ export class DatasetGenerator {
 
     for (const level of DIFFICULTY_LEVELS) {
       try {
-        const result = await this.generateDatasetForSkillLevel({
+        const result = await this.generateDatasetForLevel({
           ...params,
           level,
         });
@@ -321,63 +186,74 @@ export class DatasetGenerator {
   }
 
   /**
-   * Use LLM to generate diverse scenarios for a specific difficulty.
-   * Returns scenarios along with usage info for tracing.
+   * Generate high-quality example challenges using GPT-4o.
+   * These serve as benchmarks for evaluating generated challenge quality.
    */
-  private async generateScenariosForDifficulty(params: {
+  private async generateExampleChallenges(params: {
     skillName: string;
     skillDescription: string;
     difficulty: number;
     count: number;
   }): Promise<{
-    scenarios: ChallengeScenario[];
+    examples: GeneratedChallenge[];
     usage: { inputTokens: number; outputTokens: number };
     prompt: string;
     rawResponse: string;
     durationMs: number;
   }> {
-    const prompt = `You are generating test scenarios for evaluating MCQ challenge generation.
+    const prompt = `You are creating high-quality example multiple-choice questions that will be used as benchmarks.
 
 SKILL: ${params.skillName}
 DESCRIPTION: ${params.skillDescription}
 DIFFICULTY LEVEL: ${params.difficulty}/10
 
-Generate ${params.count} diverse scenarios that a challenge at this difficulty level should cover.
-
-For difficulty ${params.difficulty}/10:
 ${this.getDifficultyGuidance(params.difficulty)}
 
-Each scenario should specify:
-1. A specific context/situation where this skill applies
-2. The key concepts that should be tested
-3. What makes this appropriate for difficulty ${params.difficulty}
+Generate ${params.count} diverse, high-quality MCQ challenges. These will serve as gold-standard examples of what good challenges look like.
+
+REQUIREMENTS:
+- Each question must be clear, unambiguous, and answerable in under 30 seconds
+- Exactly 4 options per question, with exactly 1 correct answer
+- Distractors should be plausible but clearly wrong to someone who knows the material
+- Include a brief, educational explanation for why the answer is correct
+- Questions should be diverse (don't repeat similar concepts)
+- Difficulty should genuinely match level ${params.difficulty}/10
+
+QUALITY STANDARDS (these are benchmark examples):
+- Question: 15-25 words, direct and focused
+- Options: 3-8 words each, no obvious giveaways
+- Explanation: 20-30 words, teaches the concept
+- Correct answer position should vary across questions
 
 OUTPUT FORMAT (strict JSON array):
 [
   {
-    "scenario": "Brief description of the testing context",
-    "expected_concepts": ["concept1", "concept2"],
-    "difficulty": ${params.difficulty}
+    "question": "Clear, focused question text",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correctAnswerIndex": 0,
+    "explanation": "Brief explanation of why this is correct"
   }
 ]
 
-Generate ${params.count} diverse, non-overlapping scenarios.`;
+Generate ${params.count} high-quality examples now:`;
 
     const startTime = Date.now();
 
     try {
-      const response = await this.llmProvider.generateRaw(prompt, {
-        maxTokens: 1500,
-        temperature: 0.8, // Higher temp for diversity
+      // Use GPT-4o for high-quality example generation
+      const response = await (this.llmProvider as OpenAIProvider).generateRaw(prompt, {
+        model: 'gpt-4o',  // Full GPT-4o for quality
+        maxTokens: 3000,
+        temperature: 0.7,
       });
 
       const durationMs = Date.now() - startTime;
       const jsonMatch = response.text.match(/\[[\s\S]*\]/);
 
       if (!jsonMatch) {
-        console.warn(`[DatasetGenerator] Failed to parse scenarios for difficulty ${params.difficulty}`);
+        console.warn(`[DatasetGenerator] Failed to parse examples for difficulty ${params.difficulty}`);
         return {
-          scenarios: this.getFallbackScenarios(params.difficulty, params.count),
+          examples: [],
           usage: response.usage,
           prompt,
           rawResponse: response.text,
@@ -385,18 +261,28 @@ Generate ${params.count} diverse, non-overlapping scenarios.`;
         };
       }
 
-      const parsed = JSON.parse(jsonMatch[0]) as ChallengeScenario[];
+      const parsed = JSON.parse(jsonMatch[0]) as GeneratedChallenge[];
+
+      // Validate and add actualDifficulty
+      const validExamples = parsed
+        .slice(0, params.count)
+        .filter(ex => this.isValidChallenge(ex))
+        .map(ex => ({
+          ...ex,
+          actualDifficulty: params.difficulty,
+        }));
+
       return {
-        scenarios: parsed.slice(0, params.count),
+        examples: validExamples,
         usage: response.usage,
         prompt,
         rawResponse: response.text,
         durationMs,
       };
     } catch (error) {
-      console.error(`[DatasetGenerator] Error generating scenarios:`, error);
+      console.error(`[DatasetGenerator] Error generating examples:`, error);
       return {
-        scenarios: this.getFallbackScenarios(params.difficulty, params.count),
+        examples: [],
         usage: { inputTokens: 0, outputTokens: 0 },
         prompt,
         rawResponse: String(error),
@@ -405,100 +291,65 @@ Generate ${params.count} diverse, non-overlapping scenarios.`;
     }
   }
 
+  /**
+   * Validate that a challenge has the required structure.
+   */
+  private isValidChallenge(challenge: GeneratedChallenge): boolean {
+    return (
+      typeof challenge.question === 'string' &&
+      challenge.question.length >= 10 &&
+      Array.isArray(challenge.options) &&
+      challenge.options.length === 4 &&
+      typeof challenge.correctAnswerIndex === 'number' &&
+      challenge.correctAnswerIndex >= 0 &&
+      challenge.correctAnswerIndex <= 3 &&
+      typeof challenge.explanation === 'string'
+    );
+  }
+
   private getDifficultyGuidance(difficulty: number): string {
-    if (difficulty <= 2) {
-      return '- Basic recall and recognition\n- Fundamental concepts\n- Clear, straightforward questions';
-    } else if (difficulty <= 4) {
-      return '- Understanding relationships between concepts\n- Simple application of knowledge\n- Some context required';
-    } else if (difficulty <= 6) {
-      return '- Application to new situations\n- Combining multiple concepts\n- Analysis of scenarios';
-    } else if (difficulty <= 8) {
-      return '- Complex problem-solving\n- Edge cases and exceptions\n- Deep understanding required';
-    } else {
-      return '- Expert-level knowledge\n- Subtle distinctions\n- Real-world complex scenarios\n- Multiple valid approaches to consider';
-    }
+    const descriptions: Record<number, string> = {
+      1: 'Complete Beginner: Basic recall, fundamental terms, no prior knowledge needed.',
+      2: 'Novice: Basic terminology, simple concepts, minimal exposure required.',
+      3: 'Basic Understanding: Core principles, definitions, foundational knowledge.',
+      4: 'Developing: Apply basic concepts to straightforward scenarios.',
+      5: 'Intermediate: Solid foundation needed, analyze and compare concepts.',
+      6: 'Proficient: Integrate multiple concepts, real-world application with nuance.',
+      7: 'Advanced: Deep understanding, edge cases, evaluate competing methods.',
+      8: 'Expert: Specialized knowledge, critical evaluation, synthesis across topics.',
+      9: 'Specialist: Mastery level, nuanced judgment, obscure details.',
+      10: 'Subject Matter Expert: Frontier knowledge, cutting-edge, unresolved debates.',
+    };
+
+    return `DIFFICULTY ${difficulty}/10 means: ${descriptions[difficulty] || descriptions[5]}`;
   }
 
-  private getFallbackScenarios(difficulty: number, count: number): ChallengeScenario[] {
-    return Array.from({ length: count }, (_, i) => ({
-      scenario: `Generic scenario ${i + 1} at difficulty ${difficulty}`,
-      expected_concepts: ['general knowledge'],
-      difficulty,
-    }));
-  }
-
-  private scenarioToDatasetItem(params: {
-    skillId: string;
-    skillName: string;
-    skillDescription: string;
-    scenario: ChallengeScenario;
-  }): DatasetItem {
+  /**
+   * Convert an example challenge to a dataset item.
+   * Key: input is EMPTY, expected_output contains the example challenge.
+   */
+  private exampleToDatasetItem(example: GeneratedChallenge, itemNumber: number): DatasetItem {
     return {
-      input: {
-        skill_id: params.skillId,
-        skill_name: params.skillName,
-        skill_description: params.skillDescription,
-        difficulty: params.scenario.difficulty,
-        scenario: params.scenario.scenario,
-        expected_concepts: params.scenario.expected_concepts,
-      },
+      input: {},  // Empty input - no hints for generation
       expected_output: {
-        difficulty_range: [
-          Math.max(1, params.scenario.difficulty - 1),
-          Math.min(10, params.scenario.difficulty + 1),
-        ],
-        required_concepts: params.scenario.expected_concepts,
-        question_characteristics: {
-          min_length: 10,
-          max_length: 500,
-          must_have_explanation: true,
-          option_count: 4,
-        },
+        question: example.question,
+        options: example.options,
+        correctAnswerIndex: example.correctAnswerIndex,
+        explanation: example.explanation,
       },
       metadata: {
-        source: 'synthetic',
-        item_id: `${params.skillId}_d${params.scenario.difficulty}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        source: 'gpt-4o',
+        item_id: itemNumber,
         created_at: new Date().toISOString(),
       },
     };
   }
-
-  /**
-   * Check all skills and generate datasets for any missing ones
-   */
-  async ensureAllSkillsHaveDatasets(skills: Array<{
-    id: string;
-    name: string;
-    description: string;
-  }>): Promise<{ generated: string[]; skipped: string[] }> {
-    const generated: string[] = [];
-    const skipped: string[] = [];
-
-    for (const skill of skills) {
-      const datasetName = `skill_${skill.id}_scenarios`;
-      const existing = await opikService.findDataset(datasetName);
-
-      if (existing) {
-        skipped.push(skill.name);
-        continue;
-      }
-
-      await this.generateDatasetForSkill({
-        skillId: skill.id,
-        skillName: skill.name,
-        skillDescription: skill.description,
-      });
-      generated.push(skill.name);
-    }
-
-    return { generated, skipped };
-  }
 }
 
-// Export factory function to create generator with specific provider
-export function createDatasetGenerator(provider: LLMProviderType = 'anthropic'): DatasetGenerator {
+// Export factory function to create generator
+export function createDatasetGenerator(provider: LLMProviderType = 'openai'): DatasetGenerator {
   return new DatasetGenerator(provider);
 }
 
-// Default singleton instance (uses Anthropic)
+// Default singleton instance (uses OpenAI for example generation)
 export const datasetGenerator = new DatasetGenerator();

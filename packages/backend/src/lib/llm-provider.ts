@@ -325,13 +325,18 @@ export class OpenAIProvider {
 
   /**
    * Generate raw text from OpenAI (for dataset generation)
+   *
+   * @param prompt - The prompt to send
+   * @param options.model - Model to use (default: gpt-4o-mini, use gpt-4o for high-quality examples)
+   * @param options.maxTokens - Max tokens to generate
+   * @param options.temperature - Temperature for generation
    */
   async generateRaw(
     prompt: string,
-    options: { maxTokens?: number; temperature?: number } = {}
+    options: { model?: string; maxTokens?: number; temperature?: number } = {}
   ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
     const response = await this.client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: options.model || 'gpt-4o-mini',
       max_tokens: options.maxTokens || 1000,
       temperature: options.temperature ?? 0.7,
       messages: [{ role: 'user', content: prompt }],

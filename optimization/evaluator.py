@@ -38,7 +38,7 @@ class EvaluationResult(TypedDict):
     reasons: dict[str, str]
 
 
-# Evaluation prompt template (matches TypeScript config/evaluation.ts)
+# Evaluation prompt template (without example comparison)
 EVALUATION_PROMPT_TEMPLATE = """You are an expert educator evaluating the quality of a multiple-choice question.
 
 ## Challenge to Evaluate
@@ -76,6 +76,49 @@ Return ONLY valid JSON with no markdown formatting. Example format:
 Your response (JSON only, no other text):"""
 
 
+# Evaluation prompt template WITH example comparison
+EVALUATION_PROMPT_WITH_EXAMPLE = """You are an expert educator evaluating the quality of a multiple-choice question.
+
+## Example (what a good challenge looks like for this skill+level):
+**Question**: {example_question}
+**Options**: {example_options}
+**Explanation**: {example_explanation}
+
+## Challenge to Evaluate
+**Skill Being Tested**: {skill_name}
+**Skill Description**: {skill_description}
+**Target Difficulty**: {target_difficulty}/10
+
+**Question**: {question}
+**Options**:
+A) {option_0}
+B) {option_1}
+C) {option_2}
+D) {option_3}
+**Correct Answer**: {correct_letter}) {correct_option}
+**Explanation**: {explanation}
+
+## Evaluation Criteria
+Compare to the example above. Rate each dimension from 0-10, where 0 is completely failing and 10 is excellent (matching or exceeding the example quality). Provide a brief reason for each score.
+
+1. **CLARITY**: Is the question as clear and unambiguous as the example?
+
+2. **DIFFICULTY_ALIGNMENT**: Does the question's complexity match the target difficulty of {target_difficulty}/10 as well as the example?
+
+3. **DISTRACTOR_QUALITY**: Are the wrong options as plausible and well-crafted as the example's distractors?
+
+4. **EDUCATIONAL_VALUE**: Does the explanation teach as effectively as the example's explanation?
+
+5. **SKILL_RELEVANCE**: Does this question test "{skill_name}" as effectively as the example?
+
+CRITICAL: You MUST return ALL 5 scores and ALL 5 reasons. Missing fields will invalidate the evaluation.
+
+Return ONLY valid JSON with no markdown formatting. Example format:
+{{"clarity": 7, "clarityReason": "The question is clear because...", "difficultyAlignment": 6, "difficultyReason": "The difficulty matches because...", "distractorQuality": 8, "distractorReason": "The distractors are good because...", "educationalValue": 7, "educationalReason": "The explanation teaches...", "skillRelevance": 9, "relevanceReason": "This tests the skill because...", "overall": "Good question with minor issues in X"}}
+
+Your response (JSON only, no other text):"""
+
+
 class ChallengeEvaluator:
     """LLM-as-Judge evaluator for challenge quality."""
 
@@ -88,16 +131,25 @@ class ChallengeEvaluator:
         skill_name: str,
         skill_description: str,
         target_difficulty: int,
+        example: Optional[dict] = None,
     ) -> EvaluationResult:
         """
         Evaluate a generated challenge using LLM-as-Judge.
         Returns scores, composite score, and pass/fail status.
+
+        Args:
+            challenge: The generated challenge to evaluate
+            skill_name: Name of the skill being tested
+            skill_description: Description of the skill
+            target_difficulty: Target difficulty level (1-10)
+            example: Optional example challenge for quality comparison
         """
         prompt = self._build_prompt(
             challenge=challenge,
             skill_name=skill_name,
             skill_description=skill_description,
             target_difficulty=target_difficulty,
+            example=example,
         )
 
         try:
@@ -121,25 +173,40 @@ class ChallengeEvaluator:
         skill_name: str,
         skill_description: str,
         target_difficulty: int,
+        example: Optional[dict] = None,
     ) -> str:
         """Build the evaluation prompt from template."""
         correct_index = challenge.get("correctAnswerIndex", 0)
         options = challenge.get("options", ["", "", "", ""])
         correct_letter = ["A", "B", "C", "D"][correct_index]
 
-        return EVALUATION_PROMPT_TEMPLATE.format(
-            skill_name=skill_name,
-            skill_description=skill_description,
-            target_difficulty=target_difficulty,
-            question=challenge.get("question", ""),
-            option_0=options[0] if len(options) > 0 else "",
-            option_1=options[1] if len(options) > 1 else "",
-            option_2=options[2] if len(options) > 2 else "",
-            option_3=options[3] if len(options) > 3 else "",
-            correct_letter=correct_letter,
-            correct_option=options[correct_index] if correct_index < len(options) else "",
-            explanation=challenge.get("explanation", "No explanation provided"),
-        )
+        # Common fields for challenge being evaluated
+        base_fields = {
+            "skill_name": skill_name,
+            "skill_description": skill_description,
+            "target_difficulty": target_difficulty,
+            "question": challenge.get("question", ""),
+            "option_0": options[0] if len(options) > 0 else "",
+            "option_1": options[1] if len(options) > 1 else "",
+            "option_2": options[2] if len(options) > 2 else "",
+            "option_3": options[3] if len(options) > 3 else "",
+            "correct_letter": correct_letter,
+            "correct_option": options[correct_index] if correct_index < len(options) else "",
+            "explanation": challenge.get("explanation", "No explanation provided"),
+        }
+
+        # Use example-comparison template if example provided
+        if example and example.get("question"):
+            example_options = example.get("options", [])
+            return EVALUATION_PROMPT_WITH_EXAMPLE.format(
+                **base_fields,
+                example_question=example.get("question", ""),
+                example_options=", ".join(example_options) if example_options else "",
+                example_explanation=example.get("explanation", ""),
+            )
+
+        # Use standard template without example
+        return EVALUATION_PROMPT_TEMPLATE.format(**base_fields)
 
     def _parse_response(self, response: str) -> EvaluationResult:
         """Parse the LLM evaluation response into structured scores."""

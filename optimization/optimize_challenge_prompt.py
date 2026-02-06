@@ -83,80 +83,100 @@ def extract_first_json_object(text: str) -> dict | None:
     return None
 
 
-def challenge_quality_metric(dataset_item: dict, llm_output: str) -> ScoreResult:
+def create_quality_metric(skill_name: str, skill_description: str, target_difficulty: int):
     """
-    Metric function for the optimizer.
+    Factory function to create a metric with skill context baked in.
 
-    Takes a dataset item and the LLM's generated output, returns a ScoreResult.
-    Uses LLM-as-judge to evaluate challenge quality.
+    This allows the metric to evaluate challenges against the known skill+level
+    without requiring dataset items to contain this metadata (which would cause
+    data leakage and inflate scores).
 
-    Returns ScoreResult with name, value (0-1), and reason for HRPO compatibility.
+    The dataset items now have empty `input` and example challenges in `expected_output`.
+    The metric compares generated challenge quality against these examples.
+
+    Args:
+        skill_name: The skill being tested
+        skill_description: Description of the skill
+        target_difficulty: The target difficulty level (1-10)
+
+    Returns:
+        A metric function compatible with Opik optimizer
     """
-    # 1. Parse challenge JSON from LLM output
-    try:
-        challenge = extract_first_json_object(llm_output)
-        if not challenge:
-            print(f"[Metric] No valid JSON found in output")
+    def challenge_quality_metric(dataset_item: dict, llm_output: str) -> ScoreResult:
+        """
+        Metric function for the optimizer.
+
+        Takes a dataset item and the LLM's generated output, returns a ScoreResult.
+        Uses LLM-as-judge to evaluate challenge quality.
+
+        Note: Skill context comes from closure, not dataset_item.
+        Dataset items have empty input and example challenges in expected_output.
+
+        Returns ScoreResult with name, value (0-1), and reason for HRPO compatibility.
+        """
+        # 1. Parse challenge JSON from LLM output
+        try:
+            challenge = extract_first_json_object(llm_output)
+            if not challenge:
+                print(f"[Metric] No valid JSON found in output")
+                return ScoreResult(
+                    name="challenge_quality",
+                    value=0.0,
+                    reason="No valid JSON found in LLM output"
+                )
+        except Exception as e:
+            print(f"[Metric] JSON parse error: {e}")
             return ScoreResult(
                 name="challenge_quality",
                 value=0.0,
-                reason="No valid JSON found in LLM output"
+                reason=f"JSON parse error: {e}"
             )
-    except Exception as e:
-        print(f"[Metric] JSON parse error: {e}")
-        return ScoreResult(
-            name="challenge_quality",
-            value=0.0,
-            reason=f"JSON parse error: {e}"
+
+        # 2. Basic validation
+        if not is_valid_challenge(challenge):
+            print(f"[Metric] Challenge failed validation")
+            return ScoreResult(
+                name="challenge_quality",
+                value=0.0,
+                reason="Challenge failed structural validation (missing fields, wrong option count, etc.)"
+            )
+
+        # 3. Get example from dataset item (for comparison)
+        example = dataset_item.get("expected_output", {})
+
+        # 4. Run LLM-as-judge evaluation
+        # Skill context comes from closure (optimization context), NOT from dataset item
+        # This prevents data leakage where dataset hints inflate scores
+        evaluator = get_evaluator()
+
+        result = evaluator.evaluate(
+            challenge=challenge,
+            skill_name=skill_name,
+            skill_description=skill_description,
+            target_difficulty=target_difficulty,
+            example=example,  # Pass example for quality comparison
         )
 
-    # 2. Basic validation
-    if not is_valid_challenge(challenge):
-        print(f"[Metric] Challenge failed validation")
+        # Build detailed reason from evaluation scores
+        scores = result["scores"]
+        reasons = result.get("reasons", {})
+        reason_parts = [
+            f"Clarity: {scores['clarity']:.0%} - {reasons.get('clarity', 'N/A')}",
+            f"Difficulty: {scores['difficulty_alignment']:.0%} - {reasons.get('difficulty_alignment', 'N/A')}",
+            f"Distractors: {scores['distractor_quality']:.0%} - {reasons.get('distractor_quality', 'N/A')}",
+            f"Educational: {scores['educational_value']:.0%} - {reasons.get('educational_value', 'N/A')}",
+            f"Relevance: {scores['skill_relevance']:.0%} - {reasons.get('skill_relevance', 'N/A')}",
+        ]
+        detailed_reason = "; ".join(reason_parts)
+
+        print(f"[Metric] Score: {result['composite_score']:.2f}, Passed: {result['passed']}")
         return ScoreResult(
             name="challenge_quality",
-            value=0.0,
-            reason="Challenge failed structural validation (missing fields, wrong option count, etc.)"
+            value=result["composite_score"],
+            reason=detailed_reason
         )
 
-    # 3. Run LLM-as-judge evaluation
-    evaluator = get_evaluator()
-
-    # Extract skill info from dataset item
-    if "input" in dataset_item:
-        skill_name = dataset_item["input"].get("skill_name", "Unknown Skill")
-        skill_description = dataset_item["input"].get("skill_description", "")
-        target_difficulty = dataset_item["input"].get("difficulty", 5)
-    else:
-        skill_name = dataset_item.get("skill_name", "Unknown Skill")
-        skill_description = dataset_item.get("skill_description", "")
-        target_difficulty = dataset_item.get("difficulty", 5)
-
-    result = evaluator.evaluate(
-        challenge=challenge,
-        skill_name=skill_name,
-        skill_description=skill_description,
-        target_difficulty=target_difficulty,
-    )
-
-    # Build detailed reason from evaluation scores
-    scores = result["scores"]
-    reasons = result.get("reasons", {})
-    reason_parts = [
-        f"Clarity: {scores['clarity']:.0%} - {reasons.get('clarity', 'N/A')}",
-        f"Difficulty: {scores['difficulty_alignment']:.0%} - {reasons.get('difficulty_alignment', 'N/A')}",
-        f"Distractors: {scores['distractor_quality']:.0%} - {reasons.get('distractor_quality', 'N/A')}",
-        f"Educational: {scores['educational_value']:.0%} - {reasons.get('educational_value', 'N/A')}",
-        f"Relevance: {scores['skill_relevance']:.0%} - {reasons.get('skill_relevance', 'N/A')}",
-    ]
-    detailed_reason = "; ".join(reason_parts)
-
-    print(f"[Metric] Score: {result['composite_score']:.2f}, Passed: {result['passed']}")
-    return ScoreResult(
-        name="challenge_quality",
-        value=result["composite_score"],
-        reason=detailed_reason
-    )
+    return challenge_quality_metric
 
 
 def load_optimized_prompts() -> dict:
@@ -249,7 +269,6 @@ def run_optimization(
     level: int,
     n_refinements: int = 5,
     optimizer_type: str = "evolutionary",
-    dataset_provider: str = "anthropic",
 ) -> None:
     """
     Run prompt optimization for a specific skill at a specific difficulty level.
@@ -258,11 +277,14 @@ def run_optimization(
     concrete values before optimization. The optimizer can mutate any part of
     the prompt without breaking template syntax.
 
+    Uses example-based datasets (skill_{id}_level_{level}_examples) that contain
+    high-quality example challenges for quality comparison.
+
     Args:
         skill_id: The skill ID to optimize for (UUID)
         level: The difficulty level (1-10)
         n_refinements: Number of optimization iterations
-        optimizer_type: Which optimizer to use ("evolutionary" or "metaprompt")
+        optimizer_type: Which optimizer to use ("evolutionary", "hrpo", or "metaprompt")
     """
     print(f"\n{'='*60}")
     print(f"Per-Skill-Per-Level Prompt Optimization")
@@ -271,7 +293,7 @@ def run_optimization(
     print(f"Level: {level}")
     print(f"Refinements: {n_refinements}")
     print(f"Optimizer: {optimizer_type}")
-    print(f"Dataset Provider: {dataset_provider}")
+    print(f"Dataset: example-based (GPT-4o generated)")
     print(f"{'='*60}\n")
 
     # Validate configuration (including Supabase for skill metadata)
@@ -315,11 +337,9 @@ def run_optimization(
         ]
     )
 
-    # Load level-specific dataset (use OpenAI suffix if specified)
-    if dataset_provider == "openai":
-        dataset_name = f"skill_{skill_id}_level_{level}_openai_scenarios"
-    else:
-        dataset_name = f"skill_{skill_id}_level_{level}_scenarios"
+    # Load level-specific example dataset
+    # New naming: skill_{id}_level_{level}_examples (example-based datasets)
+    dataset_name = f"skill_{skill_id}_level_{level}_examples"
     print(f"\n[Optimizer] Loading dataset: {dataset_name}")
 
     try:
@@ -340,39 +360,48 @@ def run_optimization(
         return
 
     # Initialize optimizer based on type
+    # Note: Seeds removed so each run explores different variations
+    # Using gpt-4o for better reasoning quality
     if optimizer_type == "hrpo":
         print(f"\n[Optimizer] Initializing HierarchicalReflectiveOptimizer (HRPO)...")
-        print(f"[Optimizer] Analysis model: gpt-4o-mini")
+        print(f"[Optimizer] Analysis model: gpt-4o")
         print(f"[Optimizer] Evaluation model: {CHALLENGE_MODEL_LITELLM} (for challenge generation)")
         optimizer = HierarchicalReflectiveOptimizer(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             n_threads=1,
-            batch_size=5,  # Smaller batch for our 5-item datasets
-            convergence_threshold=0.01,
-            seed=42,
+            batch_size=5,
+            convergence_threshold=0.10,  # Higher threshold - keep exploring longer
             verbose=2,
         )
     elif optimizer_type == "metaprompt":
         print(f"\n[Optimizer] Initializing MetaPromptOptimizer...")
-        print(f"[Optimizer] Reasoning model: gpt-4o-mini")
+        print(f"[Optimizer] Reasoning model: gpt-4o")
         print(f"[Optimizer] Evaluation model: {CHALLENGE_MODEL_LITELLM} (for challenge generation)")
         optimizer = MetaPromptOptimizer(
-            model="gpt-4o-mini",
+            model="gpt-4o",
+            prompts_per_round=6,  # More candidates per round
             n_threads=1,
             verbose=2,
         )
     else:
         print(f"\n[Optimizer] Initializing EvolutionaryOptimizer...")
-        print(f"[Optimizer] Mutation model: gpt-4o-mini (for prompt mutations)")
+        print(f"[Optimizer] Mutation model: gpt-4o (for prompt mutations)")
         print(f"[Optimizer] Evaluation model: {CHALLENGE_MODEL_LITELLM} (for challenge generation)")
         optimizer = EvolutionaryOptimizer(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             n_threads=1,
-            population_size=4,
-            num_generations=3,
+            population_size=6,  # Larger population for more diversity
+            num_generations=5,  # More generations to evolve
             verbose=2,
-            seed=42,
         )
+
+    # Create metric with skill context baked in
+    # This prevents data leakage - skill info comes from optimization context, not dataset
+    metric = create_quality_metric(
+        skill_name=skill_meta["skill_name"],
+        skill_description=skill_meta["skill_description"],
+        target_difficulty=level,
+    )
 
     # Run optimization
     print(f"\n[Optimizer] Starting optimization...")
@@ -381,7 +410,7 @@ def run_optimization(
     result = optimizer.optimize_prompt(
         prompt=prompt,
         dataset=dataset,
-        metric=challenge_quality_metric,
+        metric=metric,
         n_samples=None,  # Use full dataset
         max_trials=n_refinements,
         project_name=OPIK_PROJECT_NAME,
@@ -431,7 +460,6 @@ def run_all_levels_optimization(
     n_refinements: int = 5,
     levels: list[int] | None = None,
     optimizer_type: str = "evolutionary",
-    dataset_provider: str = "anthropic",
 ) -> None:
     """
     Run optimization for all difficulty levels for a skill.
@@ -441,7 +469,6 @@ def run_all_levels_optimization(
         n_refinements: Number of optimization iterations per level
         levels: Optional list of specific levels to optimize (default: 1-10)
         optimizer_type: Which optimizer to use ("evolutionary", "hrpo", or "metaprompt")
-        dataset_provider: Which datasets to use ("anthropic" or "openai")
     """
     if levels is None:
         levels = list(range(1, 11))
@@ -450,7 +477,6 @@ def run_all_levels_optimization(
     print(f"Optimizing all levels for skill: {skill_id}")
     print(f"Levels: {levels}")
     print(f"Optimizer: {optimizer_type}")
-    print(f"Dataset Provider: {dataset_provider}")
     print(f"{'='*60}\n")
 
     for level in levels:
@@ -458,7 +484,7 @@ def run_all_levels_optimization(
             print(f"\n{'='*40}")
             print(f"LEVEL {level}/10")
             print(f"{'='*40}")
-            run_optimization(skill_id, level, n_refinements, optimizer_type, dataset_provider)
+            run_optimization(skill_id, level, n_refinements, optimizer_type)
         except Exception as e:
             print(f"[Error] Failed to optimize level {level}: {e}")
             continue
@@ -517,13 +543,6 @@ def main():
         default="evolutionary",
         help="Which optimizer to use: evolutionary, hrpo, or metaprompt (default: evolutionary)",
     )
-    parser.add_argument(
-        "--dataset-provider",
-        type=str,
-        choices=["anthropic", "openai"],
-        default="anthropic",
-        help="Which datasets to use: anthropic (Claude-generated) or openai (GPT-generated). Use openai to break circularity. (default: anthropic)",
-    )
 
     args = parser.parse_args()
 
@@ -552,7 +571,6 @@ def main():
             n_refinements=args.refinements,
             levels=levels,
             optimizer_type=args.optimizer,
-            dataset_provider=args.dataset_provider,
         )
     elif args.level:
         run_optimization(
@@ -560,7 +578,6 @@ def main():
             level=args.level,
             n_refinements=args.refinements,
             optimizer_type=args.optimizer,
-            dataset_provider=args.dataset_provider,
         )
     else:
         parser.error("Either --level or --all-levels is required with --skill")
