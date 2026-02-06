@@ -19,7 +19,7 @@ export const EVALUATION_CONFIG = {
    * Challenges scoring below this threshold are rejected.
    * Range: 0-1, Default: 0.7 (70%)
    */
-  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.75'), // Temporarily increased for testing (was 0.7)
+  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.7'), 
 
   /**
    * Veto threshold for individual scores.

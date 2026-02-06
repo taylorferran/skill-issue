@@ -220,9 +220,9 @@ REQUIREMENTS:
 - Difficulty should genuinely match level ${params.difficulty}/10
 
 QUALITY STANDARDS (these are benchmark examples):
-- Question: 15-25 words, direct and focused
-- Options: 3-8 words each, no obvious giveaways
-- Explanation: 20-30 words, teaches the concept
+- Question: 25 words maximum, direct and focused
+- Options: 12 words maximum each, no obvious giveaways
+- Explanation: 50 words maximum, teaches the concept
 - Correct answer position should vary across questions
 
 OUTPUT FORMAT (strict JSON array):

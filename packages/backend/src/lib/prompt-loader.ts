@@ -52,16 +52,15 @@ RULES:
 - Question must be answerable in under 30 seconds
 - 4 options, only 1 correct
 - Randomly shuffle the order of correct answer among the options
-- Don't repeat questions you've generated before - each challenge must be unique try to make it unique
 - Distractors should be plausible but clearly wrong to someone who knows the subject
 - Include a brief explanation of why the answer is correct
 - Tailor the question specifically to the skill described above
 - Make sure the correct answer is not ambiguous or debatable
 
 BREVITY REQUIREMENTS (CRITICAL):
-- Question: 15-25 words maximum, no unnecessary words
-- Options: 3-8 words each, direct answers only
-- Explanation: 20-30 words maximum, concise reasoning
+- Question: 25 words maximum, no unnecessary words
+- Options: 12 words maximum each, direct answers only
+- Explanation: 50 words maximum, concise reasoning
 - Avoid: storytelling, excessive context, verbose setups, filler words
 - Focus: Test the concept directly and efficiently
 
@@ -84,7 +83,7 @@ OUTPUT FORMAT (strict JSON):
 Generate the challenge now:`;
 
 interface OptimizedPrompt {
-  prompt: string;
+  prompt: string | Array<{ type?: string; text?: string }>;  // String or content blocks
   baseline_score: number;
   best_score: number;
   improvement: number;
@@ -182,8 +181,18 @@ export function getPromptForChallenge(
           `[PromptLoader] Using optimized prompt for ${skillId} level ${difficulty} ` +
             `(score: ${levelPrompt.best_score.toFixed(3)}, improvement: ${levelPrompt.improvement_percent.toFixed(1)}%)`
         );
-        // Return the concrete (baked) prompt directly - no substitution needed
-        return levelPrompt.prompt;
+
+        // Handle both string and array formats (legacy content block format)
+        const prompt = levelPrompt.prompt;
+        if (typeof prompt === 'string') {
+          return prompt;
+        } else if (Array.isArray(prompt)) {
+          // Join content blocks into a single string
+          return prompt
+            .map((block: { text?: string }) => block.text || '')
+            .join('');
+        }
+        return String(prompt);
       }
     }
   }

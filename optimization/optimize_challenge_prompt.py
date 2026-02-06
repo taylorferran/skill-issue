@@ -437,7 +437,22 @@ def run_optimization(
     # Save optimized prompt if improvement found
     if best_score > initial_score and best_prompt is not None:
         print(f"\n[Optimizer] Improvement detected! Saving optimized prompt...")
-        prompt_content = best_prompt.messages[0]["content"] if hasattr(best_prompt, 'messages') else str(best_prompt)
+
+        # Extract prompt content as plain string
+        # Handle both string content and Anthropic's content block format
+        if hasattr(best_prompt, 'messages'):
+            raw_content = best_prompt.messages[0]["content"]
+
+            # If content is a list of content blocks, join the text parts
+            if isinstance(raw_content, list):
+                prompt_content = "".join(
+                    block.get("text", "") if isinstance(block, dict) else str(block)
+                    for block in raw_content
+                )
+            else:
+                prompt_content = str(raw_content)
+        else:
+            prompt_content = str(best_prompt)
 
         # Note: The prompt is already concrete (no variables) - save as-is
         save_optimized_prompt(

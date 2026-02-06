@@ -325,12 +325,22 @@ class ChallengeEvaluator:
 
 
 def is_valid_challenge(challenge: dict) -> bool:
-    """Validate that a challenge has the required structure."""
-    # Check question
+    """
+    Validate that a challenge has the required structure.
+    Matches validation in packages/backend/src/agents/agent2-challenge-design.ts
+    """
+    # Check question exists and has minimum length
     question = challenge.get("question", "")
     if not question or len(question) < 10:
         return False
-    if len(question) > 500:
+
+    # Enforce maximum character length (150 chars)
+    if len(question) > 150:
+        return False
+
+    # Enforce maximum word count (25 words)
+    question_words = len(question.strip().split())
+    if question_words > 25:
         return False
 
     # Check options
@@ -341,7 +351,9 @@ def is_valid_challenge(challenge: dict) -> bool:
     for option in options:
         if not option or len(str(option)) < 1:
             return False
-        if len(str(option)) > 200:
+        # Enforce word limit on options (12 words max)
+        option_words = len(str(option).strip().split())
+        if option_words > 12:
             return False
 
     # Check correct answer index
@@ -352,6 +364,13 @@ def is_valid_challenge(challenge: dict) -> bool:
     # Check for duplicate options
     if len(set(options)) != len(options):
         return False
+
+    # Check explanation brevity (50 words max, if provided)
+    explanation = challenge.get("explanation", "")
+    if explanation:
+        explanation_words = len(explanation.strip().split())
+        if explanation_words > 50:
+            return False
 
     return True
 

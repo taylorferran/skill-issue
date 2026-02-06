@@ -1,71 +1,23 @@
 {
   "prompts": {
     "5a0f6aed-f7df-4403-88ee-5126d735fd9b": {
-      "3": {
-        "prompt": "Please create a single multiple-choice question to assess knowledge in Japanese Kanji. The focus should be on the basic recognition and meaning of Kanji characters at an intermediate difficulty level (3/10). Your question should adhere to the following criteria: \n- Must consist of four answer options with exactly one correct answer, ensuring the correct answer is uniquely identifiable. \n- The response should include a brief rationale for the correct answer. \n- The question must not exceed 25 words and should be answerable within 30 seconds. \n- Each answer option should be brief (3-8 words). \n- Ensure a shuffle in the order of options and avoid previous questions. \n- Follow the specified output format in strict JSON:\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 3\n}\nCreate this unique challenge now.",
-        "baseline_score": 0.8480000000000001,
-        "best_score": 0.866,
-        "improvement": 0.017999999999999905,
-        "improvement_percent": 2.122641509433951,
+      "9": {
+        "prompt": "You are generating a multiple-choice challenge to test knowledge and competence.\n\nSKILL: Japanese Kanji\nDESCRIPTION: Recognition and meaning of Japanese Kanji characters\nDIFFICULTY LEVEL: 9/10\n\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\n\nRULES:\n- Difficulty 9 means: Expert-level synthesis\n- Question must be answerable in under 30 seconds\n- 4 options, only 1 correct\n- Randomly shuffle the order of correct answer among the options\n- Distractors should be plausible, internally consistent, and realistic around the theme while being subtly incorrect\n- Include a brief explanation of why the answer is correct\n- Tailor the question specifically to the skill described above\n- Make sure the correct answer is not ambiguous or debatable\n- **Avoid explicit guidance within the question and around options; rely on complexity and depth of knowledge**\n\nBREVITY REQUIREMENTS (CRITICAL):\n- Question: 25 words maximum, no unnecessary words\n- Options: 12 words maximum each, direct answers only\n- Explanation: 50 words maximum, concise reasoning\n- Avoid: storytelling, excessive context, verbose setups, filler words\n- Focus: Test the concept directly and efficiently\n\n**CLARITY GUIDELINES (ADDED):**\n- Use straightforward language and common terms to avoid misunderstandings\n- Ensure terms and phrasing are precise and familiar to the target audience\n- Avoid obscure or technical jargon unless essential, providing explanations if needed\n- Phrase the question and options so there is no room for misinterpretation\n\n**DIFFICULTY GUIDELINES (ADDED):**\n- Leverage the depth and nuance of Kanji knowledge consistent with expert-level synthesis\n- Ensure complexity by exploring deeper meaning and less common elements\n- Avoid reducing challenge through overt hinting or including overt information that guides toward the answer\n\nExamples of good brevity:\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\n\n\u2713 \"What is the capital of France?\"\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\n\nOUTPUT FORMAT (strict JSON):\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 9\n}\n\nGenerate the challenge now:\n",
+        "baseline_score": 0.655,
+        "best_score": 0.7390000000000001,
+        "improvement": 0.08400000000000007,
+        "improvement_percent": 12.824427480916043,
         "refinements": 5,
-        "optimized_at": "2026-02-05T13:58:00.736933",
-        "status": "pending"
-      },
-      "8": {
-        "prompt": "You are generating a multiple-choice challenge to test knowledge and competence.\n\nSKILL: Japanese Kanji\nDESCRIPTION: Recognition and meaning of Japanese Kanji characters\nDIFFICULTY LEVEL: 8/10\n\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\n\nRULES:\n- Difficulty 8 means: Complex problem-solving with nuance\n- Question must be answerable in under 30 seconds\n- 4 options, only 1 correct\n- Randomly shuffle the order of correct answer among the options\n- Don't repeat questions you've generated before - each challenge must be unique try to make it unique\n- Distractors should be plausible but clearly wrong to someone who knows the subject\n- Include a brief explanation of why the answer is correct\n- Tailor the question specifically to the skill described above\n- Make sure the correct answer is not ambiguous or debatable\n\nBREVITY REQUIREMENTS (CRITICAL):\n- Question: 15-25 words maximum, no unnecessary words\n- Options: 3-8 words each, direct answers only\n- Explanation: 20-30 words maximum, concise reasoning\n- Avoid: storytelling, excessive context, verbose setups, filler words\n- Focus: Test the concept directly and efficiently\n\nExamples of good brevity:\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\n\n\u2713 \"What is the capital of France?\"\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\n\nOUTPUT FORMAT (strict JSON):\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 8\n}\n\nGenerate the challenge now:\n",
-        "baseline_score": 0.667,
-        "best_score": 0.77,
-        "improvement": 0.10299999999999998,
-        "improvement_percent": 15.442278860569711,
-        "refinements": 5,
-        "optimized_at": "2026-02-05T14:16:08.576266",
-        "status": "pending"
-      },
-      "6": {
-        "prompt": "You are generating a multiple-choice challenge to test knowledge and competence.\n\nSKILL: Japanese Kanji\nDESCRIPTION: Recognition and meaning of Japanese Kanji characters\nDIFFICULTY LEVEL: 6/10\n\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\n\nRULES:\n- Difficulty 6 means: Combining multiple concepts\n- Question must be answerable in under 30 seconds\n- 4 options, only 1 correct\n- Randomly shuffle the order of correct answer among the options\n- Don't repeat questions you've generated before - each challenge must be unique try to make it unique\n- Distractors should be plausible but clearly wrong to someone who knows the subject\n- Include a brief explanation of why the answer is correct\n- Tailor the question specifically to the skill described above\n- Make sure the correct answer is not ambiguous or debatable\n\nBREVITY REQUIREMENTS (CRITICAL):\n- Question: 15-25 words maximum, no unnecessary words\n- Options: 3-8 words each, direct answers only\n- Explanation: 20-30 words maximum, concise reasoning\n- Avoid: storytelling, excessive context, verbose setups, filler words\n- Focus: Test the concept directly and efficiently\n\nExamples of good brevity:\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\n\n\u2713 \"What is the capital of France?\"\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\n\nOUTPUT FORMAT (strict JSON):\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 6\n}\n\nGenerate the challenge now:\n",
-        "baseline_score": 0.774,
-        "best_score": 0.787,
-        "improvement": 0.013000000000000012,
-        "improvement_percent": 1.6795865633074951,
-        "refinements": 5,
-        "optimized_at": "2026-02-05T16:39:54.503207",
-        "status": "pending"
-      }
-    },
-    "9dbbc26f-6f73-4319-a4fd-f2cfca7e0789": {
-      "3": {
-        "prompt": "Generate an effective multiple-choice question (MCQ) that tests knowledge of capital cities worldwide.\n\n\u2022 SKILL: Knowledge of World Capitals\n\u2022 DESCRIPTION: Understanding which cities serve as capitals for various countries.\n\u2022 DIFFICULTY LEVEL: 3 out of 10, indicating a fundamental grasp of the subject.\n\nGenerate one unique MCQ that accurately evaluates the specified skill within the defined difficulty level.\n\nIMPORTANT RULES:\n- The question needs to be solvable in under 30 seconds.\n- Provide 4 options, one of which is the correct answer, and ensure the correct answer's position is randomized among these.\n- Each question generated must be distinct; refrain from using previously created items.\n- Create plausible options for distractors that someone knowledgeable would recognize as incorrect.\n- Include a short justification for the correct answer, clarifying its accuracy.\n- Ensure alignment with the mentioned skill, making certain that the correct option is unmistakable.\n\nBrevity is crucial:\n- Question: 15-25 words max, minimal unnecessary wording.\n- Options: 3-8 words each, direct and concise.\n- Explanation: 20-30 words maximum, clear reasoning.\n- Avoid: excessive context or elaborate narratives.\n\nOUTPUT MUST BE IN THIS JSON FORMAT:\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 3\n}\n\nProceed to generate the MCQ now.",
-        "baseline_score": 0.849,
-        "best_score": 0.857,
-        "improvement": 0.008000000000000007,
-        "improvement_percent": 0.9422850412249714,
-        "refinements": 5,
-        "optimized_at": "2026-02-05T22:32:38.425914",
-        "status": "pending"
-      }
-    },
-    "7708bdd4-0997-482b-b8d5-2cb200425957": {
-      "1": {
-        "prompt": "You are generating a multiple-choice challenge to test knowledge and competence.\n\nSKILL: Sports Trivia\nDESCRIPTION: Major sports leagues, championships, records, and athletes\nDIFFICULTY LEVEL: 1/10\n\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\n\nRULES:\n- Difficulty 1 means: Basic recall, simple facts\n- Question must be answerable in under 30 seconds\n- 4 options, only 1 correct\n- Randomly shuffle the order of correct answer among the options\n- Don't repeat questions you've generated before - each challenge must be unique try to make it unique\n- Distractors should be plausible but clearly wrong to someone who knows the subject\n- Include a brief explanation of why the answer is correct\n- Tailor the question specifically to the skill described above\n- Make sure the correct answer is not ambiguous or debatable\n\nBREVITY REQUIREMENTS (CRITICAL):\n- Question: 15-25 words maximum, no unnecessary words\n- Options: 3-8 words each, direct answers only\n- Explanation: 20-30 words maximum, concise reasoning\n- Avoid: storytelling, excessive context, verbose setups, filler words\n- Focus: Test the concept directly and efficiently\n\nExamples of good brevity:\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\n\n\u2713 \"What is the capital of France?\"\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\n\nOUTPUT FORMAT (strict JSON):\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 1\n}\n\nGenerate the challenge now:\n",
-        "baseline_score": 0.8130000000000001,
-        "best_score": 0.898,
-        "improvement": 0.08499999999999996,
-        "improvement_percent": 10.455104551045505,
-        "refinements": 5,
-        "optimized_at": "2026-02-06T12:15:03.927165",
+        "optimized_at": "2026-02-06T15:27:05.591901",
         "status": "pending"
       }
     }
   },
   "metadata": {
-    "created_at": "2026-02-05T12:00:00.000000",
-    "last_updated": "2026-02-06T12:15:03.927174",
+    "created_at": "2026-02-06T15:27:05.591888",
+    "last_updated": "2026-02-06T15:27:05.591905",
     "skills_optimized": [
-      "5a0f6aed-f7df-4403-88ee-5126d735fd9b",
-      "9dbbc26f-6f73-4319-a4fd-f2cfca7e0789",
-      "7708bdd4-0997-482b-b8d5-2cb200425957"
-    ],
-    "schema_version": "2.0",
-    "description": "Per-skill-per-level optimized prompts. Structure: prompts[skill_id][level] = { prompt, scores, status }"
+      "5a0f6aed-f7df-4403-88ee-5126d735fd9b"
+    ]
   }
 }
