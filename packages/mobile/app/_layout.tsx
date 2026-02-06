@@ -32,14 +32,14 @@ const tokenCache = {
   async getToken(key: string) {
     try {
       return SecureStore.getItemAsync(key);
-    } catch (err) {
+    } catch {
       return null;
     }
   },
   async saveToken(key: string, value: string) {
     try {
       return SecureStore.setItemAsync(key, value);
-    } catch (err) {
+    } catch {
       return;
     }
   },
@@ -49,36 +49,33 @@ function RootLayoutContent() {
   const { isSignedIn, isLoaded } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  
-  // Handle authentication-based routing
+
+  // Handle auth-based navigation
   useEffect(() => {
     if (!isLoaded) return;
 
     const inAuthGroup = segments[0] === "sign-in";
 
     if (!isSignedIn && !inAuthGroup) {
-      // Redirect to sign-in if not authenticated
+      // Not signed in and not on sign-in screen - redirect to sign-in
       router.replace("/sign-in");
     } else if (isSignedIn && inAuthGroup) {
-      // Redirect away from sign-in if already authenticated
+      // Signed in but on sign-in screen - redirect to tabs
       router.replace("/(tabs)/(skills)");
     }
   }, [isSignedIn, isLoaded, segments, router]);
-  
-  // Notification permissions will be requested after successful sign-in
-  // See sign-in.tsx for implementation
 
   // Initialize notification handler and listeners on app mount
   useEffect(() => {
-    // Configure how notifications are displayed when app is in foreground
     configureNotificationHandler();
-
-    // Set up notification listeners
     const cleanup = setupNotificationListeners();
-
-    // Cleanup listeners on unmount
     return cleanup;
   }, []);
+
+  // Show nothing while Clerk is loading
+  if (!isLoaded) {
+    return null;
+  }
 
   return (
     <NavigationTitleProvider>
@@ -93,7 +90,6 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
-  // Log backend URL configuration
   console.log('[RootLayout] 🌐 Backend URL configured:', backendUrlFromConfig);
 
   return (

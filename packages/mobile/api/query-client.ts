@@ -4,21 +4,24 @@ import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persi
 
 /**
  * TanStack Query client configuration with AsyncStorage persistence.
- * 
+ *
  * Cache behavior:
  * - Data is persisted to AsyncStorage automatically
  * - Data is returned from cache immediately (cache-first)
  * - Background refetch updates cache without UI disruption
  * - Cache never expires (staleTime: Infinity)
  * - Cache never garbage collected (gcTime: Infinity)
+ * - ALWAYS refetch on mount to get latest data while showing cached data instantly
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Never mark data as stale automatically
+      // Never mark data as stale automatically - keeps cache valid forever
       staleTime: Infinity,
-      // Never garbage collect cached data
+      // Never garbage collect cached data - infinite offline support
       gcTime: Infinity,
+      // ALWAYS refetch on mount - serves cache immediately, updates in background
+      refetchOnMount: 'always',
       // Don't refetch when app comes to foreground (mobile-specific)
       refetchOnWindowFocus: false,
       // Refetch when connection is restored

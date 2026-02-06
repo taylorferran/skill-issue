@@ -27,9 +27,9 @@ export function useNotifications(): UseNotificationsReturn {
   const { userId } = useUser();
 
   // Use TanStack Query for fetching pending challenges
-  const { 
-    data: challenges = [], 
-    isLoading, 
+  const {
+    data: challenges = [],
+    isLoading,
     isFetching,
     error,
     refetch
@@ -37,8 +37,7 @@ export function useNotifications(): UseNotificationsReturn {
     queryKey: userId ? skillsKeys.pending(userId) : ['pending-challenges', 'no-user'],
     queryFn: () => userId ? fetchPendingChallenges(userId) : Promise.resolve([]),
     enabled: !!userId,
-    staleTime: 0,
-    gcTime: 5 * 60 * 1000,
+    // Uses global defaults: refetchOnMount: 'always' for background refresh
   });
 
   // Calculate unread count (all pending challenges are unread)

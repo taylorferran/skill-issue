@@ -16,7 +16,7 @@ import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import { SkillCard } from "@/components/skill-card/SkillCard";
 import SkillsMetricsCard from "@/components/skills-metrics-card/SkillsMetricsCard";
 import { navigateTo } from "@/navigation/navigation";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { styles } from "./_index.styles";
 import { spacing } from "@/theme/ThemeUtils";
 import { Theme } from "@/theme/Theme";
@@ -38,9 +38,12 @@ import {
 } from "@/components/skill-sort-dropdown/SkillSortDropdown";
 
 export default function SkillSelectScreen() {
+  // Read tab parameter from navigation
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  
   const [selectedSegment, setSelectedSegment] = useState<
     "Current Skills" | "New Skills"
-  >("Current Skills");
+  >(tab === "new" ? "New Skills" : "Current Skills");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentSort, setCurrentSort] = useState<SortOption>("level");
   const [displayCount, setDisplayCount] = useState(10);
@@ -67,10 +70,19 @@ export default function SkillSelectScreen() {
     data: availableSkills = [],
     isLoading: isLoadingAvailableSkills,
     error: availableSkillsError,
+    refetch: refetchAvailableSkills,
   } = useQuery({
     queryKey: skillsKeys.lists(),
     queryFn: fetchSkills,
   });
+
+  // Background refetch when switching to "New Skills" tab
+  useEffect(() => {
+    if (selectedSegment === "New Skills") {
+      console.log("[Skills] 🔄 Background refetch for available skills");
+      refetchAvailableSkills();
+    }
+  }, [selectedSegment, refetchAvailableSkills]);
 
   // Mutations
   const deleteSkillMutation = useMutation({

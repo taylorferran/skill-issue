@@ -9,53 +9,37 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useOAuth } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as Localization from "expo-localization";
 import { Theme } from "@/theme/Theme";
 import { MonogramBackground } from "@/components/monogram-background/MonogramBackground";
-import { useNotificationStore } from "@/stores/notificationStore";
 import { useUser } from "@/contexts/UserContext";
 import { useMutation } from "@tanstack/react-query";
-import { createUser, updateUser } from "@/api/routes";
-import { registerForPushNotificationsAsync } from "@/utils/notifications";
+import { createUser } from "@/api/routes";
 import type { CreateUserRequest } from "@learning-platform/shared";
 
 // Important: Warm up the browser for better UX
 WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
-  const router = useRouter();
   const { startOAuthFlow: startGoogleOAuth } = useOAuth({
     strategy: "oauth_google",
   });
   const { startOAuthFlow: startGithubOAuth } = useOAuth({
     strategy: "oauth_github",
   });
-  const { setExpoPushToken, setPermissionStatus, getPushToken } = useNotificationStore();
   const { setUser, markUserAsCreated, isUserCreated } = useUser();
   
-  // Mutations
   const createUserMutation = useMutation({
     mutationFn: (data: CreateUserRequest) => createUser(data),
-  });
-  
-  const updateUserMutation = useMutation({
-    mutationFn: ({ userId, ...data }: { userId: string } & Partial<CreateUserRequest>) =>
-      updateUser(userId, data),
   });
   
   // Loading state for the entire sign-in process
   const [isSigningIn, setIsSigningIn] = React.useState(false);
   const [loadingMessage, setLoadingMessage] = React.useState("Setting up your account...");
 
-  /**
-   * Create backend user with push token (if granted)
-   * Called after successful OAuth sign-in
-   */
   const createBackendUser = async () => {
-    // Check if user already exists (e.g., reinstall scenario)
     if (isUserCreated()) {
       console.log("[SignIn] ✅ Backend user already exists, skipping creation");
       return;
@@ -63,37 +47,19 @@ export default function SignInScreen() {
 
     console.log("[SignIn] 🆕 Creating backend user...");
 
-    // Get push token from store (if notification was granted earlier)
-    const pushToken = getPushToken();
-
-    // Prepare user data with push token if available
     const userData: CreateUserRequest = {
       timezone: Localization.getCalendars()[0]?.timeZone || "UTC",
       maxChallengesPerDay: 5,
-      ...(pushToken && { deviceId: pushToken }),
     };
 
-    console.log("[SignIn] 📤 Sending user creation request:", {
-      timezone: userData.timezone,
-      maxChallengesPerDay: userData.maxChallengesPerDay,
-      hasDeviceId: !!userData.deviceId,
-    });
-
-    // Create user on backend
     const response = await createUserMutation.mutateAsync(userData);
     console.log("[SignIn] ✅ Backend user created with ID:", response.id);
 
-    // Save to UserContext
     await setUser(response);
     await markUserAsCreated();
 
     console.log("[SignIn] 💾 User data saved to local context");
-    
-    return response;
   };
-
-  // Note: Notification permissions are now auto-requested via useAutoRequestNotifications hook
-  // in _layout.tsx. No manual button needed here.
 
   const onPressGoogle = async () => {
     try {
@@ -103,51 +69,11 @@ export default function SignInScreen() {
       const { createdSessionId, setActive } = await startGoogleOAuth();
 
       if (createdSessionId && setActive) {
-        // Activate the Clerk session
         await setActive({ session: createdSessionId });
         console.log("[SignIn] ✅ Clerk session activated");
         
-        // Small delay to ensure token propagates through React context
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Create backend user with push token
         setLoadingMessage("Creating your account...");
-        const user = await createBackendUser();
-        
-        if (user?.id) {
-          // Request notification permissions immediately after sign-in
-          setLoadingMessage("Setting up notifications...");
-          try {
-            console.log("[SignIn] 🔔 Requesting notification permissions...");
-            const token = await registerForPushNotificationsAsync();
-            
-            if (token) {
-              console.log("[SignIn] ✅ Notification token received, updating user...");
-              
-              // Update backend with device ID
-              await updateUserMutation.mutateAsync({
-                userId: user.id,
-                deviceId: token,
-              });
-              
-              // Update local notification store
-              setExpoPushToken(token);
-              setPermissionStatus('granted');
-              
-              console.log("[SignIn] ✅ Notification token saved to backend and store");
-            } else {
-              console.log("[SignIn] ℹ️ Notification permission denied or unavailable");
-              setPermissionStatus('denied');
-            }
-          } catch (error) {
-            // Non-blocking - user can enable later in settings
-            console.warn("[SignIn] ⚠️ Failed to request notifications:", error);
-          }
-          
-        }
-        
-        // Navigate to skills screen immediately
-        router.replace("/(tabs)/(skills)");
+        await createBackendUser();
       }
     } catch (err: any) {
       console.error("OAuth error", err);
@@ -168,50 +94,11 @@ export default function SignInScreen() {
       const { createdSessionId, setActive } = await startGithubOAuth();
 
       if (createdSessionId && setActive) {
-        // Activate the Clerk session
         await setActive({ session: createdSessionId });
         console.log("[SignIn] ✅ Clerk session activated");
         
-        // Small delay to ensure token propagates through React context
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Create backend user with push token
         setLoadingMessage("Creating your account...");
-        const user = await createBackendUser();
-        
-        if (user?.id) {
-          // Request notification permissions immediately after sign-in
-          setLoadingMessage("Setting up notifications...");
-          try {
-            console.log("[SignIn] 🔔 Requesting notification permissions...");
-            const token = await registerForPushNotificationsAsync();
-            
-            if (token) {
-              console.log("[SignIn] ✅ Notification token received, updating user...");
-              
-              // Update backend with device ID
-              await updateUserMutation.mutateAsync({
-                userId: user.id,
-                deviceId: token,
-              });
-              
-              // Update local notification store
-              setExpoPushToken(token);
-              setPermissionStatus('granted');
-              
-              console.log("[SignIn] ✅ Notification token saved to backend and store");
-            } else {
-              console.log("[SignIn] ℹ️ Notification permission denied or unavailable");
-              setPermissionStatus('denied');
-            }
-          } catch (error) {
-            // Non-blocking - user can enable later in settings
-            console.warn("[SignIn] ⚠️ Failed to request notifications:", error);
-          }
-          
-        }
-        
-        router.replace("/(tabs)/(skills)");
+        await createBackendUser();
       }
     } catch (err: any) {
       console.error("OAuth error", err);

@@ -69,6 +69,7 @@ export const styles = StyleSheet.create({
     lineHeight: 20,
   },
   primaryButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -86,6 +87,7 @@ export const styles = StyleSheet.create({
     ...createTextStyle("base", "bold", "inverse"),
   },
   secondaryButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

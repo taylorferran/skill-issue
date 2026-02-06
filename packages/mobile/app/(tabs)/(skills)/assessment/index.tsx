@@ -55,8 +55,7 @@ const ReviewHistoryScreen = () => {
     queryFn: () => fetchUserSkills(userId || ''),
     initialData: initialData?.userSkills,  // ← Instant display from navigation
     enabled: !!userId,
-    staleTime: Infinity,
-    gcTime: Infinity,
+    // Uses global defaults: refetchOnMount: 'always' for background refresh
   });
 
   // TanStack Query - Challenge History
@@ -68,8 +67,7 @@ const ReviewHistoryScreen = () => {
     queryFn: () => fetchChallengeHistory(userId || '', { limit: CHALLENGES_PER_PAGE, offset: 0 }),
     initialData: initialData?.history,  // ← Instant display from navigation
     enabled: !!userId && !!skillId,
-    staleTime: Infinity,
-    gcTime: Infinity,
+    // Uses global defaults: refetchOnMount: 'always' for background refresh
   });
 
   // Subscribe to notification store for pending challenges

@@ -139,9 +139,6 @@ export function UserProvider({ children }: { children: ReactNode }) {
           deviceId: expoPushToken
         });
 
-        // Update local user state with the new push token
-        await updateLocalUserData({ deviceId: expoPushToken });
-
         console.log('[UserContext] ✅ Push token synced successfully');
       } catch (error) {
         console.error('[UserContext] ❌ Failed to sync push token:', error);
