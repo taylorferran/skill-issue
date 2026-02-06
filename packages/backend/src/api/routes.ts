@@ -781,6 +781,8 @@ router.put('/users/:userId', async (req: Request, res: Response) => {
 router.post('/users/:userId/skills', async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
+    console.log('[API] POST /users/:userId/skills - Enroll request:', { userId, body: req.body });
+    
     const validation = EnrollSkillRequestSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -852,6 +854,12 @@ router.post('/users/:userId/skills', async (req: Request, res: Response) => {
     }
 
     const userSkillAny = userSkill as any;
+    console.log('[API] POST /users/:userId/skills - Successfully enrolled:', {
+      userId: userSkillAny.user_id,
+      skillId: userSkillAny.skill_id,
+      recordId: userSkillAny.id
+    });
+    
     res.status(201).json({
       id: userSkillAny.id,
       userId: userSkillAny.user_id,
@@ -952,17 +960,22 @@ router.put('/users/:userId/skills/:skillId', async (req: Request, res: Response)
 router.delete('/users/:userId/skills/:skillId', async (req: Request, res: Response) => {
   try {
     const { userId, skillId } = req.params;
+    console.log('[API] DELETE /users/:userId/skills/:skillId - Delete request:', { userId, skillId });
+    
     const supabase = getSupabase();
 
     // Check if user skill exists
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('user_skill_state')
       .select('id')
       .eq('user_id', userId)
       .eq('skill_id', skillId)
       .single();
 
+    console.log('[API] DELETE - Check existing result:', { existing, checkError });
+
     if (!existing) {
+      console.log('[API] DELETE - No enrollment found for user:', userId, 'skill:', skillId);
       return res.status(404).json({ error: 'User not enrolled in this skill' });
     }
 
@@ -977,6 +990,7 @@ router.delete('/users/:userId/skills/:skillId', async (req: Request, res: Respon
       return res.status(500).json({ error: 'Failed to unenroll from skill' });
     }
 
+    console.log('[API] DELETE - Successfully deleted enrollment for user:', userId, 'skill:', skillId);
     res.status(204).send();
   } catch (error) {
     console.error('Delete user skill error:', error);

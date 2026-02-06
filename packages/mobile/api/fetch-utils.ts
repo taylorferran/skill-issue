@@ -240,7 +240,13 @@ export async function apiFetch<
     throw new Error(`API Error ${response.status}: ${response.statusText}`);
   }
 
-  // Parse response
+  // Handle 204 No Content - return null without parsing
+  if (response.status === 204) {
+    console.log('[apiFetch] ✅ Success (204 No Content):', { url: fullUrl });
+    return null as any;
+  }
+
+  // Parse response for other success codes
   const responseData = await response.json();
 
   // Validate response if schema provided

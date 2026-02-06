@@ -129,26 +129,7 @@ export default function SkillSelectScreen() {
     },
   });
 
-  // Debug logging for skills data
-  useEffect(() => {
-    console.log("[Skills] 📊 Data update:", {
-      userSkillsCount: userSkills.length,
-      availableSkillsCount: availableSkills.length,
-      isLoadingUserSkills,
-      isLoadingAvailableSkills,
-      hasUserError: !!userSkillsError,
-      hasAvailableError: !!availableSkillsError,
-      selectedSegment,
-    });
-  }, [
-    userSkills,
-    availableSkills,
-    isLoadingUserSkills,
-    isLoadingAvailableSkills,
-    userSkillsError,
-    availableSkillsError,
-    selectedSegment,
-  ]);
+
 
   // Reset navigation title when skills screen comes into focus
   const { setTitle } = useNavigationTitle();
@@ -212,7 +193,7 @@ export default function SkillSelectScreen() {
       return;
     }
 
-    console.log("[Skills] ➕ Enrolling in skill:", skill.name);
+
 
     // Optimistically update cache immediately
     const newUserSkill = {
@@ -282,7 +263,6 @@ export default function SkillSelectScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            console.log("[Skills] 🗑️ Deleting skill:", skillName);
 
             // Optimistically update cache immediately
             queryClient.setQueryData(
