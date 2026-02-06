@@ -12,9 +12,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Theme } from "@/theme/Theme";
-import { useGenerateSkillDescription } from "@/api-routes/generateSkillDescription";
-import { useCreateSkill } from "@/api-routes/createSkill";
-import { useGetSkills } from "@/api-routes/getSkills";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  generateSkillDescription,
+  createSkill,
+  fetchSkills,
+  skillsKeys,
+} from "@/api/routes";
 import { useSkillsStore } from "@/stores/skillsStore";
 import type { GenerateSkillDescriptionResponse } from "@learning-platform/shared";
 import { styles } from "./index.styles";
@@ -26,20 +30,29 @@ export default function CreateSkillScreen() {
     useState<GenerateSkillDescriptionResponse | null>(null);
   const [step, setStep] = useState<"input" | "review">("input");
 
+  const queryClient = useQueryClient();
   const { setAvailableSkills } = useSkillsStore();
-  const { execute: fetchAvailableSkills } = useGetSkills();
 
-  const {
-    execute: generateDescription,
-    isLoading: isGenerating,
-    error: generateError,
-  } = useGenerateSkillDescription();
+  // Mutations
+  const generateDescriptionMutation = useMutation({
+    mutationFn: (skillName: string) => generateSkillDescription(skillName),
+  });
 
-  const {
-    execute: createSkill,
-    isLoading: isCreating,
-    error: createError,
-  } = useCreateSkill();
+  const createSkillMutation = useMutation({
+    mutationFn: (data: { name: string; description: string }) => createSkill(data),
+    onSuccess: async () => {
+      // Refresh available skills
+      try {
+        const updatedSkills = await queryClient.fetchQuery({
+          queryKey: skillsKeys.lists(),
+          queryFn: fetchSkills,
+        });
+        setAvailableSkills(updatedSkills);
+      } catch (error) {
+        console.error("Failed to refresh skills after creation:", error);
+      }
+    },
+  });
 
   const handleGenerateDescription = useCallback(async () => {
     if (!skillName.trim()) {
@@ -48,7 +61,7 @@ export default function CreateSkillScreen() {
     }
 
     try {
-      const result = await generateDescription({ skillName: skillName.trim() });
+      const result = await generateDescriptionMutation.mutateAsync(skillName.trim());
       setGeneratedData(result);
       setSkillDescription(result.description);
       setStep("review");
@@ -59,7 +72,7 @@ export default function CreateSkillScreen() {
         "Failed to generate skill description. Please try again."
       );
     }
-  }, [skillName, generateDescription]);
+  }, [skillName, generateDescriptionMutation]);
 
   const handleCreateSkill = useCallback(async () => {
     if (!skillName.trim() || !skillDescription.trim()) {
@@ -68,18 +81,10 @@ export default function CreateSkillScreen() {
     }
 
     try {
-      await createSkill({
+      await createSkillMutation.mutateAsync({
         name: skillName.trim(),
         description: skillDescription.trim(),
       });
-
-      // Refresh available skills
-      try {
-        const updatedSkills = await fetchAvailableSkills();
-        setAvailableSkills(updatedSkills);
-      } catch (error) {
-        console.error("Failed to refresh skills after creation:", error);
-      }
 
       Alert.alert("Success", "Skill created successfully!", [
         {
@@ -93,13 +98,7 @@ export default function CreateSkillScreen() {
       console.error("Failed to create skill:", error);
       Alert.alert("Error", "Failed to create skill. Please try again.");
     }
-  }, [
-    skillName,
-    skillDescription,
-    createSkill,
-    fetchAvailableSkills,
-    setAvailableSkills,
-  ]);
+  }, [skillName, skillDescription, createSkillMutation]);
 
   const handleBack = useCallback(() => {
     setStep("input");
@@ -107,7 +106,7 @@ export default function CreateSkillScreen() {
     setSkillDescription("");
   }, []);
 
-  const isLoading = isGenerating || isCreating;
+  const isLoading = generateDescriptionMutation.isPending || createSkillMutation.isPending;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -158,14 +157,14 @@ export default function CreateSkillScreen() {
             <TouchableOpacity
               style={[
                 styles.primaryButton,
-                (!skillName.trim() || isGenerating) &&
+                (!skillName.trim() || generateDescriptionMutation.isPending) &&
                   styles.primaryButtonDisabled,
               ]}
               onPress={handleGenerateDescription}
-              disabled={!skillName.trim() || isGenerating}
+              disabled={!skillName.trim() || generateDescriptionMutation.isPending}
               activeOpacity={0.7}
             >
-              {isGenerating ? (
+              {generateDescriptionMutation.isPending ? (
                 <ActivityIndicator color={Theme.colors.text.inverse} />
               ) : (
                 <>
@@ -236,7 +235,7 @@ export default function CreateSkillScreen() {
                 numberOfLines={4}
                 maxLength={2000}
                 textAlignVertical="top"
-                editable={!isCreating}
+                editable={!createSkillMutation.isPending}
               />
               <Text style={styles.characterCount}>
                 {skillDescription.length}/2000
@@ -253,7 +252,7 @@ export default function CreateSkillScreen() {
               <TouchableOpacity
                 style={styles.secondaryButton}
                 onPress={handleBack}
-                disabled={isCreating}
+                disabled={createSkillMutation.isPending}
                 activeOpacity={0.7}
               >
                 <Text style={styles.secondaryButtonText}>Back</Text>
@@ -262,14 +261,14 @@ export default function CreateSkillScreen() {
               <TouchableOpacity
                 style={[
                   styles.primaryButton,
-                  (!skillDescription.trim() || isCreating) &&
+                  (!skillDescription.trim() || createSkillMutation.isPending) &&
                     styles.primaryButtonDisabled,
                 ]}
                 onPress={handleCreateSkill}
-                disabled={!skillDescription.trim() || isCreating}
+                disabled={!skillDescription.trim() || createSkillMutation.isPending}
                 activeOpacity={0.7}
               >
-                {isCreating ? (
+                {createSkillMutation.isPending ? (
                   <ActivityIndicator color={Theme.colors.text.inverse} />
                 ) : (
                   <>
@@ -287,7 +286,7 @@ export default function CreateSkillScreen() {
         )}
 
         {/* Error Display */}
-        {(generateError || createError) && (
+        {(generateDescriptionMutation.error || createSkillMutation.error) && (
           <View style={styles.errorContainer}>
             <Ionicons
               name="alert-circle"
@@ -295,7 +294,7 @@ export default function CreateSkillScreen() {
               color={Theme.colors.error.main}
             />
             <Text style={styles.errorText}>
-              {(generateError || createError)?.message || "An error occurred"}
+              {(generateDescriptionMutation.error || createSkillMutation.error)?.message || "An error occurred"}
             </Text>
           </View>
         )}

@@ -17,11 +17,8 @@ import { Theme } from "@/theme/Theme";
 import { MonogramBackground } from "@/components/monogram-background/MonogramBackground";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useUser } from "@/contexts/UserContext";
-import { useCreateUser } from "@/api-routes/createUser";
-import { useUpdateUser } from "@/api-routes/updateUser";
-import { useGetUserSkills } from "@/api-routes/getUserSkills";
-import { useGetSkills } from "@/api-routes/getSkills";
-import { useSkillsStore } from "@/stores/skillsStore";
+import { useMutation } from "@tanstack/react-query";
+import { createUser, updateUser } from "@/api/routes";
 import { registerForPushNotificationsAsync } from "@/utils/notifications";
 import type { CreateUserRequest } from "@learning-platform/shared";
 
@@ -38,11 +35,16 @@ export default function SignInScreen() {
   });
   const { setExpoPushToken, setPermissionStatus, getPushToken } = useNotificationStore();
   const { setUser, markUserAsCreated, isUserCreated } = useUser();
-  const { execute: createUserApi } = useCreateUser();
-  const { execute: updateUserApi } = useUpdateUser();
-  const { execute: fetchUserSkills } = useGetUserSkills();
-  const { execute: fetchAvailableSkills } = useGetSkills();
-  const { setUserSkills, setAvailableSkills } = useSkillsStore();
+  
+  // Mutations
+  const createUserMutation = useMutation({
+    mutationFn: (data: CreateUserRequest) => createUser(data),
+  });
+  
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, ...data }: { userId: string } & Partial<CreateUserRequest>) =>
+      updateUser(userId, data),
+  });
   
   // Loading state for the entire sign-in process
   const [isSigningIn, setIsSigningIn] = React.useState(false);
@@ -78,7 +80,7 @@ export default function SignInScreen() {
     });
 
     // Create user on backend
-    const response = await createUserApi(userData);
+    const response = await createUserMutation.mutateAsync(userData);
     console.log("[SignIn] ✅ Backend user created with ID:", response.id);
 
     // Save to UserContext
@@ -123,7 +125,7 @@ export default function SignInScreen() {
               console.log("[SignIn] ✅ Notification token received, updating user...");
               
               // Update backend with device ID
-              await updateUserApi({
+              await updateUserMutation.mutateAsync({
                 userId: user.id,
                 deviceId: token,
               });
@@ -142,29 +144,10 @@ export default function SignInScreen() {
             console.warn("[SignIn] ⚠️ Failed to request notifications:", error);
           }
           
-          // Pre-fetch skills data before navigation
-          setLoadingMessage("Loading your skills...");
-          try {
-            const [userSkills, availableSkills] = await Promise.all([
-              fetchUserSkills({ userId: user.id }),
-              fetchAvailableSkills(),
-            ]);
-            
-            // Cache skills data in store
-            setUserSkills(userSkills);
-            setAvailableSkills(availableSkills);
-            
-            console.log("[SignIn] ✅ Skills data pre-fetched and cached");
-          } catch (error) {
-            // Non-blocking - skills screen will fetch if needed
-            console.warn("[SignIn] ⚠️ Failed to pre-fetch skills:", error);
-          }
         }
         
-        // Navigate to skills screen after a short delay to ensure layout is mounted
-        setTimeout(() => {
-          router.replace("/(tabs)/(skills)");
-        }, 100);
+        // Navigate to skills screen immediately
+        router.replace("/(tabs)/(skills)");
       }
     } catch (err: any) {
       console.error("OAuth error", err);
@@ -207,7 +190,7 @@ export default function SignInScreen() {
               console.log("[SignIn] ✅ Notification token received, updating user...");
               
               // Update backend with device ID
-              await updateUserApi({
+              await updateUserMutation.mutateAsync({
                 userId: user.id,
                 deviceId: token,
               });
@@ -226,29 +209,9 @@ export default function SignInScreen() {
             console.warn("[SignIn] ⚠️ Failed to request notifications:", error);
           }
           
-          // Pre-fetch skills data before navigation
-          setLoadingMessage("Loading your skills...");
-          try {
-            const [userSkills, availableSkills] = await Promise.all([
-              fetchUserSkills({ userId: user.id }),
-              fetchAvailableSkills(),
-            ]);
-            
-            // Cache skills data in store
-            setUserSkills(userSkills);
-            setAvailableSkills(availableSkills);
-            
-            console.log("[SignIn] ✅ Skills data pre-fetched and cached");
-          } catch (error) {
-            // Non-blocking - skills screen will fetch if needed
-            console.warn("[SignIn] ⚠️ Failed to pre-fetch skills:", error);
-          }
         }
         
-        // Navigate to skills screen after a short delay to ensure layout is mounted
-        setTimeout(() => {
-          router.replace("/(tabs)/(skills)");
-        }, 100);
+        router.replace("/(tabs)/(skills)");
       }
     } catch (err: any) {
       console.error("OAuth error", err);

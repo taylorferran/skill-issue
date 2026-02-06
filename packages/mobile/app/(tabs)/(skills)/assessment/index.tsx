@@ -3,13 +3,12 @@ import { spacing } from "@/theme/ThemeUtils";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { styles } from "./_index.styles";
 import SkillOverviewScreen from "@/components/skill-overview/SkillOverview";
 import { challengeToMCQQuestion, type Challenge } from "@/types/Quiz";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
-import { useGetUserSkills } from "@/api-routes/getUserSkills";
-import { useGetChallengeHistory } from "@/api-routes/getChallengeHistory";
-import { useGetChallenge } from "@/api-routes/getChallenge";
+import { fetchUserSkills, fetchChallengeHistory, fetchChallenge, skillsKeys, challengeKeys } from "@/api/routes";
 import { useUser } from "@/contexts/UserContext";
 import { useNavigationTitle } from "@/contexts/NavigationTitleContext";
 import type { GetChallengeHistoryResponse } from "@learning-platform/shared";
@@ -35,6 +34,7 @@ const ReviewHistoryScreen = () => {
   const { skill, skillId, initialData } = useRouteParams('assessment');
   const params = useLocalSearchParams();
   const { setTitle } = useNavigationTitle();
+  const queryClient = useQueryClient();
 
   // Set header title to skill name (truncated to prevent overflow)
   useEffect(() => {
@@ -45,30 +45,44 @@ const ReviewHistoryScreen = () => {
   // Context
   const { userId } = useUser();
 
-  // API hooks - now only used for execute functions (cache updates happen in background)
-  const { execute: fetchUserSkills } = useGetUserSkills();
-  const { execute: fetchChallengeHistory } = useGetChallengeHistory({ storageProps: { skillId } });
-  const { execute: fetchChallenge } = useGetChallenge();
+  // TanStack Query - User Skills
+  // Shows initialData immediately (no loading state), fetches in background
+  const {
+    data: allUserSkills,
+    isFetching: isFetchingSkills,
+  } = useQuery({
+    queryKey: skillsKeys.user(userId || ''),
+    queryFn: () => fetchUserSkills(userId || ''),
+    initialData: initialData?.userSkills,  // ← Instant display from navigation
+    enabled: !!userId,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+
+  // TanStack Query - Challenge History
+  const {
+    data: challengeHistory,
+    isFetching: isFetchingHistory,
+  } = useQuery({
+    queryKey: skillsKeys.history(userId || '', skillId || ''),
+    queryFn: () => fetchChallengeHistory(userId || '', { limit: CHALLENGES_PER_PAGE, offset: 0 }),
+    initialData: initialData?.history,  // ← Instant display from navigation
+    enabled: !!userId && !!skillId,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
 
   // Subscribe to notification store for pending challenges
-  // First get all pending challenges (stable reference from store)
   const allPendingChallenges = useNotificationStore((state) => state.pendingChallenges);
   
-  // Filter by skillId using useMemo to prevent re-renders from new array references
   const pendingChallenges = useMemo(
     () => allPendingChallenges.filter((c) => c.skillId === skillId),
     [allPendingChallenges, skillId]
   );
 
-  // Data state - initialized from navigation params to prevent flicker
-  // initialData comes from cache on the previous screen, available synchronously on mount
-  const [allUserSkills, setAllUserSkills] = useState(initialData?.userSkills || null);
-  const [challengeHistory, setChallengeHistory] = useState(initialData?.history || null);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
   // UI state
   const [hasLocalAssessment, setHasLocalAssessment] = useState(false);
-  const [historyOffset, setHistoryOffset] = useState(0);
+  const [historyOffset, setHistoryOffset] = useState(CHALLENGES_PER_PAGE);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [expandedChallengeId, setExpandedChallengeId] = useState<string | null>(null);
   const [recentlyAnswered, setRecentlyAnswered] = useState<GetChallengeHistoryResponse>([]);
@@ -77,10 +91,7 @@ const ReviewHistoryScreen = () => {
   // Skill data is filtered from user skills
   const skillData = allUserSkills?.find((s: any) => s.skillName === skill) || null;
 
-  // pendingChallenges is already filtered by skillId from the store subscription
-
   // needsRating determines if calibration button should show
-  // Check backend's needsCalibration flag OR if no difficulty target is set
   const needsRating = skillData?.needsCalibration || (!hasLocalAssessment && !skillData?.difficultyTarget);
 
   // Combined display history with optimistic updates - filtered by skillId
@@ -93,48 +104,25 @@ const ReviewHistoryScreen = () => {
       )
   ];
 
-  // Initial load - fetch all data in background
+  // Check local storage for assessment status on mount
   useEffect(() => {
-    if (!userId || !skillId) return;
-
-    const loadInitialData = async () => {
-      console.log('[Assessment] 🔄 Initial load - fetching fresh data...');
-
-      // Check local storage for assessment status
+    if (!skillId) return;
+    
+    const checkAssessment = async () => {
       const localAssessment = await hasAssessedSkill(skillId);
       setHasLocalAssessment(localAssessment);
-
-      try {
-        // Fetch user skills and history in parallel
-        // Pending challenges now come from notificationStore (no API call needed)
-        const [userSkillsResult, historyResult] = await Promise.all([
-          fetchUserSkills({ userId }),
-          fetchChallengeHistory({ userId, limit: CHALLENGES_PER_PAGE, offset: 0 })
-        ]);
-
-        // Update local state with fresh data
-        setAllUserSkills(userSkillsResult);
-        setChallengeHistory(historyResult);
-
-        // Sync local assessment if needed
-        const currentSkill = userSkillsResult?.find((s: any) => s.skillName === skill);
-        if (currentSkill?.difficultyTarget && !localAssessment) {
-          await markSkillAssessed(skillId, currentSkill.difficultyTarget);
-          setHasLocalAssessment(true);
-        }
-
-        setHistoryOffset(CHALLENGES_PER_PAGE);
-        setHasMoreHistory((historyResult?.length || 0) >= CHALLENGES_PER_PAGE);
-      } catch (error) {
-        console.error('[Assessment] ❌ Initial load failed:', error);
-        // Data is already showing from initialData, no need to show error
+      
+      // Sync with server data if available
+      if (skillData?.difficultyTarget && !localAssessment) {
+        await markSkillAssessed(skillId, skillData.difficultyTarget);
+        setHasLocalAssessment(true);
       }
     };
+    
+    checkAssessment();
+  }, [skillId, skillData?.difficultyTarget]);
 
-    loadInitialData();
-  }, [userId, skill, skillId]);
-
-  // Check for recently answered challenge from navigation params
+  // Check for recently answered challenge from navigation params (optimistic update)
   useEffect(() => {
     if (params.answeredChallenge && skillId) {
       try {
@@ -142,6 +130,14 @@ const ReviewHistoryScreen = () => {
         if (answeredChallenge.skillId === skillId) {
           // Add to recently answered for optimistic UI update
           setRecentlyAnswered(prev => [answeredChallenge, ...prev]);
+          // Also update TanStack Query cache for persistence
+          queryClient.setQueryData(
+            skillsKeys.history(userId || '', skillId),
+            (old: GetChallengeHistoryResponse | undefined) => [
+              answeredChallenge,
+              ...(old || [])
+            ]
+          );
           // Emit notification event
           notificationEventEmitter.emit();
           console.log('[Assessment] 🔔 Added optimistic update for answered challenge');
@@ -150,7 +146,7 @@ const ReviewHistoryScreen = () => {
         console.error('[Assessment] Failed to parse answered challenge:', e);
       }
     }
-  }, [params.answeredChallenge, skillId]);
+  }, [params.answeredChallenge, skillId, userId, queryClient]);
 
   // Track when overview animation has played
   useEffect(() => {
@@ -162,34 +158,22 @@ const ReviewHistoryScreen = () => {
     }
   }, [selectedSegment, hasOverviewAnimated]);
 
-  // Refresh when screen comes into focus
+  // Refresh when screen comes into focus (TanStack Query handles this automatically)
   useFocusEffect(
     useCallback(() => {
       if (!userId) return;
 
-      console.log('[Assessment] 🔄 Focus refresh - fetching fresh data...');
-
-      // Fetch fresh data and update local state
-      Promise.all([
-        fetchUserSkills({ userId }),
-        fetchChallengeHistory({ userId, limit: CHALLENGES_PER_PAGE, offset: 0 })
-      ]).then(([userSkillsResult, historyResult]) => {
-        console.log('[Assessment] ✅ Focus refresh complete');
-        setAllUserSkills(userSkillsResult);
-        setChallengeHistory(historyResult);
-        // Note: pending challenges come from notificationStore (no fetch needed)
-      }).catch(error => {
-        console.error('[Assessment] ❌ Focus refresh failed:', error);
-      });
-    }, [userId])
+      console.log('[Assessment] 🔄 Focus refresh - invalidating queries...');
+      
+      // Invalidate queries to trigger background refetch
+      queryClient.invalidateQueries({ queryKey: skillsKeys.user(userId) });
+      queryClient.invalidateQueries({ queryKey: skillsKeys.history(userId, skillId || '') });
+    }, [userId, skillId, queryClient])
   );
 
-  // Listen for notification events to sync pending challenges from notificationStore
-  // This ensures the badge count and pending list stay in sync
+  // Listen for notification events to sync pending challenges
   useEffect(() => {
     const unsubscribe = notificationEventEmitter.subscribe(() => {
-      // No action needed - pendingChallenges is already subscribed to notificationStore
-      // The subscription automatically updates when the store changes
       console.log('[Assessment] 📨 Notification event received - pending challenges already synced');
     });
 
@@ -197,29 +181,32 @@ const ReviewHistoryScreen = () => {
   }, []);
 
   const loadMoreHistory = async () => {
-    if (!userId || !skillId || isLoadingHistory) return;
+    if (!userId || !skillId || isFetchingHistory) return;
 
-    setIsLoadingHistory(true);
     try {
-      const history = await fetchChallengeHistory({
-        userId,
+      const history = await fetchChallengeHistory(userId, {
         limit: CHALLENGES_PER_PAGE,
         offset: historyOffset
       });
 
-      // Append new history to existing history
-      setChallengeHistory((prev: GetChallengeHistoryResponse | null) => [...(prev || []), ...history]);
+      // Append new history to existing cache
+      queryClient.setQueryData(
+        skillsKeys.history(userId, skillId),
+        (old: GetChallengeHistoryResponse | undefined) => [
+          ...(old || []),
+          ...history
+        ]
+      );
+      
       setHistoryOffset((prev: number) => prev + CHALLENGES_PER_PAGE);
       setHasMoreHistory(history.length === CHALLENGES_PER_PAGE);
     } catch (error) {
       console.error('[Assessment] ❌ Failed to load more history:', error);
-    } finally {
-      setIsLoadingHistory(false);
     }
   };
 
   const handleLoadMore = () => {
-    if (!isLoadingHistory && hasMoreHistory) {
+    if (!isFetchingHistory && hasMoreHistory) {
       loadMoreHistory();
     }
   };
@@ -243,8 +230,8 @@ const ReviewHistoryScreen = () => {
     console.log('[Assessment] 📝 Challenge selected:', challenge.challengeId);
 
     try {
-      // Fetch full challenge details including correctOption and explanation
-      const fullChallenge = await fetchChallenge({ challengeId: challenge.challengeId });
+      // Fetch full challenge details
+      const fullChallenge = await fetchChallenge(challenge.challengeId);
       
       console.log('[Assessment] ✅ Full challenge loaded:', {
         challengeId: fullChallenge.id,
@@ -252,8 +239,11 @@ const ReviewHistoryScreen = () => {
         hasExplanation: !!fullChallenge.explanation,
       });
 
-      // Convert to MCQ format with correct answer and explanation
+      // Convert to MCQ format
       const mcqQuestion = challengeToMCQQuestion(fullChallenge);
+      
+      // Prefetch challenge for faster navigation
+      queryClient.setQueryData(challengeKeys.detail(challenge.challengeId), fullChallenge);
       
       navigateTo('quiz', { 
         skill,
@@ -269,6 +259,9 @@ const ReviewHistoryScreen = () => {
       );
     }
   };
+
+  // Combined loading state (only show loading if no cached data available)
+  const isLoadingHistory = isFetchingHistory;
 
   return (
     <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

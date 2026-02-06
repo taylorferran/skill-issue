@@ -1,8 +1,15 @@
-import { useGenerateCalibration } from "@/api-routes/generateCalibration";
-import { useStartCalibration } from "@/api-routes/startCalibration";
-import { useSubmitCalibrationAnswer } from "@/api-routes/submitCalibrationAnswer";
-import { useCompleteCalibration } from "@/api-routes/completeCalibration";
-import { useGetUserSkills } from "@/api-routes/getUserSkills";
+import { 
+  fetchChallenge,
+  fetchPendingChallenges,
+  fetchUserSkills,
+  generateCalibration,
+  startCalibration,
+  submitCalibrationAnswer,
+  completeCalibration,
+  skillsKeys,
+  challengeKeys,
+  calibrationKeys,
+} from "@/api/routes";
 import { CalibrationQuestion } from "@learning-platform/shared";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useUser } from "@/contexts/UserContext";
@@ -18,6 +25,7 @@ import { useSkillsStore } from "@/stores/skillsStore";
 import { quizTimerEmitter } from "@/utils/quizTimerEmitter";
 import { styles } from "./_index.styles";
 import type { MCQQuestion } from "@/types/Quiz";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface CalibrationAnswer {
   difficulty: number;
@@ -50,6 +58,7 @@ export default function CalibrationQuizScreen() {
   const { skill, skillId } = useRouteParams('calibration');
   const { userId } = useUser();
   const { setUserSkills } = useSkillsStore();
+  const queryClient = useQueryClient();
   
   // Track if screen is focused - pause timer when not visible
   const isFocused = useIsFocused();
@@ -60,12 +69,29 @@ export default function CalibrationQuizScreen() {
   // Generate unique ID for this calibration instance
   const calibrationInstanceId = useRef(`calibration-${++calibrationInstanceCounter}-${Date.now()}`);
   
-  // API hooks
-  const { execute: generateCalibration, isLoading: isGenerating } = useGenerateCalibration();
-  const { execute: startCalibration, isLoading: isStarting } = useStartCalibration();
-  const { execute: submitAnswer, isLoading: isSubmitting } = useSubmitCalibrationAnswer();
-  const { execute: completeCalibration, isLoading: isCompleting } = useCompleteCalibration();
-  const { execute: fetchUserSkills } = useGetUserSkills();
+  // Mutations
+  const generateCalibrationMutation = useMutation({
+    mutationFn: (skillId: string) => generateCalibration(skillId),
+  });
+  
+  const startCalibrationMutation = useMutation({
+    mutationFn: ({ userId, skillId }: { userId: string; skillId: string }) => 
+      startCalibration(userId, skillId),
+  });
+  
+  const submitAnswerMutation = useMutation({
+    mutationFn: (data: { userId: string; skillId: string; difficulty: number; selectedOption: number; responseTime: number }) =>
+      submitCalibrationAnswer(data.userId, data.skillId, { 
+        difficulty: data.difficulty, 
+        selectedOption: data.selectedOption, 
+        responseTime: data.responseTime 
+      }),
+  });
+  
+  const completeCalibrationMutation = useMutation({
+    mutationFn: ({ userId, skillId }: { userId: string; skillId: string }) =>
+      completeCalibration(userId, skillId),
+  });
   
   // State
   const [questions, setQuestions] = useState<CalibrationQuestion[]>([]);
@@ -107,10 +133,10 @@ export default function CalibrationQuizScreen() {
       
       try {
         // First generate questions (ensures they exist)
-        await generateCalibration({ skillId });
+        await generateCalibrationMutation.mutateAsync(skillId);
         
         // Then start calibration to get questions
-        const result = await startCalibration({ userId, skillId });
+        const result = await startCalibrationMutation.mutateAsync({ userId, skillId });
         
         if (result.questions && result.questions.length > 0) {
           setQuestions(result.questions);
@@ -207,7 +233,7 @@ export default function CalibrationQuizScreen() {
     try {
       const responseTime = elapsedTime * 1000; // Convert to milliseconds
       
-      const result = await submitAnswer({
+      const result = await submitAnswerMutation.mutateAsync({
         userId,
         skillId,
         difficulty: currentQuestion.difficulty,
@@ -246,11 +272,20 @@ export default function CalibrationQuizScreen() {
       setIsCorrect(false);
       setExplanation(null);
       setCorrectOption(0); // Reset correct option for next question
-      
-      // Auto-scroll to top of ScrollView
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
+
+  // Auto-scroll to top when question changes (after render completes)
+  useEffect(() => {
+    // Small delay to ensure layout is complete after question change
+    const scrollTimeout = setTimeout(() => {
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ y: 0, animated: false });
+      }
+    }, 50);
+
+    return () => clearTimeout(scrollTimeout);
+  }, [currentQuestionIndex]);
   
   const handleFinish = async () => {
     if (!userId || !skillId) return;
@@ -258,14 +293,19 @@ export default function CalibrationQuizScreen() {
     try {
       // Complete calibration to get difficulty target
       // Note: Backend already updates user_skill_state.difficulty_target
-      const result = await completeCalibration({ userId, skillId });
+      const result = await completeCalibrationMutation.mutateAsync({ userId, skillId });
       
       // Mark as assessed locally
       await markSkillAssessed(skillId, result.difficultyTarget);
       
       // Refresh user skills
-      const updatedSkills = await fetchUserSkills({ userId });
-      setUserSkills(updatedSkills);
+      if (userId) {
+        const updatedSkills = await queryClient.fetchQuery({
+          queryKey: skillsKeys.user(userId),
+          queryFn: () => fetchUserSkills(userId),
+        });
+        setUserSkills(updatedSkills);
+      }
       
       setIsFinished(true);
       
@@ -305,7 +345,7 @@ export default function CalibrationQuizScreen() {
   };
   
   // Loading state
-  if (isGenerating || isStarting || !isInitialized) {
+  if (generateCalibrationMutation.isPending || startCalibrationMutation.isPending || !isInitialized) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Theme.colors.primary.main} />
@@ -374,8 +414,8 @@ export default function CalibrationQuizScreen() {
         {/* Confirm Answer Button */}
         {selectedOption !== null && !hasAnswered && (
           <View style={styles.buttonContainer}>
-            <Pressable style={styles.confirmButton} onPress={handleConfirmAnswer} disabled={isSubmitting}>
-              {isSubmitting ? (
+            <Pressable style={styles.confirmButton} onPress={handleConfirmAnswer} disabled={submitAnswerMutation.isPending}>
+              {submitAnswerMutation.isPending ? (
                 <ActivityIndicator size="small" color={Theme.colors.text.inverse} />
               ) : (
                 <Text style={styles.confirmButtonText}>Confirm Answer</Text>
@@ -392,9 +432,9 @@ export default function CalibrationQuizScreen() {
             <Pressable 
               style={[styles.nextButton, isLastQuestion && styles.finishButton]} 
               onPress={handleNext}
-              disabled={isCompleting}
+              disabled={completeCalibrationMutation.isPending}
             >
-              {isCompleting ? (
+              {completeCalibrationMutation.isPending ? (
                 <ActivityIndicator size="small" color={Theme.colors.text.inverse} />
               ) : (
                 <Text style={styles.nextButtonText}>

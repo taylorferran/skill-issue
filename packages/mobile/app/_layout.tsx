@@ -4,7 +4,7 @@ import { ClerkProvider, ClerkLoaded, useAuth } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
 import "react-native-reanimated";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { UserProvider } from "@/contexts/UserContext";
 import { QuizProvider } from "@/contexts/QuizContext";
 import { NavigationTitleProvider } from "@/contexts/NavigationTitleContext";
@@ -12,8 +12,9 @@ import {
   configureNotificationHandler,
   setupNotificationListeners,
 } from "@/utils/notifications";
-import { ApiProvider } from "@/api/ApiProvider";
 import { NotificationBadgeOverlay } from "@/components/notification-badge-overlay/NotificationBadgeOverlay";
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { queryClient, asyncStoragePersister } from '@/api/query-client';
 
 // Get config values from expo-constants (baked in at build time via app.config.ts)
 const clerkPublishableKey = Constants.expoConfig?.extra?.clerkPublishableKey || '';
@@ -92,13 +93,8 @@ function RootLayoutContent() {
 }
 
 export default function RootLayout() {
-  // Memoize service URLs to prevent unnecessary re-renders in ApiProvider
-  // Uses environment variable with fallback for local development
-  const serviceUrls = useMemo(() => {
-    const backendUrl = backendUrlFromConfig;
-    console.log('[RootLayout] 🌐 Backend URL configured:', backendUrl);
-    return { backend: backendUrl };
-  }, []);
+  // Log backend URL configuration
+  console.log('[RootLayout] 🌐 Backend URL configured:', backendUrlFromConfig);
 
   return (
     <ClerkProvider
@@ -106,13 +102,16 @@ export default function RootLayout() {
       tokenCache={tokenCache}
     >
       <ClerkLoaded>
-        <ApiProvider serviceUrls={serviceUrls}>
+        <PersistQueryClientProvider 
+          client={queryClient} 
+          persistOptions={{ persister: asyncStoragePersister }}
+        >
           <UserProvider>
             <QuizProvider>
               <RootLayoutContent />
             </QuizProvider>
           </UserProvider>
-        </ApiProvider>
+        </PersistQueryClientProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );

@@ -22,21 +22,30 @@ import {
 } from "@/utils/notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
-import { useCreateUser } from "@/api-routes/createUser";
-import { useUpdateUser } from "@/api-routes/updateUser";
-import { useTriggerSchedulerTick } from "@/api-routes/triggerSchedulerTick";
+import { useMutation } from "@tanstack/react-query";
+import { createUser, updateUser, triggerSchedulerTick } from "@/api/routes";
 import type { CreateUserRequest } from "@learning-platform/shared";
 import { SelectDropdown, type SelectOption } from "@/components/select-dropdown/SelectDropdown";
 import { styles } from "./index.styles";
 import Slider from "@react-native-community/slider";
 
 export default function ProfileScreen() {
-  const { auth, userId, setUser, updateUser, isUserCreated, markUserAsCreated } =
+  const { auth, userId, setUser, updateLocalUserData, isUserCreated, markUserAsCreated } =
     useUser();
-  const { execute: createUserApi } = useCreateUser();
-  const { execute: updateUserApi } = useUpdateUser();
-  const { execute: triggerSchedulerTick, isLoading: isTriggeringScheduler } = useTriggerSchedulerTick();
-
+  
+  // Mutations
+  const createUserMutation = useMutation({
+    mutationFn: (data: CreateUserRequest) => createUser(data),
+  });
+  
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, ...data }: { userId: string } & Partial<CreateUserRequest>) =>
+      updateUser(userId, data),
+  });
+  
+  const triggerSchedulerMutation = useMutation({
+    mutationFn: () => triggerSchedulerTick(),
+  });
 
   // Notification state management
   const { permissionStatus, setPermissionStatus, setExpoPushToken } =
@@ -148,13 +157,13 @@ export default function ProfileScreen() {
         quietHoursEnd: updatePayload.quietHoursEnd,
       });
 
-      await updateUserApi(updatePayload);
+      await updateUserMutation.mutateAsync(updatePayload);
 
       console.log("[Profile] ✅ Quiet hours synced successfully");
     } catch (error) {
       console.error("[Profile] ❌ Failed to sync quiet hours:", error);
     }
-  }, [userId, updateUserApi]);
+  }, [userId, updateUserMutation]);
 
   // Save quiet hours settings with debounced API sync
   const saveQuietHours = useCallback((enabled: boolean, start: number, end: number) => {
@@ -175,7 +184,7 @@ export default function ProfileScreen() {
     quietHoursDebounceRef.current = setTimeout(() => {
       syncQuietHoursToBackend(enabled, start, end);
     }, QUIET_HOURS_DEBOUNCE_MS);
-  }, [userId, updateUserApi, syncQuietHoursToBackend]);
+  }, [userId, updateUserMutation, syncQuietHoursToBackend]);
 
   // Sync account settings to backend API
   const syncAccountSettingsToBackend = useCallback(async (newTimezone: string, newMaxChallenges: number) => {
@@ -192,12 +201,12 @@ export default function ProfileScreen() {
       };
 
       console.log("[Profile] 📤 Syncing account settings to backend:", updatePayload);
-      await updateUserApi(updatePayload);
+      await updateUserMutation.mutateAsync(updatePayload);
       console.log("[Profile] ✅ Account settings synced successfully");
     } catch (error) {
       console.error("[Profile] ❌ Failed to sync account settings:", error);
     }
-  }, [userId, updateUserApi]);
+  }, [userId, updateUserMutation]);
 
   // Save account settings with debounced API sync
   const saveAccountSettings = useCallback((newTimezone: string, newMaxChallenges: number) => {
@@ -287,7 +296,7 @@ export default function ProfileScreen() {
               });
 
               // Create on backend
-              const response = await createUserApi(requestData);
+              const response = await createUserMutation.mutateAsync(requestData);
               console.log("[Profile] ✅ User created on backend with ID:", response.id);
 
               // Store the RESPONSE (not the request)
@@ -319,7 +328,7 @@ export default function ProfileScreen() {
               console.log("[Profile] 📤 Calling updateUser API with userId:", userId);
 
               // Update on backend via PUT /users/:userId
-              await updateUserApi({
+              await updateUserMutation.mutateAsync({
                 userId,
                 deviceId: token,
               });
@@ -327,7 +336,7 @@ export default function ProfileScreen() {
               console.log("[Profile] ✅ Push token updated on backend");
 
               // Also update local UserContext state
-              await updateUser({ deviceId: token });
+              await updateLocalUserData({ deviceId: token });
               console.log("[Profile] 💾 Push token updated in local context");
 
               Alert.alert("Success", "Notifications enabled successfully!");
@@ -417,7 +426,7 @@ export default function ProfileScreen() {
     if (__DEV__) {
       try {
         console.log("[Profile] 🚀 Triggering scheduler tick...");
-        const result = await triggerSchedulerTick();
+        const result = await triggerSchedulerMutation.mutateAsync();
         console.log("[Profile] ✅ Scheduler tick result:", result);
         Alert.alert(
           "Scheduler Tick",
@@ -651,40 +660,44 @@ export default function ProfileScreen() {
 
         {/* Timezone & Daily Challenge Limit Settings Card */}
         <View style={styles.accountSettingsCard}>
-          <View style={styles.accountSettingsCardContentInline}>
+          <View style={styles.accountSettingsCardContentStacked}>
             {/* Timezone Picker */}
-            <View style={styles.inlinePickerContainer}>
-              <Text style={styles.inlinePickerLabel}>Timezone</Text>
-              <SelectDropdown
-                options={timezoneOptions}
-                value={timezone}
-                onChange={(itemValue) => {
-                  setTimezone(itemValue as string);
-                  saveAccountSettings(itemValue as string, maxChallengesPerDay);
-                }}
-                icon="globe-outline"
-                placeholder="Select..."
-                fullWidth={true}
-              />
+            <View style={styles.stackedPickerRow}>
+              <Text style={styles.stackedPickerLabel}>Timezone</Text>
+              <View style={styles.pickerWrapper}>
+                <SelectDropdown
+                  options={timezoneOptions}
+                  value={timezone}
+                  onChange={(itemValue) => {
+                    setTimezone(itemValue as string);
+                    saveAccountSettings(itemValue as string, maxChallengesPerDay);
+                  }}
+                  icon="globe-outline"
+                  placeholder="Select..."
+                  fullWidth={true}
+                />
+              </View>
             </View>
 
             {/* Divider */}
-            <View style={styles.inlinePickerDivider} />
+            <View style={styles.stackedPickerDivider} />
 
             {/* Daily Challenge Limit Picker */}
-            <View style={styles.inlinePickerContainer}>
-              <Text style={styles.inlinePickerLabel}>Daily Limit</Text>
-              <SelectDropdown
-                options={maxChallengesOptions}
-                value={maxChallengesPerDay}
-                onChange={(itemValue) => {
-                  setMaxChallengesPerDay(itemValue as number);
-                  saveAccountSettings(timezone, itemValue as number);
-                }}
-                icon="trophy-outline"
-                placeholder="Select..."
-                fullWidth={true}
-              />
+            <View style={styles.stackedPickerRow}>
+              <Text style={styles.stackedPickerLabel}>Daily Limit</Text>
+              <View style={styles.pickerWrapper}>
+                <SelectDropdown
+                  options={maxChallengesOptions}
+                  value={maxChallengesPerDay}
+                  onChange={(itemValue) => {
+                    setMaxChallengesPerDay(itemValue as number);
+                    saveAccountSettings(timezone, itemValue as number);
+                  }}
+                  icon="trophy-outline"
+                  placeholder="Select..."
+                  fullWidth={true}
+                />
+              </View>
             </View>
           </View>
         </View>
@@ -696,9 +709,9 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>DEVELOPER TOOLS</Text>
           <View style={styles.settingsGroup}>
             <TouchableOpacity
-              style={[styles.devButton, isTriggeringScheduler && styles.devButtonDisabled]}
+              style={[styles.devButton, triggerSchedulerMutation.isPending && styles.devButtonDisabled]}
               onPress={handleTriggerSchedulerTick}
-              disabled={isTriggeringScheduler}
+              disabled={triggerSchedulerMutation.isPending}
               activeOpacity={0.8}
             >
               <Ionicons
@@ -707,7 +720,7 @@ export default function ProfileScreen() {
                 color={Theme.colors.text.inverse}
               />
               <Text style={styles.devButtonText}>
-                {isTriggeringScheduler ? "Triggering..." : "Trigger Scheduler Tick"}
+                {triggerSchedulerMutation.isPending ? "Triggering..." : "Trigger Scheduler Tick"}
               </Text>
             </TouchableOpacity>
           </View>

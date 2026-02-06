@@ -27,7 +27,7 @@ export type ApiOptions<
   TStorageParams = any,
 > = (TRequest extends z.Schema
   ? { requestData?: z.infer<TRequest>; autoFetch?: boolean }
-  : { requestData?: never; autoFetch?: never }) &
+  : { requestData?: never; autoFetch?: boolean }) &
   (TResponse extends z.Schema
     ? {
       selector?: never;

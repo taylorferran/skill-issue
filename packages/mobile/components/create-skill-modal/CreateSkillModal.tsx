@@ -14,8 +14,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Theme } from "@/theme/Theme";
-import { useGenerateSkillDescription } from "@/api-routes/generateSkillDescription";
-import { useCreateSkill } from "@/api-routes/createSkill";
+import { useMutation } from "@tanstack/react-query";
+import { generateSkillDescription, createSkill } from "@/api/routes";
 import type { GenerateSkillDescriptionResponse } from "@learning-platform/shared";
 import { styles } from "./CreateSkillModal.styles";
 
@@ -37,17 +37,14 @@ export function CreateSkillModal({
     useState<GenerateSkillDescriptionResponse | null>(null);
   const [step, setStep] = useState<"input" | "review">("input");
 
-  const {
-    execute: generateDescription,
-    isLoading: isGenerating,
-    error: generateError,
-  } = useGenerateSkillDescription();
+  // Mutations
+  const generateDescriptionMutation = useMutation({
+    mutationFn: (skillName: string) => generateSkillDescription(skillName),
+  });
 
-  const {
-    execute: createSkill,
-    isLoading: isCreating,
-    error: createError,
-  } = useCreateSkill();
+  const createSkillMutation = useMutation({
+    mutationFn: (data: { name: string; description: string }) => createSkill(data),
+  });
 
   const resetForm = useCallback(() => {
     setSkillName("");
@@ -77,7 +74,7 @@ export function CreateSkillModal({
     }
 
     try {
-      const result = await generateDescription({ skillName: skillName.trim() });
+      const result = await generateDescriptionMutation.mutateAsync(skillName.trim());
       setGeneratedData(result);
       setSkillDescription(result.description);
       setStep("review");
@@ -88,7 +85,7 @@ export function CreateSkillModal({
         "Failed to generate skill description. Please try again."
       );
     }
-  }, [skillName, generateDescription]);
+  }, [skillName, generateDescriptionMutation]);
 
   const handleCreateSkill = useCallback(async () => {
     if (!skillName.trim() || !skillDescription.trim()) {
@@ -97,7 +94,7 @@ export function CreateSkillModal({
     }
 
     try {
-      await createSkill({
+      await createSkillMutation.mutateAsync({
         name: skillName.trim(),
         description: skillDescription.trim(),
       });
@@ -116,7 +113,7 @@ export function CreateSkillModal({
       console.error("Failed to create skill:", error);
       Alert.alert("Error", "Failed to create skill. Please try again.");
     }
-  }, [skillName, skillDescription, createSkill, onSkillCreated, onClose, resetForm]);
+  }, [skillName, skillDescription, createSkillMutation, onSkillCreated, onClose, resetForm]);
 
   const handleBack = useCallback(() => {
     setStep("input");
@@ -124,7 +121,7 @@ export function CreateSkillModal({
     setSkillDescription("");
   }, []);
 
-  const isLoading = isGenerating || isCreating;
+  const isLoading = generateDescriptionMutation.isPending || createSkillMutation.isPending;
 
   return (
     <Modal
@@ -185,14 +182,14 @@ export function CreateSkillModal({
                 <TouchableOpacity
                   style={[
                     styles.primaryButton,
-                    (!skillName.trim() || isGenerating) &&
+                    (!skillName.trim() || generateDescriptionMutation.isPending) &&
                       styles.primaryButtonDisabled,
                   ]}
                   onPress={handleGenerateDescription}
-                  disabled={!skillName.trim() || isGenerating}
+                  disabled={!skillName.trim() || generateDescriptionMutation.isPending}
                   activeOpacity={0.7}
                 >
-                  {isGenerating ? (
+                  {generateDescriptionMutation.isPending ? (
                     <ActivityIndicator color={Theme.colors.text.inverse} />
                   ) : (
                     <>
@@ -263,7 +260,7 @@ export function CreateSkillModal({
                     numberOfLines={4}
                     maxLength={2000}
                     textAlignVertical="top"
-                    editable={!isCreating}
+                    editable={!createSkillMutation.isPending}
                   />
                   <Text style={styles.characterCount}>
                     {skillDescription.length}/2000
@@ -280,7 +277,7 @@ export function CreateSkillModal({
                   <TouchableOpacity
                     style={styles.secondaryButton}
                     onPress={handleBack}
-                    disabled={isCreating}
+                    disabled={createSkillMutation.isPending}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.secondaryButtonText}>Back</Text>
@@ -289,14 +286,14 @@ export function CreateSkillModal({
                   <TouchableOpacity
                     style={[
                       styles.primaryButton,
-                      (!skillDescription.trim() || isCreating) &&
+                      (!skillDescription.trim() || createSkillMutation.isPending) &&
                         styles.primaryButtonDisabled,
                     ]}
                     onPress={handleCreateSkill}
-                    disabled={!skillDescription.trim() || isCreating}
+                    disabled={!skillDescription.trim() || createSkillMutation.isPending}
                     activeOpacity={0.7}
                   >
-                    {isCreating ? (
+                    {createSkillMutation.isPending ? (
                       <ActivityIndicator color={Theme.colors.text.inverse} />
                     ) : (
                       <>
@@ -316,7 +313,7 @@ export function CreateSkillModal({
             )}
 
             {/* Error Display */}
-            {(generateError || createError) && (
+            {(generateDescriptionMutation.error || createSkillMutation.error) && (
               <View style={styles.errorContainer}>
                 <Ionicons
                   name="alert-circle"
@@ -324,7 +321,7 @@ export function CreateSkillModal({
                   color={Theme.colors.error.main}
                 />
                 <Text style={styles.errorText}>
-                  {(generateError || createError)?.message || "An error occurred"}
+                  {(generateDescriptionMutation.error || createSkillMutation.error)?.message || "An error occurred"}
                 </Text>
               </View>
             )}

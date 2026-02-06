@@ -376,27 +376,28 @@ export const styles = StyleSheet.create({
     padding: Theme.spacing.lg,
   },
 
-  // Inline pickers layout
-  accountSettingsCardContentInline: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: Theme.spacing.md,
+  // Stacked pickers layout (title and picker inline, rows stacked vertically)
+  accountSettingsCardContentStacked: {
+    flexDirection: "column",
+    padding: Theme.spacing.lg,
     gap: Theme.spacing.md,
   },
-  inlinePickerContainer: {
-    flex: 1,
-    flexDirection: "column",
-    alignItems: "flex-start",
-    gap: Theme.spacing.sm,
+  stackedPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Theme.spacing.md,
   },
-  inlinePickerLabel: {
-    ...createTextStyle("xs", "bold", "secondary"),
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+  stackedPickerLabel: {
+    ...createTextStyle("sm", "medium", "primary"),
+    flexShrink: 0,
   },
-  inlinePickerDivider: {
-    width: 1,
-    height: 40,
+  stackedPickerDivider: {
+    height: 1,
     backgroundColor: Theme.colors.primary.light,
+  },
+  pickerWrapper: {
+    width: 160,
+    flexShrink: 0,
   },
 });
