@@ -375,4 +375,28 @@ export const styles = StyleSheet.create({
   accountSettingsCardContent: {
     padding: Theme.spacing.lg,
   },
+
+  // Inline pickers layout
+  accountSettingsCardContentInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Theme.spacing.md,
+    gap: Theme.spacing.md,
+  },
+  inlinePickerContainer: {
+    flex: 1,
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: Theme.spacing.sm,
+  },
+  inlinePickerLabel: {
+    ...createTextStyle("xs", "bold", "secondary"),
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  inlinePickerDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: Theme.colors.primary.light,
+  },
 });

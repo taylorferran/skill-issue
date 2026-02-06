@@ -23,6 +23,8 @@ interface SelectDropdownProps {
   onChange: (value: string | number) => void;
   icon?: keyof typeof Ionicons.glyphMap;
   placeholder?: string;
+  compact?: boolean;
+  fullWidth?: boolean;
 }
 
 export function SelectDropdown({
@@ -31,6 +33,8 @@ export function SelectDropdown({
   onChange,
   icon,
   placeholder = "Select...",
+  compact = false,
+  fullWidth = false,
 }: SelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -83,21 +87,24 @@ export function SelectDropdown({
     <>
       {/* Trigger Button */}
       <TouchableOpacity
-        style={styles.trigger}
+        style={[
+          compact ? styles.triggerCompact : styles.trigger,
+          fullWidth && styles.triggerFullWidth,
+        ]}
         onPress={openDropdown}
         activeOpacity={0.7}
       >
         <Ionicons
           name={icon || selectedOption?.icon || "chevron-down-outline"}
-          size={16}
+          size={compact ? 14 : 16}
           color={Theme.colors.primary.main}
         />
-        <Text style={styles.triggerText}>
+        <Text style={compact ? styles.triggerTextCompact : styles.triggerText}>
           {selectedOption?.label || placeholder}
         </Text>
         <Ionicons
           name="chevron-down"
-          size={14}
+          size={compact ? 12 : 14}
           color={Theme.colors.primary.main}
           style={isOpen ? styles.triggerIconOpen : styles.triggerIcon}
         />

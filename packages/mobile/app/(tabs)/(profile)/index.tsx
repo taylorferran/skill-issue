@@ -649,63 +649,43 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>ACCOUNT SETTINGS</Text>
 
-        {/* Timezone Setting Card */}
+        {/* Timezone & Daily Challenge Limit Settings Card */}
         <View style={styles.accountSettingsCard}>
-          <View style={styles.accountSettingsCardHeader}>
-            <View style={styles.accountSettingsCardHeaderLeft}>
-              <View style={[styles.accountSettingsIconContainer, { backgroundColor: Theme.colors.primary.medium }]}>
-                <Ionicons name="globe-outline" size={Theme.iconSize.md} color={Theme.colors.primary.main} />
-              </View>
-              <View style={styles.accountSettingsCardHeaderText}>
-                <Text style={styles.accountSettingsCardTitle}>Timezone</Text>
-                <Text style={styles.accountSettingsCardSubtitle}>Set your local timezone</Text>
-              </View>
+          <View style={styles.accountSettingsCardContentInline}>
+            {/* Timezone Picker */}
+            <View style={styles.inlinePickerContainer}>
+              <Text style={styles.inlinePickerLabel}>Timezone</Text>
+              <SelectDropdown
+                options={timezoneOptions}
+                value={timezone}
+                onChange={(itemValue) => {
+                  setTimezone(itemValue as string);
+                  saveAccountSettings(itemValue as string, maxChallengesPerDay);
+                }}
+                icon="globe-outline"
+                placeholder="Select..."
+                fullWidth={true}
+              />
             </View>
-          </View>
-          
-          <View style={styles.accountSettingsCardDivider} />
-          
-          <View style={styles.accountSettingsCardContent}>
-            <SelectDropdown
-              options={timezoneOptions}
-              value={timezone}
-              onChange={(itemValue) => {
-                setTimezone(itemValue as string);
-                saveAccountSettings(itemValue as string, maxChallengesPerDay);
-              }}
-              icon="globe-outline"
-              placeholder="Select timezone..."
-            />
-          </View>
-        </View>
 
-        {/* Max Challenges Per Day Setting Card */}
-        <View style={[styles.accountSettingsCard, { marginTop: Theme.spacing.md }]}>
-          <View style={styles.accountSettingsCardHeader}>
-            <View style={styles.accountSettingsCardHeaderLeft}>
-              <View style={[styles.accountSettingsIconContainer, { backgroundColor: Theme.colors.primary.medium }]}>
-                <Ionicons name="trophy-outline" size={Theme.iconSize.md} color={Theme.colors.primary.main} />
-              </View>
-              <View style={styles.accountSettingsCardHeaderText}>
-                <Text style={styles.accountSettingsCardTitle}>Daily Challenge Limit</Text>
-                <Text style={styles.accountSettingsCardSubtitle}>Maximum challenges per day</Text>
-              </View>
+            {/* Divider */}
+            <View style={styles.inlinePickerDivider} />
+
+            {/* Daily Challenge Limit Picker */}
+            <View style={styles.inlinePickerContainer}>
+              <Text style={styles.inlinePickerLabel}>Daily Limit</Text>
+              <SelectDropdown
+                options={maxChallengesOptions}
+                value={maxChallengesPerDay}
+                onChange={(itemValue) => {
+                  setMaxChallengesPerDay(itemValue as number);
+                  saveAccountSettings(timezone, itemValue as number);
+                }}
+                icon="trophy-outline"
+                placeholder="Select..."
+                fullWidth={true}
+              />
             </View>
-          </View>
-          
-          <View style={styles.accountSettingsCardDivider} />
-          
-          <View style={styles.accountSettingsCardContent}>
-            <SelectDropdown
-              options={maxChallengesOptions}
-              value={maxChallengesPerDay}
-              onChange={(itemValue) => {
-                setMaxChallengesPerDay(itemValue as number);
-                saveAccountSettings(timezone, itemValue as number);
-              }}
-              icon="trophy-outline"
-              placeholder="Select limit..."
-            />
           </View>
         </View>
       </View>

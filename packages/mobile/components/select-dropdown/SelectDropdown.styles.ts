@@ -12,10 +12,28 @@ export const styles = StyleSheet.create({
     borderRadius: Theme.borderRadius.md,
     gap: 4,
   },
+  triggerCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Theme.colors.primary.light,
+    paddingHorizontal: Theme.spacing.xs,
+    paddingVertical: Theme.spacing.xs / 2,
+    borderRadius: Theme.borderRadius.sm,
+    gap: 2,
+  },
   triggerText: {
     ...createTextStyle("sm", "bold", "primary"),
     color: Theme.colors.primary.main,
     letterSpacing: 0.3,
+  },
+  triggerTextCompact: {
+    ...createTextStyle("xs", "bold", "primary"),
+    color: Theme.colors.primary.main,
+    letterSpacing: 0.3,
+  },
+  triggerFullWidth: {
+    width: "100%",
+    justifyContent: "space-between",
   },
   triggerIcon: {
     marginLeft: 2,
