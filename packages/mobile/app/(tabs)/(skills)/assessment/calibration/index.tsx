@@ -2,14 +2,13 @@ import { useGenerateCalibration } from "@/api-routes/generateCalibration";
 import { useStartCalibration } from "@/api-routes/startCalibration";
 import { useSubmitCalibrationAnswer } from "@/api-routes/submitCalibrationAnswer";
 import { useCompleteCalibration } from "@/api-routes/completeCalibration";
-import { useEnrollSkill } from "@/api-routes/enrollSkill";
 import { useGetUserSkills } from "@/api-routes/getUserSkills";
 import { CalibrationQuestion } from "@learning-platform/shared";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useUser } from "@/contexts/UserContext";
 import { useState, useEffect, useRef } from "react";
 import { useIsFocused } from "@react-navigation/native";
-import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert } from "react-native";
+import { View, Text, ScrollView, Pressable, ActivityIndicator, Alert, type ScrollView as ScrollViewType } from "react-native";
 import { Theme } from "@/theme/Theme";
 import { MaterialIcons } from "@expo/vector-icons";
 import { QuizResult } from "@/components/mcq-quiz/quiz-result/QuizResult";
@@ -54,6 +53,9 @@ export default function CalibrationQuizScreen() {
   
   // Track if screen is focused - pause timer when not visible
   const isFocused = useIsFocused();
+  
+  // Ref for ScrollView to enable auto-scroll on next question
+  const scrollViewRef = useRef<ScrollViewType>(null);
    
   // Generate unique ID for this calibration instance
   const calibrationInstanceId = useRef(`calibration-${++calibrationInstanceCounter}-${Date.now()}`);
@@ -63,7 +65,6 @@ export default function CalibrationQuizScreen() {
   const { execute: startCalibration, isLoading: isStarting } = useStartCalibration();
   const { execute: submitAnswer, isLoading: isSubmitting } = useSubmitCalibrationAnswer();
   const { execute: completeCalibration, isLoading: isCompleting } = useCompleteCalibration();
-  const { execute: enrollSkill, isLoading: isEnrolling } = useEnrollSkill();
   const { execute: fetchUserSkills } = useGetUserSkills();
   
   // State
@@ -245,6 +246,9 @@ export default function CalibrationQuizScreen() {
       setIsCorrect(false);
       setExplanation(null);
       setCorrectOption(0); // Reset correct option for next question
+      
+      // Auto-scroll to top of ScrollView
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
   
@@ -253,14 +257,8 @@ export default function CalibrationQuizScreen() {
     
     try {
       // Complete calibration to get difficulty target
+      // Note: Backend already updates user_skill_state.difficulty_target
       const result = await completeCalibration({ userId, skillId });
-      
-      // Enroll user in skill with calculated difficulty
-      await enrollSkill({
-        userId,
-        skillId,
-        difficultyTarget: result.difficultyTarget
-      });
       
       // Mark as assessed locally
       await markSkillAssessed(skillId, result.difficultyTarget);
@@ -345,7 +343,7 @@ export default function CalibrationQuizScreen() {
   
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView ref={scrollViewRef} style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* Progress Section */}
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
@@ -394,9 +392,9 @@ export default function CalibrationQuizScreen() {
             <Pressable 
               style={[styles.nextButton, isLastQuestion && styles.finishButton]} 
               onPress={handleNext}
-              disabled={isCompleting || isEnrolling}
+              disabled={isCompleting}
             >
-              {isCompleting || isEnrolling ? (
+              {isCompleting ? (
                 <ActivityIndicator size="small" color={Theme.colors.text.inverse} />
               ) : (
                 <Text style={styles.nextButtonText}>

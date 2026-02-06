@@ -211,7 +211,7 @@ export default function SkillSelectScreen() {
       console.log('[Skills] ➕ Enrolling in skill:', skill.name);
 
       // Enroll user in the skill with default difficulty
-      await enrollSkillApi({ userId, skillId: skill.id, difficultyTarget: 2 });
+      await enrollSkillApi({ userId, skillId: skill.id, difficultyTarget: 0 });
 
       console.log('[Skills] ✅ Successfully enrolled in skill:', skill.name);
 

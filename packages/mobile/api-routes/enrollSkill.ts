@@ -9,7 +9,7 @@ import { z } from "zod";
 const EnrollSkillCombinedSchema = z.object({
   userId: z.string().uuid(), // Path parameter
   skillId: z.string().uuid(), // Body parameter
-  difficultyTarget: z.number().min(1).max(10).default(2).optional(), // Body parameter
+  difficultyTarget: z.number().min(0).max(10).default(0).optional(), // Body parameter
 });
 
 /**
@@ -23,7 +23,7 @@ const EnrollSkillCombinedSchema = z.object({
  * const enrollment = await execute({ 
  *   userId: "user-uuid",
  *   skillId: "skill-uuid",
- *   difficultyTarget: 2  // optional, defaults to 2
+ *   difficultyTarget: 0  // optional, defaults to 0
  * });
  * 
  * Note: The API layer will handle:
