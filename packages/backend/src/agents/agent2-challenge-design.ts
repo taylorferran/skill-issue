@@ -40,7 +40,8 @@ interface ChallengeResult {
 
 export class ChallengeDesignAgent {
   private llmProvider = createLLMProvider();
-  private readonly MAX_RETRIES = 3;
+  private readonly MAX_RETRIES = 3; // For duplicate detection within a single generation attempt
+  private readonly MAX_QUALITY_RETRIES = 3; // For validation/quality gate failures - triggers full regeneration
   private readonly RECENT_QUESTIONS_LIMIT = 10;
   private readonly QUESTION_POOL_ENABLED = process.env.QUESTION_POOL_ENABLED !== 'false'; // Default: enabled
   private readonly QUESTION_POOL_MIN_RATING = parseFloat(process.env.QUESTION_POOL_MIN_RATING || '2.0');
@@ -121,6 +122,9 @@ export class ChallengeDesignAgent {
           explanation: poolResult.poolQuestion.explanation,
         };
 
+        const dbStartTime = Date.now();
+
+        // Store challenge
         const { data: challenge, error: insertError } = await supabase
           .from('challenges')
           // @ts-expect-error - Supabase type inference issue
@@ -145,6 +149,21 @@ export class ChallengeDesignAgent {
           .update({ last_challenged_at: new Date().toISOString() })
           .eq('user_id', decision.userId)
           .eq('skill_id', decision.skillId);
+
+        // Track all DB operations in a single span
+        await opikService.createSpan({
+          traceId,
+          name: 'db_operations',
+          type: 'tool',
+          input: { challengeId, source: 'pool' },
+          output: {
+            challengeStored: true,
+            pushEventCreated: true,
+            lastChallengedUpdated: true,
+          },
+          durationMs: Date.now() - dbStartTime,
+          metadata: { poolId: poolResult.poolId },
+        });
 
         // Track pool usage in Opik
         await opikService.createSpan({
@@ -184,7 +203,7 @@ export class ChallengeDesignAgent {
 
       // A/B Testing: Select prompt variant if experiment is enabled
       let selectedVariant: { variantName: string; template: string; tags: string[]; metadata: Record<string, unknown> } | null = null;
-      let templateToUse: string | undefined;
+      let baseTemplate: string | undefined;
 
       if (CHALLENGE_PROMPT_EXPERIMENT.enabled) {
         // Prepare variants with actual templates
@@ -201,191 +220,320 @@ export class ChallengeDesignAgent {
           variants,
         });
 
-        templateToUse = selectedVariant.template;
+        baseTemplate = selectedVariant.template;
         console.log(`[Agent 2] Using A/B test variant: ${selectedVariant.variantName}`);
       }
 
-      // Add history context to the template
-      const historyContext = this.buildHistoryContext(recentQuestions);
-      if (templateToUse && historyContext) {
-        templateToUse = templateToUse + historyContext;
-      }
+      // Quality retry loop - wraps generation + validation + evaluation
+      // All attempts are tracked within the same trace for full observability
+      let qualityAttempt = 0;
+      let finalChallenge: GeneratedChallenge | null = null;
+      let finalLlmResult: any = null;
+      let finalEvaluation: ChallengeEvaluation | null = null;
+      let promptVersion: any = null;
 
-      // Try up to MAX_RETRIES times to generate a unique challenge
-      let generatedChallenge: GeneratedChallenge | null = null;
-      let llmResult: any = null;
-      let llmDuration = 0;
-      let attempt = 0;
+      while (qualityAttempt < this.MAX_QUALITY_RETRIES) {
+        qualityAttempt++;
+        console.log(`[Agent 2] Quality attempt ${qualityAttempt}/${this.MAX_QUALITY_RETRIES}`);
 
-      while (attempt < this.MAX_RETRIES && !generatedChallenge) {
-        attempt++;
-        console.log(`[Agent 2] Generation attempt ${attempt}/${this.MAX_RETRIES}`);
-
-        // Generate challenge via LLM
-        const llmStartTime = Date.now();
-        llmResult = await this.llmProvider.generateChallenge({
-          skillId: decision.skillId,
-          skillName: skill.name,
-          skillDescription: skill.description + historyContext,
-          difficulty: decision.difficultyTarget,
-          customTemplate: templateToUse,
-        });
-        llmDuration = Date.now() - llmStartTime;
-
-        const challenge = llmResult.challenge;
-
-        // Generate hash and check for duplicate
-        const questionHash = this.generateQuestionHash(challenge.question);
-        const isDuplicate = await this.checkDuplicateHash(
-          decision.userId,
-          decision.skillId,
-          questionHash
-        );
-
-        if (isDuplicate) {
-          console.log(`[Agent 2] Duplicate question detected (hash match), retrying...`);
-          // Add this question to the history for next attempt
-          recentQuestions.unshift(challenge.question);
-          const newHistoryContext = this.buildHistoryContext(recentQuestions);
-          if (templateToUse) {
-            // Remove old history and add new
-            templateToUse = templateToUse.split('\n\nRECENT QUESTIONS TO AVOID')[0] + newHistoryContext;
-          }
-          continue;
+        // Build fresh history context for this attempt (includes any previously failed questions)
+        const historyContext = this.buildHistoryContext(recentQuestions);
+        let templateToUse = baseTemplate;
+        if (templateToUse && historyContext) {
+          templateToUse = templateToUse + historyContext;
         }
 
-        // No duplicate, we're good
-        generatedChallenge = challenge;
-      }
+        // Try up to MAX_RETRIES times to generate a unique challenge (duplicate detection)
+        let generatedChallenge: GeneratedChallenge | null = null;
+        let llmResult: any = null;
+        let llmDuration = 0;
+        let duplicateAttempt = 0;
 
-      if (!generatedChallenge) {
-        throw new Error(`Failed to generate unique challenge after ${this.MAX_RETRIES} attempts`);
-      }
+        while (duplicateAttempt < this.MAX_RETRIES && !generatedChallenge) {
+          duplicateAttempt++;
+          console.log(`[Agent 2] Duplicate check attempt ${duplicateAttempt}/${this.MAX_RETRIES} (quality attempt ${qualityAttempt})`);
 
-      const { challenge: finalChallenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
+          // Generate challenge via LLM
+          const llmStartTime = Date.now();
+          llmResult = await this.llmProvider.generateChallenge({
+            skillId: decision.skillId,
+            skillName: skill.name,
+            skillDescription: skill.description + historyContext,
+            difficulty: decision.difficultyTarget,
+            customTemplate: templateToUse,
+          });
+          llmDuration = Date.now() - llmStartTime;
 
-      // Create LLM generation span immediately after the call
-      await opikService.createSpan({
-        traceId,
-        name: 'llm_generation',
-        type: 'llm',
-        model: 'claude-haiku-4-5-20251001',
-        provider: 'anthropic',
-        input: { prompt: actualPrompt },
-        output: { response: rawResponse },
-        promptTokens: usage.inputTokens,
-        completionTokens: usage.outputTokens,
-        durationMs: llmDuration,
-        metadata: { attempts: attempt, recentQuestionsCount: recentQuestions.length },
-      });
+          const challenge = llmResult.challenge;
 
-      // Register prompt with Opik
-      const promptVersion = await opikService.createOrGetPrompt({
-        name: selectedVariant
-          ? `${CHALLENGE_PROMPT_EXPERIMENT.experimentName}_${selectedVariant.variantName}`
-          : 'challenge_generation',
-        template: templateToUse || AnthropicProvider.getChallengePromptTemplate(),
-        metadata: {
-          model: 'claude-haiku-4-5-20251001',
-          ...(selectedVariant?.metadata || {}),
-        },
-        tags: selectedVariant?.tags || ['v0.1-base'],
-      });
+          // Generate hash and check for duplicate
+          const questionHash = this.generateQuestionHash(challenge.question);
+          const isDuplicate = await this.checkDuplicateHash(
+            decision.userId,
+            decision.skillId,
+            questionHash
+          );
 
-      // Validate challenge
-      const validation = this.validateChallenge(finalChallenge);
+          if (isDuplicate) {
+            console.log(`[Agent 2] Duplicate question detected (hash match), retrying...`);
+            // Add this question to the history for next attempt
+            recentQuestions.unshift(challenge.question);
+            const newHistoryContext = this.buildHistoryContext(recentQuestions);
+            if (templateToUse) {
+              // Remove old history and add new
+              templateToUse = templateToUse.split('\n\nRECENT QUESTIONS TO AVOID')[0] + newHistoryContext;
+            }
+            continue;
+          }
 
-      // Track validation step as a span
-      await opikService.createSpan({
-        traceId,
-        name: 'validate_challenge',
-        type: 'general',
-        input: { question: finalChallenge.question, optionCount: finalChallenge.options?.length },
-        output: { isValid: validation.isValid, errors: validation.errors },
-      });
+          // No duplicate, we're good
+          generatedChallenge = challenge;
+        }
 
-      if (!validation.isValid) {
-        console.error('[Agent 2] Invalid challenge generated:', validation.errors);
+        if (!generatedChallenge) {
+          throw new Error(`Failed to generate unique challenge after ${this.MAX_RETRIES} duplicate check attempts`);
+        }
 
-        // End trace with failure
-        await opikService.endTrace({
-          traceId,
-          output: { error: 'Validation failed', errors: validation.errors },
-          error: new Error('Validation failed'),
-        });
+        const { challenge, usage, prompt: actualPrompt, rawResponse } = llmResult;
 
-        return null;
-      }
-
-      // LLM-as-Judge Evaluation (quality gate)
-      let evaluation: ChallengeEvaluation | null = null;
-      if (isEvaluationEnabled()) {
-        console.log('[Agent 2] Running LLM-as-Judge evaluation...');
-        const evaluator = getEvaluator();
-
-        evaluation = await evaluator.evaluate({
-          challenge: finalChallenge,
-          skillName: skill.name,
-          skillDescription: skill.description,
-          targetDifficulty: decision.difficultyTarget,
-        });
-
-        // Track evaluation as an LLM span
+        // Create LLM generation span with quality attempt number
         await opikService.createSpan({
           traceId,
-          name: 'llm_judge_evaluation',
+          name: 'llm_generation',
           type: 'llm',
-          model: EVALUATION_CONFIG.model,
+          model: 'claude-haiku-4-5-20251001',
           provider: 'anthropic',
-          input: {
-            challenge: {
-              question: finalChallenge.question,
-              options: finalChallenge.options,
-              correctAnswerIndex: finalChallenge.correctAnswerIndex,
-            },
-            targetDifficulty: decision.difficultyTarget,
+          input: { prompt: actualPrompt },
+          output: { response: rawResponse },
+          promptTokens: usage.inputTokens,
+          completionTokens: usage.outputTokens,
+          durationMs: llmDuration,
+          metadata: {
+            qualityAttempt,
+            duplicateAttempts: duplicateAttempt,
+            recentQuestionsCount: recentQuestions.length
           },
-          output: {
-            scores: evaluation.scores,
-            reasons: evaluation.reasons,
-            compositeScore: evaluation.compositeScore,
-            passed: evaluation.passed,
-          },
-          promptTokens: evaluation.usage.inputTokens,
-          completionTokens: evaluation.usage.outputTokens,
-          durationMs: evaluation.durationMs,
         });
 
-        // Add individual feedback scores with per-dimension LLM reasoning
-        await opikService.addFeedbackScores(traceId, [
-          { name: 'judge_clarity', value: evaluation.scores.clarity, reason: evaluation.reasons.clarity },
-          { name: 'judge_difficulty', value: evaluation.scores.difficultyAlignment, reason: evaluation.reasons.difficultyAlignment },
-          { name: 'judge_distractors', value: evaluation.scores.distractorQuality, reason: evaluation.reasons.distractorQuality },
-          { name: 'judge_educational', value: evaluation.scores.educationalValue, reason: evaluation.reasons.educationalValue },
-          { name: 'judge_relevance', value: evaluation.scores.skillRelevance, reason: evaluation.reasons.skillRelevance },
-          { name: 'judge_composite', value: evaluation.compositeScore, reason: evaluation.reasons.overall },
+        // Register prompt with Opik (only on first attempt to avoid duplicates)
+        if (!promptVersion) {
+          promptVersion = await opikService.createOrGetPrompt({
+            name: selectedVariant
+              ? `${CHALLENGE_PROMPT_EXPERIMENT.experimentName}_${selectedVariant.variantName}`
+              : 'challenge_generation',
+            template: templateToUse || AnthropicProvider.getChallengePromptTemplate(),
+            metadata: {
+              model: 'claude-haiku-4-5-20251001',
+              ...(selectedVariant?.metadata || {}),
+            },
+            tags: selectedVariant?.tags || ['v0.1-base'],
+          });
+        }
+
+        // Validate challenge
+        const validation = this.validateChallenge(challenge);
+
+        // Track validation step as a guardrail span
+        const validationSpanId = await opikService.createSpan({
+          traceId,
+          name: 'validate_challenge',
+          type: 'guardrail',
+          input: { question: challenge.question, optionCount: challenge.options?.length },
+          output: { isValid: validation.isValid, errors: validation.errors },
+          metadata: { qualityAttempt },
+        });
+
+        // Add feedback scores to validation span
+        await opikService.addSpanFeedbackScores(validationSpanId, [
+          { name: 'valid_structure', value: validation.isValid ? 1 : 0, reason: validation.isValid ? 'All validation checks passed' : `Failed: ${validation.errors.join(', ')}` },
+          { name: 'question_length', value: (challenge.question?.length >= 10 && challenge.question?.length <= 150) ? 1 : 0, reason: `Question: ${challenge.question?.length || 0} chars (10-150 required)` },
+          { name: 'option_count', value: challenge.options?.length === 4 ? 1 : 0, reason: `Options: ${challenge.options?.length || 0} (4 required)` },
         ], 'online_scoring');
 
-        // Quality gate: reject low-quality challenges
-        if (!evaluation.passed) {
-          console.warn(`[Agent 2] Challenge rejected by LLM judge: score=${evaluation.compositeScore.toFixed(2)}, threshold=${EVALUATION_CONFIG.qualityThreshold}`);
-          console.warn(`[Agent 2] Reasoning: ${evaluation.reasons.overall}`);
+        if (!validation.isValid) {
+          console.error(`[Agent 2] Invalid challenge generated (attempt ${qualityAttempt}):`, validation.errors);
 
-          // End trace with failure
+          // Add failed question to history to avoid similar issues
+          recentQuestions.unshift(challenge.question);
+
+          // Log retry span if we have more attempts
+          if (qualityAttempt < this.MAX_QUALITY_RETRIES) {
+            await opikService.createSpan({
+              traceId,
+              name: 'quality_gate_retry',
+              type: 'general',
+              input: {
+                failedQuestion: challenge.question,
+                qualityAttempt,
+              },
+              output: {
+                reason: 'validation_failed',
+                errors: validation.errors,
+                retriesRemaining: this.MAX_QUALITY_RETRIES - qualityAttempt,
+              },
+              metadata: { qualityAttempt },
+            });
+            console.log(`[Agent 2] Retrying due to validation failure (${this.MAX_QUALITY_RETRIES - qualityAttempt} attempts remaining)`);
+            continue; // Try again
+          }
+
+          // No more retries - end trace with failure
           await opikService.endTrace({
             traceId,
             output: {
-              error: 'Quality gate failed',
-              compositeScore: evaluation.compositeScore,
-              threshold: EVALUATION_CONFIG.qualityThreshold,
+              error: 'Validation failed after all retries',
+              errors: validation.errors,
+              totalQualityAttempts: qualityAttempt,
             },
-            error: new Error('Quality gate failed'),
+            error: new Error('Validation failed after all retries'),
           });
 
           return null;
         }
 
-        console.log(`[Agent 2] Challenge passed quality gate: score=${evaluation.compositeScore.toFixed(2)}`);
+        // LLM-as-Judge Evaluation (quality gate)
+        let evaluation: ChallengeEvaluation | null = null;
+        if (isEvaluationEnabled()) {
+          console.log(`[Agent 2] Running LLM-as-Judge evaluation (attempt ${qualityAttempt})...`);
+          const evaluator = getEvaluator();
+
+          evaluation = await evaluator.evaluate({
+            challenge,
+            skillName: skill.name,
+            skillDescription: skill.description,
+            targetDifficulty: decision.difficultyTarget,
+          });
+
+          // Track evaluation as an LLM span with attempt number
+          const evaluationSpanId = await opikService.createSpan({
+            traceId,
+            name: 'llm_judge_evaluation',
+            type: 'llm',
+            model: EVALUATION_CONFIG.model,
+            provider: 'anthropic',
+            input: {
+              challenge: {
+                question: challenge.question,
+                options: challenge.options,
+                correctAnswerIndex: challenge.correctAnswerIndex,
+              },
+              targetDifficulty: decision.difficultyTarget,
+            },
+            output: {
+              scores: evaluation.scores,
+              reasons: evaluation.reasons,
+              compositeScore: evaluation.compositeScore,
+              passed: evaluation.passed,
+            },
+            promptTokens: evaluation.usage.inputTokens,
+            completionTokens: evaluation.usage.outputTokens,
+            durationMs: evaluation.durationMs,
+            metadata: { qualityAttempt },
+          });
+
+          // Add individual feedback scores to the evaluation span (not the trace)
+          // This allows each attempt's scores to be visible on its own span
+          await opikService.addSpanFeedbackScores(evaluationSpanId, [
+            { name: 'clarity', value: evaluation.scores.clarity, reason: evaluation.reasons.clarity },
+            { name: 'difficulty', value: evaluation.scores.difficultyAlignment, reason: evaluation.reasons.difficultyAlignment },
+            { name: 'distractors', value: evaluation.scores.distractorQuality, reason: evaluation.reasons.distractorQuality },
+            { name: 'educational', value: evaluation.scores.educationalValue, reason: evaluation.reasons.educationalValue },
+            { name: 'relevance', value: evaluation.scores.skillRelevance, reason: evaluation.reasons.skillRelevance },
+            { name: 'composite', value: evaluation.compositeScore, reason: evaluation.reasons.overall },
+          ], 'online_scoring');
+
+          // Veto check: any individual score below threshold auto-fails
+          const scoreEntries = [
+            { name: 'clarity', value: evaluation.scores.clarity },
+            { name: 'difficulty', value: evaluation.scores.difficultyAlignment },
+            { name: 'distractors', value: evaluation.scores.distractorQuality },
+            { name: 'educational', value: evaluation.scores.educationalValue },
+            { name: 'relevance', value: evaluation.scores.skillRelevance },
+          ];
+          const failedScores = scoreEntries.filter(s => s.value < EVALUATION_CONFIG.vetoThreshold);
+          const vetoTriggered = failedScores.length > 0;
+
+          // Quality gate: check if challenge passes (composite threshold OR veto)
+          if (!evaluation.passed || vetoTriggered) {
+            const failReason = vetoTriggered
+              ? `Veto triggered: ${failedScores.map(s => `${s.name}=${s.value.toFixed(2)}`).join(', ')} below ${EVALUATION_CONFIG.vetoThreshold}`
+              : `Composite score ${evaluation.compositeScore.toFixed(2)} below threshold ${EVALUATION_CONFIG.qualityThreshold}`;
+            console.warn(`[Agent 2] Challenge rejected by LLM judge (attempt ${qualityAttempt}): ${failReason}`);
+            console.warn(`[Agent 2] Reasoning: ${evaluation.reasons.overall}`);
+
+            // Add failed question to history to encourage different approach
+            recentQuestions.unshift(challenge.question);
+
+            // Log retry span if we have more attempts
+            if (qualityAttempt < this.MAX_QUALITY_RETRIES) {
+              await opikService.createSpan({
+                traceId,
+                name: 'quality_gate_retry',
+                type: 'general',
+                input: {
+                  failedQuestion: challenge.question,
+                  qualityAttempt,
+                  compositeScore: evaluation.compositeScore,
+                },
+                output: {
+                  reason: vetoTriggered ? 'veto_triggered' : 'quality_gate_failed',
+                  vetoTriggered,
+                  failedScores: failedScores.map(s => s.name),
+                  vetoThreshold: EVALUATION_CONFIG.vetoThreshold,
+                  compositeThreshold: EVALUATION_CONFIG.qualityThreshold,
+                  scores: evaluation.scores,
+                  reasoning: evaluation.reasons.overall,
+                  retriesRemaining: this.MAX_QUALITY_RETRIES - qualityAttempt,
+                },
+                metadata: { qualityAttempt },
+              });
+              console.log(`[Agent 2] Retrying due to quality gate failure (${this.MAX_QUALITY_RETRIES - qualityAttempt} attempts remaining)`);
+              continue; // Try again
+            }
+
+            // No more retries - end trace with failure
+            await opikService.endTrace({
+              traceId,
+              output: {
+                error: 'Quality gate failed after all retries',
+                compositeScore: evaluation.compositeScore,
+                threshold: EVALUATION_CONFIG.qualityThreshold,
+                totalQualityAttempts: qualityAttempt,
+              },
+              error: new Error('Quality gate failed after all retries'),
+            });
+
+            return null;
+          }
+
+          console.log(`[Agent 2] Challenge passed quality gate (attempt ${qualityAttempt}): score=${evaluation.compositeScore.toFixed(2)}`);
+        }
+
+        // Challenge passed all checks - break out of quality retry loop
+        finalChallenge = challenge;
+        finalLlmResult = llmResult;
+        finalEvaluation = evaluation;
+        break;
+      }
+
+      // Safety check - should not reach here without a challenge
+      if (!finalChallenge || !finalLlmResult) {
+        throw new Error('Unexpected state: no challenge generated after quality loop');
+      }
+
+      const evaluation = finalEvaluation;
+
+      // Add final successful scores to trace level (for filtering/overview in Opik UI)
+      // Individual attempt scores are already on their respective spans
+      if (evaluation) {
+        await opikService.addFeedbackScores(traceId, [
+          { name: 'final_clarity', value: evaluation.scores.clarity, reason: evaluation.reasons.clarity },
+          { name: 'final_difficulty', value: evaluation.scores.difficultyAlignment, reason: evaluation.reasons.difficultyAlignment },
+          { name: 'final_distractors', value: evaluation.scores.distractorQuality, reason: evaluation.reasons.distractorQuality },
+          { name: 'final_educational', value: evaluation.scores.educationalValue, reason: evaluation.reasons.educationalValue },
+          { name: 'final_relevance', value: evaluation.scores.skillRelevance, reason: evaluation.reasons.skillRelevance },
+          { name: 'final_composite', value: evaluation.compositeScore, reason: evaluation.reasons.overall },
+        ], 'online_scoring');
       }
 
       // Generate and store question hash for duplicate detection
@@ -420,6 +568,9 @@ export class ChallengeDesignAgent {
         explanation: finalChallenge.explanation,
       };
 
+      const dbStartTime = Date.now();
+
+      // Store challenge
       const { data: challenge, error: insertError } = await supabase
         .from('challenges')
         // @ts-expect-error - Supabase type inference issue with Insert types
@@ -454,6 +605,20 @@ export class ChallengeDesignAgent {
         .eq('user_id', decision.userId)
         .eq('skill_id', decision.skillId);
 
+      // Track all DB operations in a single span
+      await opikService.createSpan({
+        traceId,
+        name: 'db_operations',
+        type: 'tool',
+        input: { challengeId },
+        output: {
+          challengeStored: true,
+          pushEventCreated: true,
+          lastChallengedUpdated: true,
+        },
+        durationMs: Date.now() - dbStartTime,
+      });
+
       // End trace with success
       await opikService.endTrace({
         traceId,
@@ -461,7 +626,7 @@ export class ChallengeDesignAgent {
           challengeId: challenge.id,
           question: finalChallenge.question,
           difficulty: decision.difficultyTarget,
-          attempts: attempt,
+          qualityAttempts: qualityAttempt,
           recentQuestionsCount: recentQuestions.length,
           ...(evaluation && {
             judgeScore: evaluation.compositeScore,
@@ -525,8 +690,8 @@ export class ChallengeDesignAgent {
 
         // Enforce word limit on options
         const optionWords = option.trim().split(/\s+/).length;
-        if (optionWords > 8) {
-          errors.push(`Option ${idx} too long (${optionWords} words, max 8)`);
+        if (optionWords > 12) {
+          errors.push(`Option ${idx} too long (${optionWords} words, max 12)`);
         }
       });
     }
@@ -549,8 +714,8 @@ export class ChallengeDesignAgent {
     // Check explanation brevity (if provided)
     if (challenge.explanation) {
       const explanationWords = challenge.explanation.trim().split(/\s+/).length;
-      if (explanationWords > 30) {
-        errors.push(`Explanation too long (${explanationWords} words, max 30)`);
+      if (explanationWords > 50) {
+        errors.push(`Explanation too long (${explanationWords} words, max 50)`);
       }
     }
 

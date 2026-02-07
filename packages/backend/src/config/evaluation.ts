@@ -19,7 +19,14 @@ export const EVALUATION_CONFIG = {
    * Challenges scoring below this threshold are rejected.
    * Range: 0-1, Default: 0.7 (70%)
    */
-  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.7'),
+  qualityThreshold: parseFloat(process.env.LLM_JUDGE_THRESHOLD || '0.7'), 
+
+  /**
+   * Veto threshold for individual scores.
+   * If ANY individual score falls below this, the challenge fails regardless of composite.
+   * Range: 0-1, Default: 0.4 (40%)
+   */
+  vetoThreshold: parseFloat(process.env.LLM_JUDGE_VETO_THRESHOLD || '0.4'),
 
   /**
    * Weights for calculating composite score.

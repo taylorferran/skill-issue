@@ -73,8 +73,16 @@ interface TraceContext {
   creationPromise?: Promise<void>;  // Wait for trace to be created before updating
 }
 
+interface SpanContext {
+  spanId: string;
+  creationPromise: Promise<void>;  // Wait for span to be created before adding feedback
+}
+
 // Active trace contexts (for nested span support)
 const activeTraces = new Map<string, TraceContext>();
+
+// Active span contexts (for feedback score support)
+const activeSpans = new Map<string, SpanContext>();
 
 class OpikService {
   private apiKey: string | null = null;
@@ -354,16 +362,26 @@ class OpikService {
 
     // Get the trace context to wait for trace creation
     const traceContext = activeTraces.get(params.traceId);
-    const creationPromise = traceContext?.creationPromise;
+    const traceCreationPromise = traceContext?.creationPromise;
 
     // Wait for trace creation before creating span
-    const promise = (async () => {
-      if (creationPromise) {
-        await creationPromise;
+    const spanCreationPromise = (async () => {
+      try {
+        if (traceCreationPromise) {
+          await traceCreationPromise;
+        }
+        await this.request('POST', '/spans/batch', { spans: [spanData] });
+      } catch (error) {
+        console.error(`[Opik] Span creation failed for ${spanId}:`, error);
       }
-      await this.request('POST', '/spans/batch', { spans: [spanData] });
     })();
-    this.pendingRequests.push(promise);
+    this.pendingRequests.push(spanCreationPromise);
+
+    // Track span creation promise so feedback can wait for it
+    activeSpans.set(spanId, {
+      spanId,
+      creationPromise: spanCreationPromise,
+    });
 
     return spanId;
   }
@@ -393,11 +411,11 @@ class OpikService {
     }>;
   }): Promise<void> {
     if (params.traceId) {
-      // Create a general span under the existing trace
+      // Create a tool span under the existing trace (agents perform DB operations)
       const agentSpanId = await this.createSpan({
         traceId: params.traceId,
         name: `agent_${params.agentName}`,
-        type: 'general',
+        type: 'tool',
         input: params.input,
         output: params.output,
         metadata: { ...params.metadata, agent: params.agentName, success: params.success },
@@ -968,6 +986,90 @@ class OpikService {
     await Promise.all(promises);
   }
 
+  /**
+   * Add a feedback score to a span
+   * Useful for attaching evaluation scores directly to LLM call spans
+   */
+  async addSpanFeedbackScore(params: {
+    spanId: string;
+    name: string;
+    value: number; // 0-1
+    source: 'ui' | 'sdk' | 'online_scoring';
+    reason?: string;
+  }): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(
+        `[Opik] Span Feedback: ${params.name}=${params.value} for span ${params.spanId}`
+      );
+      return;
+    }
+
+    const feedbackData = {
+      name: params.name,
+      value: params.value,
+      source: params.source,
+      reason: params.reason,
+    };
+
+    // Get span context to wait for span creation
+    const spanContext = activeSpans.get(params.spanId);
+    const spanCreationPromise = spanContext?.creationPromise;
+
+    const promise = (async () => {
+      try {
+        // Wait for span to be created before adding feedback
+        if (spanCreationPromise) {
+          await spanCreationPromise;
+        }
+        await this.request(
+          'PUT',
+          `/spans/${params.spanId}/feedback-scores`,
+          feedbackData
+        );
+      } catch (error) {
+        console.error(`[Opik] Span feedback failed for ${params.spanId}:`, error);
+      }
+    })();
+    this.pendingRequests.push(promise);
+  }
+
+  /**
+   * Add multiple feedback scores to a span at once.
+   * Convenience method for attaching LLM-as-Judge scores to evaluation spans.
+   */
+  async addSpanFeedbackScores(
+    spanId: string,
+    scores: Array<{
+      name: string;
+      value: number;
+      reason?: string;
+    }>,
+    source: 'ui' | 'sdk' | 'online_scoring' = 'online_scoring'
+  ): Promise<void> {
+    if (!this.isEnabled) {
+      console.log(
+        `[Opik] Batch span feedback: ${scores.length} scores for span ${spanId}`
+      );
+      for (const score of scores) {
+        console.log(`  - ${score.name}=${score.value.toFixed(2)}`);
+      }
+      return;
+    }
+
+    // Add all scores in parallel
+    const promises = scores.map((score) =>
+      this.addSpanFeedbackScore({
+        spanId,
+        name: score.name,
+        value: score.value,
+        source,
+        reason: score.reason,
+      })
+    );
+
+    await Promise.all(promises);
+  }
+
   // ============= Dataset Management =============
 
   /**
@@ -1024,6 +1126,13 @@ class OpikService {
 
   /**
    * Add items to a dataset
+   *
+   * For example-based datasets:
+   * - input: {} (empty)
+   * - expected_output: { question, options, correctAnswerIndex, explanation }
+   *
+   * Opik expects `input` and `expected_output` as top-level fields in `data`.
+   * Do NOT flatten - the Python optimizer reads via dataset_item.get("expected_output", {})
    */
   async addDatasetItems(
     datasetName: string,
@@ -1040,35 +1149,16 @@ class OpikService {
 
     // Format items according to Opik API spec:
     // - Use PUT method (not POST)
-    // - All fields must be inside a 'data' object
-    // - Flatten nested objects so Opik displays clean columns
+    // - Preserve nested structure in 'data' object
     // - 'source' field is required
-    const formattedItems = items.map(item => {
-      const input = item.input as Record<string, unknown>;
-      const expectedOutput = item.expected_output as Record<string, unknown>;
-      const metadata = item.metadata as Record<string, unknown> | undefined;
-      const difficultyRange = expectedOutput.difficulty_range as [number, number] | undefined;
-
-      return {
-        id: generateUUIDv7(),
-        source: 'sdk',
-        data: {
-          // Flattened input fields (skill_id omitted - same for all items in dataset)
-          skill_name: input.skill_name,
-          skill_description: input.skill_description,
-          difficulty: input.difficulty,
-          scenario: input.scenario,
-          expected_concepts: input.expected_concepts,
-          // Flattened expected_output fields
-          difficulty_range_min: difficultyRange?.[0],
-          difficulty_range_max: difficultyRange?.[1],
-          required_concepts: expectedOutput.required_concepts,
-          // Flattened metadata fields (created_at omitted - not useful for analysis)
-          source_type: metadata?.source,
-          item_id: metadata?.item_id,
-        },
-      };
-    });
+    const formattedItems = items.map(item => ({
+      id: generateUUIDv7(),
+      source: 'sdk',
+      data: {
+        input: item.input,                    // Preserve as nested object
+        expected_output: item.expected_output, // Preserve as nested object
+      },
+    }));
 
     // Batch in groups of 50
     for (let i = 0; i < formattedItems.length; i += 50) {

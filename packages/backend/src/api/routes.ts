@@ -18,7 +18,7 @@ import {
 } from '@shared/schemas';
 import { calibrationService } from '@/services/calibration.service';
 import { createLLMProvider } from '@/lib/llm-provider';
-import { datasetGenerator } from '@/lib/dataset-generator';
+import { datasetGenerator, createDatasetGenerator } from '@/lib/dataset-generator';
 import { experimentRunner } from '@/lib/experiment-runner';
 const router = express.Router();
 
@@ -89,10 +89,11 @@ router.post('/answer', async (req: Request, res: Response) => {
       await opikService.createSpan({
         traceId,
         name: 'load_challenge',
-        type: 'general',
+        type: 'tool',
         input: { challengeId: body.challengeId },
         output: { found: false },
         durationMs: Date.now() - lookupStart,
+        metadata: { operation: 'select', table: 'challenges' },
       });
       await opikService.endTrace({ traceId, error: new Error('Challenge not found') });
       return res.status(404).json({ error: 'Challenge not found' });
@@ -109,10 +110,11 @@ router.post('/answer', async (req: Request, res: Response) => {
     await opikService.createSpan({
       traceId,
       name: 'load_challenge',
-      type: 'general',
+      type: 'tool',
       input: { challengeId: body.challengeId },
       output: { found: true, alreadyAnswered: !!existingAnswer },
       durationMs: Date.now() - lookupStart,
+      metadata: { operation: 'select', table: 'challenges' },
     });
 
     if (existingAnswer) {
@@ -150,10 +152,11 @@ router.post('/answer', async (req: Request, res: Response) => {
     await opikService.createSpan({
       traceId,
       name: 'store_answer',
-      type: 'general',
-      input: { challengeId: body.challengeId },
+      type: 'tool',
+      input: { challengeId: body.challengeId, userId: body.userId },
       output: { isCorrect },
       durationMs: Date.now() - storeStartTime,
+      metadata: { operation: 'insert', table: 'answers' },
     });
 
     // Track metrics with Opik — creates a span under the root trace
@@ -1091,22 +1094,13 @@ router.post('/skills', async (req: Request, res: Response) => {
 
     const skillData = skill as any;
 
-    // Auto-generate dataset in background (don't wait for it)
-    datasetGenerator.generateDatasetForSkill({
-      skillId: skillData.id,
-      skillName: skillData.name,
-      skillDescription: skillData.description,
-    }).catch(err => {
-      console.error('[Skill Creation] Dataset generation failed:', err);
-    });
-
     res.status(201).json({
       id: skillData.id,
       name: skillData.name,
       description: skillData.description,
       active: skillData.active,
       createdAt: skillData.created_at,
-      message: 'Skill created. Dataset generation started in background.',
+      message: 'Skill created. Use POST /api/datasets/generate-all-levels to create example datasets.',
     });
   } catch (error) {
     console.error('Create skill error:', error);
@@ -1353,50 +1347,133 @@ router.get('/users/:userId/skills/:skillId/calibration/status', async (req: Requ
 
 /**
  * POST /api/datasets/generate
- * Generate dataset for a specific skill or all skills without datasets
+ * Generate example-based dataset for a specific skill at a specific level.
+ *
+ * Example-based datasets contain high-quality example challenges that serve
+ * as benchmarks for evaluating generated challenge quality.
+ *
+ * Body:
+ * - skillId: string (required) - The skill ID to generate for
+ * - level: number (required) - The difficulty level (1-10)
+ * - count: number (optional) - Number of examples to generate (default: 5)
+ *
+ * Creates dataset: skill_{id}_level_{level}_examples
+ * Each item has empty input and expected_output containing an example challenge.
  */
 router.post('/datasets/generate', async (req: Request, res: Response) => {
   try {
-    const { skillId } = req.body;
+    const { skillId, level, count } = req.body;
+
+    if (!skillId) {
+      return res.status(400).json({ error: 'skillId is required' });
+    }
+
+    if (level === undefined) {
+      return res.status(400).json({ error: 'level is required (1-10)' });
+    }
+
+    const levelNum = parseInt(level);
+    if (isNaN(levelNum) || levelNum < 1 || levelNum > 10) {
+      return res.status(400).json({ error: 'Level must be between 1 and 10' });
+    }
+
     const supabase = getSupabase();
 
-    if (skillId) {
-      // Generate for specific skill
-      const { data: skill, error } = await supabase
-        .from('skills')
-        .select('id, name, description')
-        .eq('id', skillId)
-        .single();
-
-      if (error || !skill) {
-        return res.status(404).json({ error: 'Skill not found' });
-      }
-
-      const skillData = skill as any;
-      const result = await datasetGenerator.generateDatasetForSkill({
-        skillId: skillData.id,
-        skillName: skillData.name,
-        skillDescription: skillData.description,
-      });
-
-      return res.json(result);
-    }
-
-    // Generate for all skills without datasets
-    const { data: skills, error } = await supabase
+    const { data: skill, error } = await supabase
       .from('skills')
       .select('id, name, description')
-      .eq('active', true);
+      .eq('id', skillId)
+      .single();
 
-    if (error || !skills) {
-      return res.status(500).json({ error: 'Failed to fetch skills' });
+    if (error || !skill) {
+      return res.status(404).json({ error: 'Skill not found' });
     }
 
-    const result = await datasetGenerator.ensureAllSkillsHaveDatasets(skills as any[]);
-    res.json(result);
+    const skillData = skill as any;
+
+    // Create generator (uses OpenAI GPT-4o by default for quality)
+    const generator = createDatasetGenerator('openai');
+
+    console.log(`[API] Generating example dataset for skill: ${skillData.name} level ${levelNum}`);
+
+    const result = await generator.generateDatasetForLevel({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      skillDescription: skillData.description,
+      level: levelNum,
+      count: count || 5,
+    });
+
+    return res.json({
+      ...result,
+      skillName: skillData.name,
+      level: levelNum,
+      type: 'example-based',
+      message: result.itemsCreated > 0
+        ? `Created ${result.itemsCreated} example challenges for ${skillData.name} level ${levelNum}`
+        : `Dataset already exists: ${result.datasetName}`,
+    });
   } catch (error) {
     console.error('Dataset generation error:', error);
     res.status(500).json({ error: 'Failed to generate dataset' });
+  }
+});
+
+/**
+ * POST /api/datasets/generate-all-levels
+ * Generate example-based datasets for all 10 difficulty levels of a skill.
+ * Creates datasets: skill_{id}_level_1_examples through skill_{id}_level_10_examples
+ * Each dataset contains 5 example challenges.
+ *
+ * Body:
+ * - skillId: string (required) - The skill ID to generate datasets for
+ */
+router.post('/datasets/generate-all-levels', async (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.body;
+
+    if (!skillId) {
+      return res.status(400).json({ error: 'skillId is required' });
+    }
+
+    const supabase = getSupabase();
+
+    const { data: skill, error } = await supabase
+      .from('skills')
+      .select('id, name, description')
+      .eq('id', skillId)
+      .single();
+
+    if (error || !skill) {
+      return res.status(404).json({ error: 'Skill not found' });
+    }
+
+    const skillData = skill as any;
+
+    // Create generator (uses OpenAI GPT-4o by default for quality)
+    const generator = createDatasetGenerator('openai');
+
+    console.log(`[API] Generating all-levels example datasets for skill: ${skillData.name}`);
+
+    const result = await generator.generateAllLevelDatasets({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      skillDescription: skillData.description,
+    });
+
+    res.json({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      type: 'example-based',
+      generated: result.generated,
+      skipped: result.skipped,
+      errors: result.errors,
+      totalLevels: 10,
+      message: `Generated ${result.generated.length} level datasets, skipped ${result.skipped.length} (already exist), ${result.errors.length} errors`,
+    });
+  } catch (error) {
+    console.error('Generate all-levels dataset error:', error);
+    res.status(500).json({ error: 'Failed to generate level datasets' });
   }
 });
 
