@@ -361,6 +361,7 @@ def run_optimization(
     level: int,
     n_refinements: int = 5,
     optimizer_type: str = "evolutionary",
+    reset: bool = False,
 ) -> None:
     """
     Run prompt optimization for a specific skill at a specific difficulty level.
@@ -377,6 +378,7 @@ def run_optimization(
         level: The difficulty level (1-10)
         n_refinements: Number of optimization iterations
         optimizer_type: Which optimizer to use ("evolutionary", "hrpo", or "metaprompt")
+        reset: If True, ignore existing optimized prompt and start from base template
     """
     print(f"\n{'='*60}")
     print(f"Per-Skill-Per-Level Prompt Optimization")
@@ -385,6 +387,7 @@ def run_optimization(
     print(f"Level: {level}")
     print(f"Refinements: {n_refinements}")
     print(f"Optimizer: {optimizer_type}")
+    print(f"Reset: {reset} {'(starting from base template)' if reset else '(building on existing)'}")
     print(f"Dataset: example-based (GPT-4o generated)")
     print(f"{'='*60}\n")
 
@@ -415,10 +418,10 @@ def run_optimization(
         print(f"[Optimizer] Error fetching skill: {e}")
         return
 
-    # Bake the prompt with concrete values (NO template variables)
-    print(f"\n[Optimizer] Baking prompt with concrete values...")
-    baked_prompt = bake_prompt_for_skill_level(skill_id, level)
-    print(f"[Optimizer] Baked prompt length: {len(baked_prompt)} chars")
+    # Get the starting prompt (existing optimized or base template)
+    print(f"\n[Optimizer] Loading starting prompt...")
+    baked_prompt = bake_prompt_for_skill_level(skill_id, level, use_optimized=not reset)
+    print(f"[Optimizer] Prompt length: {len(baked_prompt)} chars")
     print(f"[Optimizer] Difficulty description: {get_difficulty_description(level)}")
 
     # Create ChatPrompt with the baked (concrete) prompt
@@ -568,6 +571,7 @@ def run_all_levels_optimization(
     n_refinements: int = 5,
     levels: list[int] | None = None,
     optimizer_type: str = "evolutionary",
+    reset: bool = False,
 ) -> None:
     """
     Run optimization for all difficulty levels for a skill.
@@ -577,6 +581,7 @@ def run_all_levels_optimization(
         n_refinements: Number of optimization iterations per level
         levels: Optional list of specific levels to optimize (default: 1-10)
         optimizer_type: Which optimizer to use ("evolutionary", "hrpo", or "metaprompt")
+        reset: If True, ignore existing optimized prompts and start from base template
     """
     if levels is None:
         levels = list(range(1, 11))
@@ -585,6 +590,7 @@ def run_all_levels_optimization(
     print(f"Optimizing all levels for skill: {skill_id}")
     print(f"Levels: {levels}")
     print(f"Optimizer: {optimizer_type}")
+    print(f"Reset: {reset}")
     print(f"{'='*60}\n")
 
     for level in levels:
@@ -592,7 +598,7 @@ def run_all_levels_optimization(
             print(f"\n{'='*40}")
             print(f"LEVEL {level}/10")
             print(f"{'='*40}")
-            run_optimization(skill_id, level, n_refinements, optimizer_type)
+            run_optimization(skill_id, level, n_refinements, optimizer_type, reset)
         except Exception as e:
             print(f"[Error] Failed to optimize level {level}: {e}")
             continue
@@ -651,6 +657,11 @@ def main():
         default="evolutionary",
         help="Which optimizer to use: evolutionary, hrpo, or metaprompt (default: evolutionary)",
     )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Ignore existing optimized prompt and start fresh from base template",
+    )
 
     args = parser.parse_args()
 
@@ -679,6 +690,7 @@ def main():
             n_refinements=args.refinements,
             levels=levels,
             optimizer_type=args.optimizer,
+            reset=args.reset,
         )
     elif args.level:
         run_optimization(
@@ -686,6 +698,7 @@ def main():
             level=args.level,
             n_refinements=args.refinements,
             optimizer_type=args.optimizer,
+            reset=args.reset,
         )
     else:
         parser.error("Either --level or --all-levels is required with --skill")

@@ -15,10 +15,13 @@ from pathlib import Path
 from typing import Optional
 from supabase import create_client, Client
 
+import json
+
 from config import (
     SUPABASE_URL,
     SUPABASE_KEY,
     BASE_PROMPT_PATH,
+    OPTIMIZED_PROMPTS_PATH,
 )
 
 
@@ -151,17 +154,60 @@ def bake_prompt(
     return baked
 
 
-def bake_prompt_for_skill_level(skill_id: str, level: int) -> str:
+def load_existing_optimized_prompt(skill_id: str, level: int) -> str | None:
     """
-    Convenience function to fetch skill metadata and bake a prompt in one call.
+    Check if an optimized prompt already exists for this skill+level.
+
+    Returns the prompt string if found and deployed, None otherwise.
+    """
+    if not OPTIMIZED_PROMPTS_PATH.exists():
+        return None
+
+    try:
+        with open(OPTIMIZED_PROMPTS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        skill_prompts = data.get("prompts", {}).get(skill_id, {})
+        level_data = skill_prompts.get(str(level), {})
+
+        # Only use if status is deployed (or pending - still valid for re-optimization)
+        if level_data.get("prompt") and level_data.get("status") in ("deployed", "pending"):
+            return level_data["prompt"]
+
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        print(f"[bake_prompt] Warning: Could not load optimized prompt: {e}")
+
+    return None
+
+
+def bake_prompt_for_skill_level(skill_id: str, level: int, use_optimized: bool = True) -> str:
+    """
+    Get the best available prompt for a skill+level combination.
+
+    Priority:
+    1. Existing optimized prompt (if use_optimized=True and one exists)
+    2. Base template with variables baked in
+
+    This allows the optimizer to build on previous improvements rather than
+    starting from scratch each time.
 
     Args:
         skill_id: The UUID of the skill
         level: The difficulty level (1-10)
+        use_optimized: Whether to check for existing optimized prompts (default: True)
 
     Returns:
-        A concrete prompt string with all variables replaced
+        A concrete prompt string ready for optimization or generation
     """
+    # First, check for existing optimized prompt
+    if use_optimized:
+        existing = load_existing_optimized_prompt(skill_id, level)
+        if existing:
+            print(f"[bake_prompt] Using existing optimized prompt for {skill_id} level {level}")
+            return existing
+
+    # Fall back to baking from base template
+    print(f"[bake_prompt] Using base template for {skill_id} level {level}")
     skill_meta = get_skill_metadata(skill_id)
 
     return bake_prompt(
