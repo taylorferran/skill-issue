@@ -32,6 +32,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import requests
 import opik
 from opik_optimizer import EvolutionaryOptimizer, MetaPromptOptimizer, ChatPrompt
 from opik_optimizer.algorithms.hierarchical_reflective_optimizer import HierarchicalReflectiveOptimizer
@@ -192,13 +193,19 @@ def load_optimized_prompts() -> dict:
 
 def save_optimized_prompt(
     skill_id: str,
+    skill_name: str,
     level: int,
     optimized_prompt: str,
     baseline_score: float,
     best_score: float,
     refinements: int,
 ) -> None:
-    """Save the optimized prompt to JSON file with skill+level key."""
+    """
+    Save the optimized prompt to JSON file and register with Opik prompt library.
+
+    Auto-promotes to 'deployed' status since optimization found improvement.
+    Also registers with Opik for versioning and A/B testing capabilities.
+    """
     data = load_optimized_prompts()
 
     # Ensure skill entry exists
@@ -207,6 +214,7 @@ def save_optimized_prompt(
 
     # Add or update this skill+level's optimized prompt
     # Note: prompt is already concrete (no variables) - ready for direct use
+    # Auto-promote to deployed since optimization found improvement
     data["prompts"][skill_id][str(level)] = {
         "prompt": optimized_prompt,
         "baseline_score": baseline_score,
@@ -215,7 +223,7 @@ def save_optimized_prompt(
         "improvement_percent": ((best_score - baseline_score) / baseline_score * 100) if baseline_score > 0 else 0,
         "refinements": refinements,
         "optimized_at": datetime.now().isoformat(),
-        "status": "pending",  # Can be: pending, deployed, disabled
+        "status": "deployed",  # Auto-promote: improvement found = ready for production
     }
 
     data["metadata"]["last_updated"] = datetime.now().isoformat()
@@ -224,13 +232,97 @@ def save_optimized_prompt(
     if skill_id not in data["metadata"]["skills_optimized"]:
         data["metadata"]["skills_optimized"].append(skill_id)
 
-    # Save
+    # Save to JSON file
     PROMPTS_DIR.mkdir(parents=True, exist_ok=True)
     with open(OPTIMIZED_PROMPTS_PATH, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
     print(f"\n[Optimizer] Saved optimized prompt to: {OPTIMIZED_PROMPTS_PATH}")
     print(f"[Optimizer] Key: prompts.{skill_id}.{level}")
+    print(f"[Optimizer] Status: deployed (auto-promoted)")
+
+    # Register with Opik prompt library for versioning and A/B testing
+    register_prompt_with_opik(
+        skill_id=skill_id,
+        skill_name=skill_name,
+        level=level,
+        prompt_content=optimized_prompt,
+        baseline_score=baseline_score,
+        best_score=best_score,
+    )
+
+
+def register_prompt_with_opik(
+    skill_id: str,
+    skill_name: str,
+    level: int,
+    prompt_content: str,
+    baseline_score: float,
+    best_score: float,
+) -> None:
+    """
+    Register the optimized prompt with Opik's prompt library.
+
+    This enables:
+    - Version tracking (Opik auto-creates new version if content changed)
+    - A/B testing capabilities
+    - Filtering by skill/level tags in Opik UI
+
+    Prompt naming: challenge_prompt_{skill_id}_level_{level}
+    Tags: skill:{skill_name}, level:{level}
+
+    Uses REST API directly since Python SDK doesn't expose tags parameter.
+    """
+    try:
+        prompt_name = f"challenge_prompt_{skill_id}_level_{level}"
+        tags = [f"skill:{skill_name}", f"level:{level}"]
+
+        # Use Opik REST API directly to support tags (Python SDK doesn't expose this)
+        headers = {
+            "Authorization": OPIK_API_KEY,
+            "Content-Type": "application/json",
+        }
+        if OPIK_WORKSPACE:
+            headers["Comet-Workspace"] = OPIK_WORKSPACE
+
+        payload = {
+            "name": prompt_name,
+            "template": prompt_content,
+            "tags": tags,
+            "metadata": {
+                "skill_id": skill_id,
+                "skill_name": skill_name,
+                "level": level,
+                "baseline_score": baseline_score,
+                "best_score": best_score,
+                "improvement_percent": ((best_score - baseline_score) / baseline_score * 100) if baseline_score > 0 else 0,
+                "optimized_at": datetime.now().isoformat(),
+            },
+            "change_description": f"Optimized at {datetime.now().isoformat()}",
+        }
+
+        response = requests.post(
+            "https://www.comet.com/opik/api/v1/private/prompts",
+            headers=headers,
+            json=payload,
+        )
+
+        if response.ok:
+            data = response.json()
+            commit = data.get("latest_version", {}).get("commit", "unknown")
+            print(f"[Optimizer] Registered prompt with Opik: {prompt_name}")
+            print(f"[Optimizer] Tags: {', '.join(tags)}")
+            print(f"[Optimizer] Commit: {commit}")
+        elif response.status_code == 409:
+            # Prompt already exists with same content - that's fine
+            print(f"[Optimizer] Prompt already exists in Opik: {prompt_name}")
+        else:
+            print(f"[Optimizer] Warning: Opik API returned {response.status_code}: {response.text}")
+
+    except Exception as e:
+        # Don't fail the whole operation if Opik registration fails
+        print(f"[Optimizer] Warning: Failed to register prompt with Opik: {e}")
+        print(f"[Optimizer] Prompt was still saved to JSON file.")
 
 
 def list_datasets() -> list[str]:
@@ -457,6 +549,7 @@ def run_optimization(
         # Note: The prompt is already concrete (no variables) - save as-is
         save_optimized_prompt(
             skill_id=skill_id,
+            skill_name=skill_meta["skill_name"],
             level=level,
             optimized_prompt=prompt_content,
             baseline_score=initial_score,

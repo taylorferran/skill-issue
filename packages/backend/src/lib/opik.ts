@@ -1092,13 +1092,18 @@ class OpikService {
 
   /**
    * Create a new dataset
+   *
+   * @param tags - Tags for organizing and filtering datasets
+   *               (e.g., ['skill:World Capitals', 'level:3'])
    */
   async createDataset(params: {
     name: string;
     description?: string;
+    tags?: string[];
   }): Promise<string | null> {
     if (!this.isEnabled) {
-      console.log(`[Opik] Dataset created (local): ${params.name}`);
+      const tagsStr = params.tags ? ` (tags: ${params.tags.join(', ')})` : '';
+      console.log(`[Opik] Dataset created (local): ${params.name}${tagsStr}`);
       return 'local-dataset-id';
     }
 
@@ -1107,6 +1112,7 @@ class OpikService {
       id,
       name: params.name,
       description: params.description,
+      tags: params.tags,
     });
 
     if (response?.ok) {

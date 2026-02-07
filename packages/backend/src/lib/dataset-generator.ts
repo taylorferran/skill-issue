@@ -81,10 +81,11 @@ export class DatasetGenerator {
     console.log(`[DatasetGenerator] Generating example dataset: ${datasetName}`);
 
     try {
-      // Create the dataset in Opik
+      // Create the dataset in Opik with skill/level tags for filtering
       await opikService.createDataset({
         name: datasetName,
         description: `Example challenges for ${params.skillName} at difficulty level ${params.level}`,
+        tags: [`skill:${params.skillName}`, `level:${params.level}`],
       });
 
       // Generate example challenges using GPT-4o
