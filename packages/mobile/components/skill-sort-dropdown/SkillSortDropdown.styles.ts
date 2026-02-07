@@ -28,17 +28,14 @@ export const styles = StyleSheet.create({
   // Modal / Dropdown
   backdrop: {
     flex: 1,
-    backgroundColor: "transparent",
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-    paddingTop: 220, // Position below the section header
-    paddingRight: Theme.spacing["2xl"],
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Theme.spacing["2xl"],
   },
   dropdownContainer: {
-    position: "absolute",
-    top: 220,
-    right: Theme.spacing["2xl"],
-    zIndex: 1000,
+    width: "100%",
+    maxWidth: 320,
   },
   dropdown: {
     backgroundColor: Theme.colors.background.secondary,
@@ -46,7 +43,6 @@ export const styles = StyleSheet.create({
     borderWidth: Theme.borderWidth.thin,
     borderColor: Theme.colors.gray[200],
     ...Theme.shadows.card,
-    minWidth: 200,
     overflow: "hidden",
   },
 

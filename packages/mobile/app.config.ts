@@ -21,7 +21,7 @@ const config = {
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
-    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
+    googleServicesFile: './google-services.json',
     package: "com.jmurphy.skillissue.mobile",
   },
   web: {
