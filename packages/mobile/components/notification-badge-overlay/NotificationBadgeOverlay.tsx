@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   Alert,
   TouchableOpacity,
   ScrollView,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,15 +40,30 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
   const { isSignedIn } = useClerkAuth();
   const { pendingChallenges, setPendingChallenges } = useNotificationStore();
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const [hasInitialFetchCompleted, setHasInitialFetchCompleted] = useState(false);
   const queryClient = useQueryClient();
 
-  // TanStack Query for pending challenges
+  // TanStack Query for pending challenges - always refetch on mount
   const { data: challengesData } = useQuery({
     queryKey: userId ? skillsKeys.pending(userId) : ['pending-challenges', 'no-user'],
     queryFn: () => userId ? fetchPendingChallenges(userId) : Promise.resolve([]),
-    enabled: !!userId && !hasInitialFetchCompleted,
+    enabled: !!userId,
   });
+
+  // Refetch pending challenges when app comes to foreground
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('[NotificationBadgeOverlay] App came to foreground, refetching pending challenges...');
+        if (userId) {
+          queryClient.invalidateQueries({ queryKey: skillsKeys.pending(userId) });
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [userId, queryClient]);
 
   // Hide notification bar on quiz and calibration pages
   const isQuizPage = pathname?.includes('/assessment/quiz');
@@ -57,13 +74,12 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
   const displayCount = count > 9 ? '9+' : String(count);
   const showBadge = count > 0;
 
-  // Update pending challenges when data changes
+  // Update pending challenges whenever data changes - server is source of truth
   useEffect(() => {
-    if (challengesData && !hasInitialFetchCompleted) {
+    if (challengesData) {
       setPendingChallenges(challengesData);
-      setHasInitialFetchCompleted(true);
     }
-  }, [challengesData, setPendingChallenges, hasInitialFetchCompleted]);
+  }, [challengesData, setPendingChallenges]);
 
   // Note: We intentionally do NOT listen for notification events to auto-refresh from server.
   // Push notifications add challenges directly via addPendingChallenge() in notifications.ts

@@ -38,6 +38,7 @@ import {
 } from "@/components/skill-sort-dropdown/SkillSortDropdown";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { requestNotificationPermissions } from "@/utils/notifications";
+import { usePendingChallengesBySkill } from "@/hooks/usePendingChallengesBySkill";
 
 export default function SkillSelectScreen() {
   // Read tab parameter from navigation
@@ -63,6 +64,9 @@ export default function SkillSelectScreen() {
     setExpoPushToken,
     permissionStatus 
   } = useNotificationStore();
+
+  // Pending challenges by skill for badge counts
+  const { getPendingCountForSkill } = usePendingChallengesBySkill();
 
   // TanStack Query for user skills
   const {
@@ -603,6 +607,7 @@ export default function SkillSelectScreen() {
                         aiPowered: true,
                         needsCalibration: skill.needsCalibration,
                       }}
+                      pendingCount={getPendingCountForSkill(skill.skillId)}
                       onSelect={() => handleSkillSelect(skill)}
                       onDelete={() =>
                         handleDeleteSkill(skill.skillId, skill.skillName)

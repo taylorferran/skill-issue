@@ -14,9 +14,10 @@ interface SkillCardProps {
   skill: Skill;
   onSelect: (skill: Skill) => void;
   onDelete?: () => void; // Optional delete handler
+  pendingCount?: number; // Number of pending challenges for this skill
 }
 
-export function SkillCard({ skill, onSelect, onDelete }: SkillCardProps) {
+export function SkillCard({ skill, onSelect, onDelete, pendingCount = 0 }: SkillCardProps) {
   const swipeProgress = useRef(new Animated.Value(0)).current;
   const isDeleteMode = useRef(false);
 
@@ -137,44 +138,55 @@ export function SkillCard({ skill, onSelect, onDelete }: SkillCardProps) {
               </View>
 
               {/* Skill/Delete Icon Container */}
-              <Animated.View
-                style={[
-                  styles.iconContainer,
-                  {
-                    transform: [{ scale: iconScale }],
-                    backgroundColor: iconBackgroundColor,
-                  }
-                ]}
-              >
-                <TouchableOpacity
-                  onPress={handleIconPress}
-                  activeOpacity={0.7}
-                  style={styles.iconTouchable}
+              <View style={styles.iconWrapper}>
+                <Animated.View
+                  style={[
+                    styles.iconContainer,
+                    {
+                      transform: [{ scale: iconScale }],
+                      backgroundColor: iconBackgroundColor,
+                    }
+                  ]}
                 >
-                  {/* Skill Icon - fades out when swiping */}
-                  <Animated.View style={{ opacity: skillIconOpacity }}>
-                    <Ionicons
-                      name={skill.icon}
-                      size={28}
-                      color={Theme.colors.text.inverse}
-                    />
-                  </Animated.View>
-
-                  {/* Delete Icon - fades in when swiping */}
-                  <Animated.View
-                    style={[
-                      styles.deleteIconOverlay,
-                      { opacity: deleteIconOpacity }
-                    ]}
+                  <TouchableOpacity
+                    onPress={handleIconPress}
+                    activeOpacity={0.7}
+                    style={styles.iconTouchable}
                   >
-                    <Ionicons
-                      name="trash-outline"
-                      size={28}
-                      color={Theme.colors.text.inverse}
-                    />
-                  </Animated.View>
-                </TouchableOpacity>
-              </Animated.View>
+                    {/* Skill Icon - fades out when swiping */}
+                    <Animated.View style={{ opacity: skillIconOpacity }}>
+                      <Ionicons
+                        name={skill.icon}
+                        size={28}
+                        color={Theme.colors.text.inverse}
+                      />
+                    </Animated.View>
+
+                    {/* Delete Icon - fades in when swiping */}
+                    <Animated.View
+                      style={[
+                        styles.deleteIconOverlay,
+                        { opacity: deleteIconOpacity }
+                      ]}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={28}
+                        color={Theme.colors.text.inverse}
+                      />
+                    </Animated.View>
+                  </TouchableOpacity>
+                </Animated.View>
+
+                {/* Pending Challenges Badge */}
+                {pendingCount > 0 && (
+                  <View style={styles.pendingBadge}>
+                    <Text style={styles.pendingBadgeText}>
+                      {pendingCount > 9 ? '9+' : pendingCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Progress Bar */}
