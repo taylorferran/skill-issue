@@ -57,7 +57,7 @@ COPY optimization /optimization
 
 # Install Python dependencies for prompt optimization
 RUN cd /optimization && \
-    pip3 install --no-cache-dir -r requirements.txt
+    pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Install only runtime dependencies (those marked as external in tsup.config.ts)
 # The shared package code is already bundled in dist/index.js
