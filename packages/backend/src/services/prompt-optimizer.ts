@@ -7,6 +7,8 @@
 
 import { getSupabase } from '@/lib/supabase';
 import { runOptimization, type OptimizationResult } from '@/lib/python-optimizer';
+import { opikService } from '@/lib/opik';
+import { DatasetGenerator } from '@/lib/dataset-generator';
 import type { Database } from '@/types/database';
 
 type PromptTemplate = Database['public']['Tables']['prompt_templates']['Row'];
@@ -308,6 +310,28 @@ export class PromptOptimizer {
 
       if (skillError || !skill) {
         throw new Error(`Skill not found: ${job.skill_id}`);
+      }
+
+      console.log(`[PromptOptimizer] Processing ${skill.name} level ${job.difficulty_level}`);
+
+      // Ensure dataset exists before optimization
+      const datasetName = `skill_${job.skill_id}_level_${job.difficulty_level}_examples`;
+      const existingDataset = await opikService.findDataset(datasetName);
+
+      if (!existingDataset) {
+        console.log(`[PromptOptimizer] Dataset not found, generating: ${datasetName}`);
+
+        const datasetGenerator = new DatasetGenerator('openai');
+        await datasetGenerator.generateDatasetForLevel({
+          skillId: job.skill_id,
+          skillName: skill.name,
+          skillDescription: skill.description,
+          level: job.difficulty_level,
+        });
+
+        console.log(`[PromptOptimizer] Dataset generated successfully`);
+      } else {
+        console.log(`[PromptOptimizer] Dataset already exists: ${datasetName}`);
       }
 
       console.log(`[PromptOptimizer] Running Python optimizer for ${skill.name} level ${job.difficulty_level}`);
