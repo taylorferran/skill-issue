@@ -32,10 +32,14 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import litellm
 import opik
+from opik import evaluate
 from opik_optimizer import EvolutionaryOptimizer, MetaPromptOptimizer, ChatPrompt
 from opik_optimizer.algorithms.hierarchical_reflective_optimizer import HierarchicalReflectiveOptimizer
 from opik.evaluation.metrics.score_result import ScoreResult
+from opik.evaluation.metrics import base_metric
+from opik.evaluation.metrics import Hallucination, AnswerRelevance
 
 from config import (
     validate_config,
@@ -179,6 +183,84 @@ def create_quality_metric(skill_name: str, skill_description: str, target_diffic
     return challenge_quality_metric
 
 
+class ChallengeQualityMetric(base_metric.BaseMetric):
+    """
+    Custom metric class for use with opik.evaluate().
+
+    Wraps the challenge quality evaluation logic in a BaseMetric-compatible class.
+    """
+
+    def __init__(self, skill_name: str, skill_description: str, target_difficulty: int):
+        super().__init__(name="challenge_quality")
+        self.skill_name = skill_name
+        self.skill_description = skill_description
+        self.target_difficulty = target_difficulty
+
+    def score(self, output: str, **ignored_kwargs) -> ScoreResult:
+        """
+        Score the challenge quality.
+
+        Args:
+            output: The LLM-generated challenge output
+            **ignored_kwargs: Other arguments from task/dataset (ignored)
+
+        Returns:
+            ScoreResult with value between 0-1 and reason
+        """
+        # 1. Parse challenge JSON from LLM output
+        try:
+            challenge = extract_first_json_object(output)
+            if not challenge:
+                return ScoreResult(
+                    name=self.name,
+                    value=0.0,
+                    reason="No valid JSON found in LLM output"
+                )
+        except Exception as e:
+            return ScoreResult(
+                name=self.name,
+                value=0.0,
+                reason=f"JSON parse error: {e}"
+            )
+
+        # 2. Basic validation
+        if not is_valid_challenge(challenge):
+            return ScoreResult(
+                name=self.name,
+                value=0.0,
+                reason="Challenge failed structural validation (missing fields, wrong option count, etc.)"
+            )
+
+        # 3. Run LLM-as-judge evaluation
+        evaluator = get_evaluator()
+
+        result = evaluator.evaluate(
+            challenge=challenge,
+            skill_name=self.skill_name,
+            skill_description=self.skill_description,
+            target_difficulty=self.target_difficulty,
+            example={},  # No example for comparison experiments
+        )
+
+        # Build detailed reason from evaluation scores
+        scores = result["scores"]
+        reasons = result.get("reasons", {})
+        reason_parts = [
+            f"Clarity: {scores['clarity']:.0%} - {reasons.get('clarity', 'N/A')}",
+            f"Difficulty: {scores['difficulty_alignment']:.0%} - {reasons.get('difficulty_alignment', 'N/A')}",
+            f"Distractors: {scores['distractor_quality']:.0%} - {reasons.get('distractor_quality', 'N/A')}",
+            f"Educational: {scores['educational_value']:.0%} - {reasons.get('educational_value', 'N/A')}",
+            f"Relevance: {scores['skill_relevance']:.0%} - {reasons.get('skill_relevance', 'N/A')}",
+        ]
+        detailed_reason = "; ".join(reason_parts)
+
+        return ScoreResult(
+            name=self.name,
+            value=result["composite_score"],
+            reason=detailed_reason
+        )
+
+
 def load_optimized_prompts() -> dict:
     """Load existing optimized prompts from JSON file."""
     if OPTIMIZED_PROMPTS_PATH.exists():
@@ -249,6 +331,115 @@ def save_optimized_prompt(
         baseline_score=baseline_score,
         best_score=best_score,
     )
+
+
+def generate_challenge_with_prompt(prompt: str) -> str:
+    """Generate a challenge using a specific prompt."""
+    response = litellm.completion(
+        model=CHALLENGE_MODEL_LITELLM,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000,
+        temperature=0.7,
+    )
+    return response.choices[0].message.content
+
+
+def run_comparison_experiment(
+    skill_id: str,
+    skill_name: str,
+    skill_description: str,
+    level: int,
+    baseline_prompt: str,
+    optimized_prompt: str,
+    dataset_name: str,
+) -> None:
+    """
+    Run Opik experiments comparing baseline vs optimized prompt.
+
+    Creates four experiment runs on the same dataset:
+    1. Hallucination experiment (baseline vs optimized)
+    2. AnswerRelevance experiment (baseline vs optimized)
+
+    Results appear in Opik dashboard for side-by-side comparison.
+    """
+    client = opik.Opik()
+    dataset = client.get_dataset(name=dataset_name)
+
+    # Build context for the metrics
+    difficulty_desc = get_difficulty_description(level)
+    context = [
+        f"Skill: {skill_name}",
+        f"Skill Description: {skill_description}",
+        f"Target Difficulty Level: {level}/10 - {difficulty_desc}",
+    ]
+    task_input = f"Generate a multiple-choice challenge question for the skill '{skill_name}' at difficulty level {level}/10."
+
+    # Create metric instances
+    hallucination_metric = Hallucination(model="gpt-4o")
+    relevance_metric = AnswerRelevance(model="gpt-4o", require_context=False)
+
+    # Define task functions for each prompt variant
+    # Task output must include: input, output, context for the metrics
+    def baseline_task(dataset_item):
+        response = generate_challenge_with_prompt(baseline_prompt)
+        return {
+            "input": task_input,
+            "output": response,
+            "context": context,
+        }
+
+    def optimized_task(dataset_item):
+        response = generate_challenge_with_prompt(optimized_prompt)
+        return {
+            "input": task_input,
+            "output": response,
+            "context": context,
+        }
+
+    # Run Hallucination experiments
+    print(f"[Experiment] Running Hallucination evaluation (baseline)...")
+    evaluate(
+        dataset=dataset,
+        task=baseline_task,
+        scoring_metrics=[hallucination_metric],
+        experiment_name=f"{skill_id}_level_{level}_hallucination_baseline",
+        project_name=OPIK_PROJECT_NAME,
+    )
+
+    print(f"[Experiment] Running Hallucination evaluation (optimized)...")
+    evaluate(
+        dataset=dataset,
+        task=optimized_task,
+        scoring_metrics=[hallucination_metric],
+        experiment_name=f"{skill_id}_level_{level}_hallucination_optimized",
+        project_name=OPIK_PROJECT_NAME,
+    )
+
+    # Run AnswerRelevance experiments
+    print(f"[Experiment] Running AnswerRelevance evaluation (baseline)...")
+    evaluate(
+        dataset=dataset,
+        task=baseline_task,
+        scoring_metrics=[relevance_metric],
+        experiment_name=f"{skill_id}_level_{level}_relevance_baseline",
+        project_name=OPIK_PROJECT_NAME,
+    )
+
+    print(f"[Experiment] Running AnswerRelevance evaluation (optimized)...")
+    evaluate(
+        dataset=dataset,
+        task=optimized_task,
+        scoring_metrics=[relevance_metric],
+        experiment_name=f"{skill_id}_level_{level}_relevance_optimized",
+        project_name=OPIK_PROJECT_NAME,
+    )
+
+    print(f"[Experiment] Comparison complete. View in Opik dashboard.")
+    print(f"[Experiment] Experiments created:")
+    print(f"  - {skill_id}_level_{level}_hallucination_baseline")
+    print(f"  - {skill_id}_level_{level}_hallucination_optimized")
+    print(f"  - {skill_id}_level_{level}_relevance_baseline")
+    print(f"  - {skill_id}_level_{level}_relevance_optimized")
 
 
 def register_prompt_with_opik(
@@ -342,6 +533,7 @@ def run_optimization(
     n_refinements: int = 5,
     optimizer_type: str = "evolutionary",
     reset: bool = False,
+    skip_experiment: bool = False,
 ) -> None:
     """
     Run prompt optimization for a specific skill at a specific difficulty level.
@@ -359,6 +551,7 @@ def run_optimization(
         n_refinements: Number of optimization iterations
         optimizer_type: Which optimizer to use ("evolutionary", "hrpo", or "metaprompt")
         reset: If True, ignore existing optimized prompt and start from base template
+        skip_experiment: If True, skip post-optimization comparison experiment
     """
     print(f"\n{'='*60}")
     print(f"Per-Skill-Per-Level Prompt Optimization")
@@ -539,6 +732,21 @@ def run_optimization(
             best_score=best_score,
             refinements=n_refinements,
         )
+
+        # Run comparison experiment
+        if not skip_experiment:
+            print(f"\n[Optimizer] Running comparison experiment...")
+            run_comparison_experiment(
+                skill_id=skill_id,
+                skill_name=skill_meta["skill_name"],
+                skill_description=skill_meta["skill_description"],
+                level=level,
+                baseline_prompt=baked_prompt,  # Original prompt before optimization
+                optimized_prompt=prompt_content,  # New optimized prompt
+                dataset_name=dataset_name,
+            )
+        else:
+            print(f"\n[Optimizer] Skipping comparison experiment (--skip-experiment flag set)")
     else:
         print(f"\n[Optimizer] No improvement found. Base prompt is already optimal for this skill+level.")
 
@@ -552,6 +760,7 @@ def run_all_levels_optimization(
     levels: list[int] | None = None,
     optimizer_type: str = "evolutionary",
     reset: bool = False,
+    skip_experiment: bool = False,
 ) -> None:
     """
     Run optimization for all difficulty levels for a skill.
@@ -562,6 +771,7 @@ def run_all_levels_optimization(
         levels: Optional list of specific levels to optimize (default: 1-10)
         optimizer_type: Which optimizer to use ("evolutionary", "hrpo", or "metaprompt")
         reset: If True, ignore existing optimized prompts and start from base template
+        skip_experiment: If True, skip post-optimization comparison experiment
     """
     if levels is None:
         levels = list(range(1, 11))
@@ -578,7 +788,7 @@ def run_all_levels_optimization(
             print(f"\n{'='*40}")
             print(f"LEVEL {level}/10")
             print(f"{'='*40}")
-            run_optimization(skill_id, level, n_refinements, optimizer_type, reset)
+            run_optimization(skill_id, level, n_refinements, optimizer_type, reset, skip_experiment)
         except Exception as e:
             print(f"[Error] Failed to optimize level {level}: {e}")
             continue
@@ -642,6 +852,11 @@ def main():
         action="store_true",
         help="Ignore existing optimized prompt and start fresh from base template",
     )
+    parser.add_argument(
+        "--skip-experiment",
+        action="store_true",
+        help="Skip post-optimization comparison experiment",
+    )
 
     args = parser.parse_args()
 
@@ -671,6 +886,7 @@ def main():
             levels=levels,
             optimizer_type=args.optimizer,
             reset=args.reset,
+            skip_experiment=args.skip_experiment,
         )
     elif args.level:
         run_optimization(
@@ -679,6 +895,7 @@ def main():
             n_refinements=args.refinements,
             optimizer_type=args.optimizer,
             reset=args.reset,
+            skip_experiment=args.skip_experiment,
         )
     else:
         parser.error("Either --level or --all-levels is required with --skill")
