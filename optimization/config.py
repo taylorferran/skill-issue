@@ -7,14 +7,23 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env file from backend directory (shared with TypeScript backend)
-env_path = Path(__file__).parent.parent / "packages" / "backend" / ".env"
-load_dotenv(env_path)
+# Load .env file from multiple possible locations
+# Supports both local development and Docker deployment
+env_paths = [
+    Path(__file__).parent.parent / "packages" / "backend" / ".env",  # Local dev
+    Path("/app/.env"),  # Docker container
+    Path(__file__).parent / ".env",  # Fallback: optimization/.env
+]
 
-# Fallback to optimization/.env if backend/.env doesn't exist
-if not env_path.exists():
-    fallback_env = Path(__file__).parent / ".env"
-    load_dotenv(fallback_env)
+env_loaded = False
+for env_path in env_paths:
+    if env_path.exists():
+        load_dotenv(env_path)
+        env_loaded = True
+        break
+
+if not env_loaded:
+    print("[Warning] No .env file found. Using environment variables from shell.")
 
 # API Keys
 OPIK_API_KEY = os.getenv("OPIK_API_KEY")

@@ -720,6 +720,9 @@
       <button class="nav-tab" onclick="showTab('challenges')">
         🎮 Challenges
       </button>
+      <button class="nav-tab" onclick="showTab('prompts')">
+        📝 Prompts
+      </button>
       <button class="nav-tab" onclick="showTab('admin')">
         ⚙️ Admin
       </button>
@@ -1149,6 +1152,76 @@
       </div>
     </div>
 
+    <!-- Prompts Tab -->
+    <div id="prompts" class="tab-content">
+      <!-- Optimization Status -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-2);">🎯</div>
+            Optimization Status
+          </div>
+          <button class="btn btn-secondary" onclick="loadPromptStatus()">Refresh</button>
+        </div>
+        <div id="optimizationStatus">
+          <div class="empty-state">
+            <div class="empty-state-icon">🔄</div>
+            <p>Click Refresh to check optimization status</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Manual Optimization Trigger -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-1);">⚡</div>
+            Trigger Optimization
+          </div>
+        </div>
+        <div class="info-box">
+          <span class="info-box-icon">💡</span>
+          <div class="info-box-content">
+            Manually trigger prompt optimization for a specific skill and difficulty level.
+            The system will use Opik's evolutionary optimizer to improve question quality based on user ratings.
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Select Skill</label>
+            <select class="form-select" id="optimizeSkillId">
+              <option value="">-- Select skill --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Difficulty Level (1-10)</label>
+            <input type="number" class="form-input" id="optimizeLevel" min="1" max="10" placeholder="e.g., 5">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="triggerOptimization()">
+          Start Optimization
+        </button>
+        <div id="triggerOptimizationResponse"></div>
+      </div>
+
+      <!-- Prompt Templates List -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">
+            <div class="card-icon" style="background: var(--gradient-3);">📚</div>
+            All Prompt Templates
+          </div>
+          <button class="btn btn-secondary" onclick="loadAllPrompts()">Refresh</button>
+        </div>
+        <div id="promptsList">
+          <div class="empty-state">
+            <div class="empty-state-icon">📝</div>
+            <p>Click Refresh to load prompt templates</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Admin Tab -->
     <div id="admin" class="tab-content">
       <div class="grid-2">
@@ -1283,10 +1356,10 @@
     function showTab(tabId) {
       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
       document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
-      
+
       document.getElementById(tabId).classList.add('active');
       event.target.classList.add('active');
-      
+
       // Load data for specific tabs
       if (tabId === 'users') loadUsers();
       if (tabId === 'skills') loadSkills();
@@ -1297,6 +1370,11 @@
       if (tabId === 'challenges') {
         loadUsersIntoSelect('pendingUserId');
         loadUsersIntoSelect('historyUserId');
+      }
+      if (tabId === 'prompts') {
+        loadSkillsIntoSelect('optimizeSkillId');
+        loadPromptStatus();
+        loadAllPrompts();
       }
     }
 
@@ -2062,6 +2140,262 @@
         document.getElementById('challengeHistoryList').innerHTML = `<div class="data-list">${html}</div>`;
       } catch (error) {
         document.getElementById('challengeHistoryList').innerHTML = `<p style="color: var(--error);">Error: ${error.message}</p>`;
+      }
+    }
+
+    // Prompts
+    async function loadPromptStatus() {
+      showLoading('optimizationStatus');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/prompts/status`, {
+          headers: getHeaders()
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          document.getElementById('optimizationStatus').innerHTML = `
+            <div class="empty-state"><p style="color: var(--error);">Error: ${data.error || 'Failed to load status'}</p></div>
+          `;
+          return;
+        }
+
+        let html = '';
+
+        // Show pending jobs
+        if (data.pendingJobs && data.pendingJobs.length > 0) {
+          const jobsHtml = data.pendingJobs.map(job => `
+            <div class="data-list-item">
+              <div>
+                <strong>${job.skills?.name || 'Unknown Skill'}</strong> - Level ${job.level}
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                  Status: <span style="color: var(--warning);">${job.status}</span> •
+                  Trigger: ${job.trigger_reason} •
+                  ${new Date(job.created_at).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          `).join('');
+
+          html += `
+            <div style="margin-bottom: 1.5rem;">
+              <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-secondary);">Active Jobs</h3>
+              <div class="data-list">${jobsHtml}</div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="info-box" style="margin-bottom: 1.5rem; background: rgba(16, 185, 129, 0.1); border-color: var(--success);">
+              <span class="info-box-icon">✅</span>
+              <div class="info-box-content">No optimization jobs currently running</div>
+            </div>
+          `;
+        }
+
+        // Show low-rated skill levels
+        if (data.lowRatedSkillLevels && data.lowRatedSkillLevels.length > 0) {
+          const lowRatedHtml = data.lowRatedSkillLevels.map(item => `
+            <div class="data-list-item">
+              <div>
+                <strong>${item.skillName}</strong> - Level ${item.level}
+                <div style="color: var(--text-secondary); font-size: 0.875rem;">
+                  Avg Rating: <span style="color: var(--warning);">${item.avgRating.toFixed(2)}</span> ⭐ •
+                  ${item.questionsCount} questions
+                </div>
+              </div>
+              <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="quickOptimize('${item.skillId}', ${item.level})">
+                Optimize
+              </button>
+            </div>
+          `).join('');
+
+          html += `
+            <div>
+              <h3 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-secondary);">
+                Low-Rated Skills (Below Threshold)
+              </h3>
+              <div class="data-list">${lowRatedHtml}</div>
+            </div>
+          `;
+        } else {
+          html += `
+            <div class="info-box" style="background: rgba(16, 185, 129, 0.1); border-color: var(--success);">
+              <span class="info-box-icon">✨</span>
+              <div class="info-box-content">All skills are performing well! No optimizations needed.</div>
+            </div>
+          `;
+        }
+
+        document.getElementById('optimizationStatus').innerHTML = html;
+      } catch (error) {
+        document.getElementById('optimizationStatus').innerHTML = `
+          <div class="empty-state"><p style="color: var(--error);">Error: ${error.message}</p></div>
+        `;
+      }
+    }
+
+    async function loadAllPrompts() {
+      showLoading('promptsList');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/prompts/all`, {
+          headers: getHeaders()
+        });
+
+        const prompts = await response.json();
+
+        if (!Array.isArray(prompts)) {
+          document.getElementById('promptsList').innerHTML = `
+            <div class="empty-state"><p>Error loading prompts</p></div>
+          `;
+          return;
+        }
+
+        if (prompts.length === 0) {
+          document.getElementById('promptsList').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📝</div>
+              <p>No prompt templates found. Run an optimization to create prompts.</p>
+            </div>
+          `;
+          return;
+        }
+
+        // Group by skill and level
+        const grouped = {};
+        prompts.forEach(prompt => {
+          const skillName = prompt.skills?.name || 'Unknown Skill';
+          const key = `${prompt.skill_id}:${prompt.difficulty_level}`;
+          if (!grouped[key]) {
+            grouped[key] = {
+              skillName,
+              skillId: prompt.skill_id,
+              level: prompt.difficulty_level,
+              versions: []
+            };
+          }
+          grouped[key].versions.push(prompt);
+        });
+
+        // Generate HTML for each skill+level
+        const html = Object.values(grouped).map(group => {
+          const activeVersion = group.versions.find(v => v.is_active);
+          const versionList = group.versions.map(v => {
+            const statusColor = v.status === 'deployed' ? 'var(--success)' :
+                               v.status === 'optimizing' ? 'var(--warning)' :
+                               'var(--text-secondary)';
+            const isActive = v.is_active ? ' 🟢 ACTIVE' : '';
+
+            return `
+              <div style="padding: 0.75rem; background: var(--bg-dark); border-radius: 8px; margin-bottom: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                  <div>
+                    <strong>Version ${v.version}</strong>${isActive}
+                    <div style="color: ${statusColor}; font-size: 0.875rem; margin-top: 0.25rem;">
+                      Status: ${v.status}
+                    </div>
+                  </div>
+                  <div style="text-align: right; font-size: 0.875rem; color: var(--text-secondary);">
+                    ${v.deployed_at ? new Date(v.deployed_at).toLocaleString() : 'Not deployed'}
+                  </div>
+                </div>
+                ${v.baseline_score !== null ? `
+                  <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                    Baseline: ${v.baseline_score.toFixed(3)} → Current: ${v.current_score?.toFixed(3) || 'N/A'}
+                    ${v.improvement_percent ? ` (+${v.improvement_percent.toFixed(1)}%)` : ''}
+                  </div>
+                ` : ''}
+                <details style="cursor: pointer;">
+                  <summary style="color: var(--primary); font-size: 0.875rem; user-select: none;">View Prompt Content</summary>
+                  <pre style="margin-top: 0.5rem; padding: 0.75rem; background: var(--bg-card); border-radius: 6px; overflow-x: auto; font-size: 0.8rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word;">${v.prompt_content}</pre>
+                </details>
+              </div>
+            `;
+          }).join('');
+
+          return `
+            <div style="margin-bottom: 1.5rem; padding: 1.5rem; background: var(--bg-dark); border-radius: 12px; border: 1px solid var(--border);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                  <h3 style="font-size: 1.125rem; font-weight: 600;">${group.skillName}</h3>
+                  <div style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+                    Difficulty Level: ${group.level} • ${group.versions.length} version(s)
+                    ${activeVersion ? ` • Active: v${activeVersion.version}` : ''}
+                  </div>
+                </div>
+                <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="quickOptimize('${group.skillId}', ${group.level})">
+                  Re-optimize
+                </button>
+              </div>
+              ${versionList}
+            </div>
+          `;
+        }).join('');
+
+        document.getElementById('promptsList').innerHTML = html;
+      } catch (error) {
+        document.getElementById('promptsList').innerHTML = `
+          <div class="empty-state"><p style="color: var(--error);">Error: ${error.message}</p></div>
+        `;
+      }
+    }
+
+    async function triggerOptimization() {
+      const skillId = document.getElementById('optimizeSkillId').value;
+      const level = parseInt(document.getElementById('optimizeLevel').value);
+
+      if (!skillId || !level) {
+        showResponse('triggerOptimizationResponse', { error: 'Please select skill and level' }, true);
+        return;
+      }
+
+      if (level < 1 || level > 10) {
+        showResponse('triggerOptimizationResponse', { error: 'Level must be between 1 and 10' }, true);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/prompts/optimize`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ skillId, level })
+        });
+
+        const data = await response.json();
+        showResponse('triggerOptimizationResponse', data, !response.ok);
+
+        if (response.ok) {
+          // Refresh status
+          loadPromptStatus();
+        }
+      } catch (error) {
+        showResponse('triggerOptimizationResponse', { error: error.message }, true);
+      }
+    }
+
+    async function quickOptimize(skillId, level) {
+      if (!confirm(`Start optimization for this skill at level ${level}?`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/prompts/optimize`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ skillId, level })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          alert('Optimization queued successfully!');
+          loadPromptStatus();
+        } else {
+          alert(`Error: ${data.error || 'Failed to queue optimization'}`);
+        }
+      } catch (error) {
+        alert(`Error: ${error.message}`);
       }
     }
 

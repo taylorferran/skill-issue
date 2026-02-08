@@ -1602,6 +1602,143 @@ router.post('/experiments/run', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/prompts/all
+ * Get all prompt templates with version history and skill info
+ */
+router.get('/prompts/all', async (_req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+
+    const { data: prompts, error } = await supabase
+      .from('prompt_templates')
+      .select(`
+        *,
+        skills:skill_id (
+          id,
+          name,
+          description
+        )
+      `)
+      .order('skill_id', { ascending: true })
+      .order('difficulty_level', { ascending: true })
+      .order('version', { ascending: false });
+
+    if (error) {
+      console.error('[API] Error fetching prompts:', error);
+      return res.status(500).json({ error: 'Failed to fetch prompts' });
+    }
+
+    res.json(prompts || []);
+  } catch (error) {
+    console.error('[API] Error fetching prompts:', error);
+    res.status(500).json({ error: 'Failed to fetch prompts' });
+  }
+});
+
+/**
+ * GET /api/prompts/skill/:skillId
+ * Get all prompt templates for a specific skill
+ */
+router.get('/prompts/skill/:skillId', async (req: Request, res: Response) => {
+  try {
+    const { skillId } = req.params;
+    const supabase = getSupabase();
+
+    const { data: prompts, error } = await supabase
+      .from('prompt_templates')
+      .select('*')
+      .eq('skill_id', skillId)
+      .order('difficulty_level', { ascending: true })
+      .order('version', { ascending: false });
+
+    if (error) {
+      console.error('[API] Error fetching prompts for skill:', error);
+      return res.status(500).json({ error: 'Failed to fetch prompts' });
+    }
+
+    res.json(prompts || []);
+  } catch (error) {
+    console.error('[API] Error fetching prompts for skill:', error);
+    res.status(500).json({ error: 'Failed to fetch prompts' });
+  }
+});
+
+/**
+ * GET /api/prompts/status
+ * Get optimization job status and low-rated skill levels
+ */
+router.get('/prompts/status', async (_req: Request, res: Response) => {
+  try {
+    const { promptOptimizer } = await import('@/services/prompt-optimizer');
+    const supabase = getSupabase();
+
+    // Get pending/running jobs
+    const { data: jobs, error: jobsError } = await supabase
+      .from('prompt_optimization_queue')
+      .select(`
+        *,
+        skills:skill_id (
+          id,
+          name
+        )
+      `)
+      .in('status', ['pending', 'running'])
+      .order('created_at', { ascending: false });
+
+    if (jobsError) {
+      console.error('[API] Error fetching jobs:', jobsError);
+      return res.status(500).json({ error: 'Failed to fetch optimization status' });
+    }
+
+    // Get low-rated skill levels
+    const lowRated = await promptOptimizer.findSkillLevelsBelowThreshold();
+
+    res.json({
+      pendingJobs: jobs || [],
+      lowRatedSkillLevels: lowRated,
+    });
+  } catch (error) {
+    console.error('[API] Error fetching optimization status:', error);
+    res.status(500).json({ error: 'Failed to fetch optimization status' });
+  }
+});
+
+/**
+ * POST /api/prompts/optimize
+ * Manually trigger prompt optimization for a specific skill+level
+ */
+router.post('/prompts/optimize', async (req: Request, res: Response) => {
+  try {
+    const { promptOptimizer } = await import('@/services/prompt-optimizer');
+    const { skillId, level } = req.body;
+
+    if (!skillId || !level) {
+      return res.status(400).json({ error: 'skillId and level are required' });
+    }
+
+    const jobId = await promptOptimizer.queueOptimization({
+      skillId,
+      level,
+      triggerReason: 'manual_trigger',
+    });
+
+    if (!jobId) {
+      return res.json({ message: 'Already queued or running', status: 'skipped' });
+    }
+
+    // Process in background
+    promptOptimizer.processOptimizationQueue().catch((err) => {
+      console.error('[API] Optimization error:', err);
+    });
+
+    res.json({ message: 'Optimization queued', jobId, status: 'processing' });
+  } catch (error) {
+    console.error('[API] Optimization trigger error:', error);
+    res.status(500).json({ error: 'Failed to queue optimization' });
+  }
+});
+
 console.log('[Routes] All routes defined, exporting router');
 console.log(`[Routes] Router stack length: ${router.stack?.length}`);
 

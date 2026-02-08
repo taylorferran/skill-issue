@@ -70,7 +70,7 @@ export class PromptOptimizer {
   /**
    * Find skill+level combinations with ratings below threshold
    */
-  private async findSkillLevelsBelowThreshold(): Promise<SkillLevelBelowThreshold[]> {
+  async findSkillLevelsBelowThreshold(): Promise<SkillLevelBelowThreshold[]> {
     const supabase = getSupabase();
 
     // Query to find low-rated skill+level combinations
@@ -80,11 +80,19 @@ export class PromptOptimizer {
     });
 
     if (error) {
+      console.warn('[PromptOptimizer] RPC function error, using fallback:', error);
       // If RPC doesn't exist, fall back to manual query
       return this.findSkillLevelsBelowThresholdFallback();
     }
 
-    return data || [];
+    // Transform snake_case SQL columns to camelCase TypeScript
+    return (data || []).map((row: any) => ({
+      skillId: row.skill_id,
+      skillName: row.skill_name,
+      level: row.level,
+      avgRating: parseFloat(row.avg_rating),
+      questionsCount: parseInt(row.questions_count),
+    }));
   }
 
   /**
