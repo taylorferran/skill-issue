@@ -27,6 +27,16 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# ============================================
+# NEW: Install Python 3 and dependencies
+# ============================================
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    python3-dev \
+    build-base \
+    && ln -sf python3 /usr/bin/python
+
 # Create minimal package.json to mark as ESM
 RUN echo '{"type":"module","name":"skill-issue-backend","version":"0.1.0"}' > package.json
 
@@ -39,6 +49,15 @@ COPY --from=builder /monorepo/packages/backend/public ./public
 # Copy other necessary files
 COPY --from=builder /monorepo/packages/backend/supabase-schema.sql ./
 COPY --from=builder /monorepo/packages/backend/example-skills.sql ./
+
+# ============================================
+# NEW: Copy optimization folder and install Python deps
+# ============================================
+COPY optimization /optimization
+
+# Install Python dependencies for prompt optimization
+RUN cd /optimization && \
+    pip3 install --no-cache-dir -r requirements.txt
 
 # Install only runtime dependencies (those marked as external in tsup.config.ts)
 # The shared package code is already bundled in dist/index.js

@@ -3,3 +3,5 @@ anthropic>=0.30.0
 python-dotenv>=1.0.0
 opik>=1.0.0
 supabase>=2.0.0
+requests>=2.28.0
+litellm>=1.0.0

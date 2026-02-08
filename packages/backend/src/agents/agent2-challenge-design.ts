@@ -4,6 +4,7 @@ import { createLLMProvider, AnthropicProvider } from '@/lib/llm-provider';
 import { opikService } from '@/lib/opik';
 import { getEvaluator, isEvaluationEnabled } from '@/lib/evaluator';
 import { findAvailablePoolQuestions } from '@/lib/question-pool';
+import { promptOptimizer } from '@/services/prompt-optimizer';
 import { CHALLENGE_PROMPT_EXPERIMENT } from '@/config/ab-tests';
 import { EVALUATION_CONFIG } from '@/config/evaluation';
 import type { SchedulingDecision, Challenge, GeneratedChallenge, ChallengeEvaluation } from '@/types';
@@ -201,11 +202,27 @@ export class ChallengeDesignAgent {
       const recentQuestions = await this.fetchRecentQuestions(decision.userId, decision.skillId);
       console.log(`[Agent 2] Found ${recentQuestions.length} recent questions for context`);
 
+      // Check for optimized prompt first (highest priority)
+      let optimizedPrompt = null;
+      let promptTemplateId: string | null = null;
+      try {
+        optimizedPrompt = await promptOptimizer.getOptimizedPrompt(decision.skillId, decision.difficultyTarget);
+        if (optimizedPrompt) {
+          console.log(`[Agent 2] Using optimized prompt v${optimizedPrompt.version} (score: ${optimizedPrompt.current_score})`);
+          promptTemplateId = optimizedPrompt.id;
+        }
+      } catch (error) {
+        console.error('[Agent 2] Error fetching optimized prompt:', error);
+      }
+
       // A/B Testing: Select prompt variant if experiment is enabled
       let selectedVariant: { variantName: string; template: string; tags: string[]; metadata: Record<string, unknown> } | null = null;
       let baseTemplate: string | undefined;
 
-      if (CHALLENGE_PROMPT_EXPERIMENT.enabled) {
+      // Priority: Optimized prompt > A/B test variant > Default template
+      if (optimizedPrompt) {
+        baseTemplate = optimizedPrompt.prompt_content;
+      } else if (CHALLENGE_PROMPT_EXPERIMENT.enabled) {
         // Prepare variants with actual templates
         const variants = CHALLENGE_PROMPT_EXPERIMENT.variants.map(v => ({
           name: v.name,
@@ -563,6 +580,7 @@ export class ChallengeDesignAgent {
         question: finalChallenge.question,
         question_hash: questionHash,
         question_pool_id: poolId, // Link to pool if added
+        prompt_template_id: promptTemplateId, // Link to optimized prompt if used
         options_json: finalChallenge.options,
         correct_option: finalChallenge.correctAnswerIndex,
         explanation: finalChallenge.explanation,

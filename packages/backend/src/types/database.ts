@@ -31,6 +31,19 @@ export interface Database {
         };
         Returns: void;
       };
+      find_low_rated_skill_levels: {
+        Args: {
+          p_rating_threshold?: number;
+          p_min_questions?: number;
+        };
+        Returns: {
+          skill_id: string;
+          skill_name: string;
+          level: number;
+          avg_rating: number;
+          questions_count: number;
+        }[];
+      };
     };
     Tables: {
       users: {
@@ -248,6 +261,7 @@ export interface Database {
           question: string;
           question_hash: string | null;
           question_pool_id: string | null;
+          prompt_template_id: string | null;
           options_json: any; // JSONB (array of 4 strings)
           correct_option: number;
           explanation: string | null;
@@ -263,6 +277,7 @@ export interface Database {
           question: string;
           question_hash?: string | null;
           question_pool_id?: string | null;
+          prompt_template_id?: string | null;
           options_json: any;
           correct_option: number;
           explanation?: string | null;
@@ -278,6 +293,7 @@ export interface Database {
           question?: string;
           question_hash?: string | null;
           question_pool_id?: string | null;
+          prompt_template_id?: string | null;
           options_json?: any;
           correct_option?: number;
           explanation?: string | null;
@@ -432,6 +448,138 @@ export interface Database {
           reason?: string;
           difficulty_target?: number;
           created_at?: string;
+        };
+      };
+      prompt_templates: {
+        Row: {
+          id: string;
+          skill_id: string;
+          difficulty_level: number;
+          prompt_content: string;
+          prompt_type: string;
+          version: number;
+          is_active: boolean;
+          status: 'baseline' | 'optimizing' | 'pending' | 'deployed' | 'archived';
+          baseline_score: number | null;
+          current_score: number | null;
+          improvement_percent: number | null;
+          optimization_method: string | null;
+          refinement_count: number;
+          opik_prompt_id: string | null;
+          opik_commit_hash: string | null;
+          created_at: string;
+          updated_at: string;
+          deployed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          skill_id: string;
+          difficulty_level: number;
+          prompt_content: string;
+          prompt_type?: string;
+          version?: number;
+          is_active?: boolean;
+          status?: 'baseline' | 'optimizing' | 'pending' | 'deployed' | 'archived';
+          baseline_score?: number | null;
+          current_score?: number | null;
+          improvement_percent?: number | null;
+          optimization_method?: string | null;
+          refinement_count?: number;
+          opik_prompt_id?: string | null;
+          opik_commit_hash?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deployed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          skill_id?: string;
+          difficulty_level?: number;
+          prompt_content?: string;
+          prompt_type?: string;
+          version?: number;
+          is_active?: boolean;
+          status?: 'baseline' | 'optimizing' | 'pending' | 'deployed' | 'archived';
+          baseline_score?: number | null;
+          current_score?: number | null;
+          improvement_percent?: number | null;
+          optimization_method?: string | null;
+          refinement_count?: number;
+          opik_prompt_id?: string | null;
+          opik_commit_hash?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deployed_at?: string | null;
+        };
+      };
+      prompt_optimization_queue: {
+        Row: {
+          id: string;
+          skill_id: string;
+          difficulty_level: number;
+          status: 'pending' | 'running' | 'completed' | 'failed';
+          trigger_reason: string;
+          avg_rating_at_trigger: number | null;
+          questions_count: number | null;
+          started_at: string | null;
+          completed_at: string | null;
+          error_message: string | null;
+          result_prompt_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          skill_id: string;
+          difficulty_level: number;
+          status?: 'pending' | 'running' | 'completed' | 'failed';
+          trigger_reason: string;
+          avg_rating_at_trigger?: number | null;
+          questions_count?: number | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          error_message?: string | null;
+          result_prompt_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          skill_id?: string;
+          difficulty_level?: number;
+          status?: 'pending' | 'running' | 'completed' | 'failed';
+          trigger_reason?: string;
+          avg_rating_at_trigger?: number | null;
+          questions_count?: number | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          error_message?: string | null;
+          result_prompt_id?: string | null;
+          created_at?: string;
+        };
+      };
+      prompt_optimization_metrics: {
+        Row: {
+          id: string;
+          prompt_template_id: string;
+          optimization_queue_id: string | null;
+          metric_name: string;
+          metric_value: number;
+          recorded_at: string;
+        };
+        Insert: {
+          id?: string;
+          prompt_template_id: string;
+          optimization_queue_id?: string | null;
+          metric_name: string;
+          metric_value: number;
+          recorded_at?: string;
+        };
+        Update: {
+          id?: string;
+          prompt_template_id?: string;
+          optimization_queue_id?: string | null;
+          metric_name?: string;
+          metric_value?: number;
+          recorded_at?: string;
         };
       };
     };

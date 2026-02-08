@@ -6,6 +6,7 @@ import { initSupabase, getSupabase } from '@/lib/supabase';
 import { initOpik, opikService } from '@/lib/opik';
 import { schedulerService } from '@/services/scheduler.service';
 import { datasetGenerator } from '@/lib/dataset-generator';
+import { startPromptOptimizationScheduler } from '@/schedulers/prompt-optimization-scheduler';
 import apiRoutes from '@/api/routes';
 
 // Get __dirname equivalent in ES modules
@@ -172,6 +173,11 @@ async function start() {
     const cronExpression = process.env.SCHEDULER_CRON || '*/30 * * * *';
     schedulerService.start(cronExpression);
     console.log(`Scheduler started (${cronExpression})\n`);
+
+    // Start prompt optimization scheduler
+    console.log('Starting Prompt Optimization Scheduler...');
+    await startPromptOptimizationScheduler();
+    console.log('Prompt Optimization Scheduler initialized\n');
 
     // Check for missing datasets in background (don't block startup)
     // Disabled for manual testing - uncomment to re-enable auto-generation
