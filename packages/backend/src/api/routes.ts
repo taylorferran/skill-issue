@@ -1094,13 +1094,25 @@ router.post('/skills', async (req: Request, res: Response) => {
 
     const skillData = skill as any;
 
+    // Auto-generate datasets in the background (don't block response)
+    const generator = createDatasetGenerator('openai');
+    generator.generateAllLevelDatasets({
+      skillId: skillData.id,
+      skillName: skillData.name,
+      skillDescription: skillData.description,
+    }).then((result) => {
+      console.log(`[API] Auto-generated datasets for new skill ${skillData.name}:`, result);
+    }).catch((err) => {
+      console.error(`[API] Failed to auto-generate datasets for ${skillData.name}:`, err);
+    });
+
     res.status(201).json({
       id: skillData.id,
       name: skillData.name,
       description: skillData.description,
       active: skillData.active,
       createdAt: skillData.created_at,
-      message: 'Skill created. Use POST /api/datasets/generate-all-levels to create example datasets.',
+      message: 'Skill created. Datasets are being generated in the background.',
     });
   } catch (error) {
     console.error('Create skill error:', error);
@@ -1474,6 +1486,83 @@ router.post('/datasets/generate-all-levels', async (req: Request, res: Response)
   } catch (error) {
     console.error('Generate all-levels dataset error:', error);
     res.status(500).json({ error: 'Failed to generate level datasets' });
+  }
+});
+
+/**
+ * POST /api/datasets/generate-all-skills
+ * Generate example-based datasets for ALL active skills.
+ * Useful for backfilling datasets for existing skills.
+ *
+ * This runs in the background and returns immediately.
+ * Check logs for progress.
+ */
+router.post('/datasets/generate-all-skills', async (req: Request, res: Response) => {
+  try {
+    const supabase = getSupabase();
+
+    // Get all active skills
+    const { data: skills, error } = await supabase
+      .from('skills')
+      .select('id, name, description')
+      .eq('active', true);
+
+    if (error || !skills) {
+      return res.status(500).json({ error: 'Failed to fetch skills' });
+    }
+
+    if (skills.length === 0) {
+      return res.json({ message: 'No active skills found', totalSkills: 0 });
+    }
+
+    const totalSkills = skills.length;
+    console.log(`[API] Starting dataset generation for ${totalSkills} skills...`);
+
+    // Run generation in background for all skills
+    const generator = createDatasetGenerator('openai');
+
+    // Process all skills in background (don't await)
+    (async () => {
+      const results: { skillName: string; generated: number[]; skipped: number[]; errors: number[] }[] = [];
+
+      for (const skill of skills) {
+        const skillData = skill as any;
+        try {
+          console.log(`[API] Generating datasets for skill: ${skillData.name}`);
+          const result = await generator.generateAllLevelDatasets({
+            skillId: skillData.id,
+            skillName: skillData.name,
+            skillDescription: skillData.description,
+          });
+          results.push({
+            skillName: skillData.name,
+            ...result,
+          });
+          console.log(`[API] Completed ${skillData.name}: ${result.generated.length} generated, ${result.skipped.length} skipped`);
+        } catch (err) {
+          console.error(`[API] Failed to generate datasets for ${skillData.name}:`, err);
+          results.push({
+            skillName: skillData.name,
+            generated: [],
+            skipped: [],
+            errors: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+          });
+        }
+      }
+
+      console.log(`[API] Dataset generation complete for all ${totalSkills} skills`);
+      console.log('[API] Results:', JSON.stringify(results, null, 2));
+    })();
+
+    // Return immediately
+    res.json({
+      message: `Dataset generation started for ${totalSkills} skills. Check server logs for progress.`,
+      totalSkills,
+      skills: skills.map((s: any) => ({ id: s.id, name: s.name })),
+    });
+  } catch (error) {
+    console.error('Generate all-skills dataset error:', error);
+    res.status(500).json({ error: 'Failed to start dataset generation' });
   }
 });
 
