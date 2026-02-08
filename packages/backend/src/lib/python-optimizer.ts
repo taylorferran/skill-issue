@@ -32,7 +32,6 @@ export interface OptimizationParams {
   level: number;
   refinements?: number;
   optimizerType?: 'evolutionary' | 'hrpo' | 'metaprompt';
-  reset?: boolean;
 }
 
 /**
@@ -44,7 +43,6 @@ export async function runOptimization(params: OptimizationParams): Promise<Optim
     level,
     refinements = 5,
     optimizerType = 'evolutionary',
-    reset = false,
   } = params;
 
   // Path to optimization directory
@@ -66,12 +64,7 @@ export async function runOptimization(params: OptimizationParams): Promise<Optim
     '--level', String(level),
     '--refinements', String(refinements),
     '--optimizer', optimizerType,
-    '--skip-experiment', // Skip comparison experiment for automation
   ];
-
-  if (reset) {
-    args.push('--reset');
-  }
 
   return new Promise((resolve, reject) => {
     const pythonProcess = spawn('python3', args, {
