@@ -1,12 +1,13 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { useUser as useClerkUser, useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { 
+import { useMutation } from '@tanstack/react-query';
+import type {
   CreateUserRequest,
-  CreateUserResponse 
+  CreateUserResponse
 } from '@learning-platform/shared';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { useUpdateUser } from '@/api-routes/updateUser';
+import { updateUser } from '@/api/routes';
 import { clearAssessedSkills } from '@/utils/assessmentStorage';
 
 // Storage keys
@@ -38,7 +39,7 @@ interface UserContextValue {
   
   // User management methods
   setUser: (userData: CreateUserResponse) => Promise<void>;
-  updateUser: (partialData: Partial<CreateUserRequest>) => Promise<void>;
+  updateLocalUserData: (partialData: Partial<CreateUserRequest>) => Promise<void>;
   clearUser: () => Promise<void>;
   
   // Backend sync tracking
@@ -61,8 +62,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
   const [isUserCreatedFlag, setIsUserCreatedFlag] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
-  // API hook for updating user (including push token sync)
-  const { execute: updateUserApi } = useUpdateUser();
+  // API mutation for updating user (including push token sync)
+  const updateUserMutation = useMutation({
+    mutationFn: ({ userId, ...data }: { userId: string } & Partial<CreateUserRequest>) =>
+      updateUser(userId, data),
+  });
   const { expoPushToken } = useNotificationStore();
   
   // Initialize: Load user data from AsyncStorage on mount
@@ -128,16 +132,13 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       try {
         console.log('[UserContext] 🔄 Auto-syncing push token to backend...');
-        
+
         // Update user with push token using the updateUser endpoint
-        await updateUserApi({ 
+        await updateUserMutation.mutateAsync({
           userId: user.id,
-          deviceId: expoPushToken 
+          deviceId: expoPushToken
         });
-        
-        // Update local user state with the new push token
-        await updateUser({ deviceId: expoPushToken });
-        
+
         console.log('[UserContext] ✅ Push token synced successfully');
       } catch (error) {
         console.error('[UserContext] ❌ Failed to sync push token:', error);
@@ -172,7 +173,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
   
   // Update partial user data (merge with existing)
-  const updateUser = async (partialData: Partial<CreateUserRequest>): Promise<void> => {
+  const updateLocalUserData = async (partialData: Partial<CreateUserRequest>): Promise<void> => {
     try {
       console.log('[UserContext] 🔄 Updating user data:', partialData);
       
@@ -284,7 +285,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
     user,
     userId: user?.id || null,
     setUser,
-    updateUser,
+    updateLocalUserData,
     clearUser,
     isUserCreated,
     markUserAsCreated,

@@ -18,7 +18,9 @@ export const styles = StyleSheet.create({
     marginRight: 16,
   },
   backButton: {
-    paddingRight: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
   },
   logoBox: {
     width: 32,

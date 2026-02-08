@@ -1,16 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { router } from "expo-router";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MCQQuiz } from "@/components/mcq-quiz/quiz/MCQQuiz";
 import { useRouteParams, navigateTo } from "@/navigation/navigation";
 import { useUser } from "@/contexts/UserContext";
-import { useSubmitAnswer } from "@/api-routes/submitAnswer";
-import { useGetUserSkills } from "@/api-routes/getUserSkills";
+import { submitAnswer, skillsKeys, userKeys } from "@/api/routes";
 import { Alert } from "react-native";
-import type { AnswerChallengeResponse } from "@learning-platform/shared";
+import type { AnswerChallengeResponse, GetChallengeHistoryResponse, GetUserSkillsResponse } from "@learning-platform/shared";
 import type { MCQQuestion, Challenge, ChallengeWithNotification } from "@/types/Quiz";
 import { notificationEventEmitter } from "@/utils/notificationEvents";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { useSkillsStore } from "@/stores/skillsStore";
 import { clearNotification } from "@/utils/badgeUtils";
 
 interface AnswerSubmissionData {
@@ -31,6 +30,7 @@ interface QuizResultData extends AnswerChallengeResponse {
 const SkillAssessmentScreen = () => {
   const { data, challengeId, skill, skillId } = useRouteParams("quiz");
   const { userId } = useUser();
+  const queryClient = useQueryClient();
   
   // Mount tracking for debugging
   useEffect(() => {
@@ -55,15 +55,108 @@ const SkillAssessmentScreen = () => {
     prevDataRef.current = dataString;
   }
   
-  const { execute: submitAnswer, isLoading: isSubmitting } = useSubmitAnswer();
-  const { execute: fetchUserSkills, isLoading: isFetchingSkills } = useGetUserSkills();
+  // TanStack Query Mutation for submitting answers
+  const submitMutation = useMutation({
+    mutationFn: submitAnswer,
+    
+    // Optimistic update before mutation
+    onMutate: async (newAnswer) => {
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update
+      await queryClient.cancelQueries({ queryKey: skillsKeys.history(userId || '', skillId || '') });
+      await queryClient.cancelQueries({ queryKey: skillsKeys.user(userId || '') });
+      
+      // Snapshot the previous values for potential rollback
+      const previousHistory = queryClient.getQueryData<GetChallengeHistoryResponse>(
+        skillsKeys.history(userId || '', skillId || '')
+      );
+      const previousSkills = queryClient.getQueryData<GetUserSkillsResponse>(
+        skillsKeys.user(userId || '')
+      );
+      
+      // Create optimistic history entry
+      const questionData = Array.isArray(data) ? data[0] : data;
+      const optimisticAnswer = {
+        answerId: `temp-${Date.now()}`,
+        challengeId: newAnswer.challengeId,
+        skillId: skillId || '',
+        skillName: skill || '',
+        difficulty: 5, // Default difficulty
+        question: questionData?.question || '',
+        options: questionData?.answers?.map((a: { text: string }) => a.text) || [],
+        selectedOption: newAnswer.selectedOption,
+        correctOption: -1, // Will be updated after submission
+        isCorrect: false, // Will be updated after submission
+        explanation: null,
+        responseTime: newAnswer.responseTime,
+        confidence: newAnswer.confidence,
+        answeredAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      };
+      
+      // Optimistically update history cache
+      queryClient.setQueryData(
+        skillsKeys.history(userId || '', skillId || ''),
+        (old: GetChallengeHistoryResponse | undefined) => [
+          optimisticAnswer,
+          ...(old || [])
+        ]
+      );
+      
+      // Return the previous values for rollback on error
+      return { previousHistory, previousSkills, optimisticAnswer };
+    },
+    
+    // If mutation fails, roll back to previous values
+    onError: (err, newAnswer, context) => {
+      console.error('[Quiz] ❌ Submission failed, rolling back optimistic update:', err);
+      
+      if (context?.previousHistory) {
+        queryClient.setQueryData(
+          skillsKeys.history(userId || '', skillId || ''),
+          context.previousHistory
+        );
+      }
+      if (context?.previousSkills) {
+        queryClient.setQueryData(skillsKeys.user(userId || ''), context.previousSkills);
+      }
+      
+      Alert.alert('Error', 'Failed to submit your answer. Please try again.');
+    },
+    
+    // After success or error, update with real data or invalidate
+    onSuccess: (result, variables, context) => {
+      // Update the optimistic entry with real server data
+      if (context?.optimisticAnswer && skillId) {
+        const questionData = Array.isArray(data) ? data[0] : data;
+        const finalAnswer = {
+          ...context.optimisticAnswer,
+          correctOption: result.correctOption,
+          isCorrect: result.isCorrect,
+          explanation: result.explanation,
+        };
+        
+        queryClient.setQueryData(
+          skillsKeys.history(userId || '', skillId),
+          (old: GetChallengeHistoryResponse | undefined) => {
+            if (!old) return [finalAnswer];
+            // Replace the temp entry with the final one
+            return old.map((entry) =>
+              entry.answerId === context.optimisticAnswer?.answerId ? finalAnswer : entry
+            );
+          }
+        );
+        
+        // Also invalidate user skills to refresh stats
+        queryClient.invalidateQueries({ queryKey: skillsKeys.user(userId || '') });
+        
+        console.log('[Quiz] ✅ Updated cache with server response');
+      }
+    },
+  });
+  
   const { removePendingChallenge } = useNotificationStore();
-  const { setSkillPendingChallenges, getCachedPendingChallenges } = useSkillsStore();
-    
-  // Combined loading state for the entire finish flow
-  const isProcessing = isSubmitting || isFetchingSkills;
-    
-  // Store quiz result for optimistic update
+  
+  // Store quiz result for navigation
   const [quizResult, setQuizResult] = useState<QuizResultData | null>(null);
 
   // MEMOIZE quizKey based on challenge data
@@ -80,7 +173,6 @@ const SkillAssessmentScreen = () => {
   }, [data]);
     
   // Extract question data (single question mode for skills)
-  // MEMOIZE to prevent useEffect from running unnecessarily
   const questionData = useMemo<MCQQuestion>(() => {
     return Array.isArray(data) ? data[0] : data;
   }, [data]);
@@ -91,110 +183,88 @@ const SkillAssessmentScreen = () => {
     console.log(`[Quiz] ⚠️ RENDER #${renderCount.current} - possible infinite loop!`);
   }
 
-  // Add challenge to pending list on mount ONLY - use ref to track if already added
+  // Add challenge to pending list on mount ONLY
   const hasAddedChallenge = useRef(false);
   
   useEffect(() => {
-    // Only run once per mount - prevent infinite re-adds
     if (hasAddedChallenge.current) {
       return;
     }
     
     if (challengeId && questionData && skillId) {
-      console.log(`[Quiz] ➕ Adding challenge to pending list: ${challengeId} (render #${renderCount.current})`);
+      console.log(`[Quiz] ➕ Adding challenge to pending list: ${challengeId}`);
       
-      // Get addPendingChallenge from store directly (stable reference)
       const { addPendingChallenge } = useNotificationStore.getState();
       
-      // Create a challenge object to add to the pending list
       const challenge: Challenge = {
         challengeId: challengeId,
         skillId: skillId,
         skillName: skill || '',
         question: questionData.question,
         options: questionData.answers.map(a => a.text),
-        difficulty: 5, // Default difficulty
+        difficulty: 5,
         createdAt: new Date().toISOString(),
       };
       
       addPendingChallenge(challenge);
       hasAddedChallenge.current = true;
     }
-  // Only depend on the initial mount, not on changing references
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmitAnswer = async (answerData: AnswerSubmissionData) => {
-    try {
-      console.log('[Quiz] 📝 Submitting answer:', {
-        challengeId: answerData.challengeId,
-        selectedOption: answerData.selectedOption,
-        confidence: answerData.confidence,
-      });
+    console.log('[Quiz] 📝 Submitting answer:', {
+      challengeId: answerData.challengeId,
+      selectedOption: answerData.selectedOption,
+      confidence: answerData.confidence,
+    });
 
-      const result = await submitAnswer({
-        challengeId: answerData.challengeId,
-        userId: answerData.userId,
-        selectedOption: answerData.selectedOption,
-        responseTime: answerData.responseTime,
-        confidence: answerData.confidence || undefined,
-        userFeedback: answerData.userFeedback,
-      });
+    // Execute the mutation (onMutate handles optimistic updates)
+    const result = await submitMutation.mutateAsync({
+      challengeId: answerData.challengeId,
+      userId: answerData.userId,
+      selectedOption: answerData.selectedOption,
+      responseTime: answerData.responseTime,
+      confidence: answerData.confidence || undefined,
+      userFeedback: answerData.userFeedback,
+    });
 
-      // Store result for optimistic update
-      setQuizResult({
-        ...result,
-        selectedOption: answerData.selectedOption,
-        responseTime: answerData.responseTime,
-        confidence: answerData.confidence,
-      });
+    // Store result for navigation
+    const quizResultData: QuizResultData = {
+      ...result,
+      selectedOption: answerData.selectedOption,
+      responseTime: answerData.responseTime,
+      confidence: answerData.confidence,
+    };
+    setQuizResult(quizResultData);
 
-      // Remove the challenge from pending notifications immediately after successful submission
-      // This updates the badge count while the loading spinner is still visible for skill progress fetching
-      if (answerData.challengeId) {
-        // Get the challenge from the store to find its notification identifier (if from push notification)
-        const { pendingChallenges } = useNotificationStore.getState();
-        
-        const challenge = pendingChallenges.find(c => c.challengeId === answerData.challengeId) as ChallengeWithNotification | undefined;
-        
-        // Clear the OS notification if it has a notification identifier
-        if (challenge?.notificationIdentifier) {
-          clearNotification(challenge.notificationIdentifier);
-        }
-        
-        removePendingChallenge(answerData.challengeId);
-        
-        // Also remove from skillsStore cache to ensure assessment page is updated
-        if (skillId) {
-          const currentPending = getCachedPendingChallenges(skillId) || [];
-          const updatedPending = currentPending.filter(c => c.challengeId !== answerData.challengeId);
-          setSkillPendingChallenges(skillId, updatedPending);
-        }
-        // Emit notification event to refresh badge count immediately
-        notificationEventEmitter.emit();
+    // Remove the challenge from pending notifications
+    if (answerData.challengeId) {
+      const { pendingChallenges } = useNotificationStore.getState();
+      
+      const challenge = pendingChallenges.find(c => c.challengeId === answerData.challengeId) as ChallengeWithNotification | undefined;
+      
+      if (challenge?.notificationIdentifier) {
+        clearNotification(challenge.notificationIdentifier);
       }
-
-    } catch (error) {
-      console.error('[Quiz] ❌ Failed to submit answer:', error);
-      Alert.alert(
-        'Error',
-        'Failed to submit your answer. Please try again.'
-      );
-      throw error;
+      
+      removePendingChallenge(answerData.challengeId);
+      
+      // Emit notification event to refresh badge count
+      notificationEventEmitter.emit();
     }
   };
 
   const handleFinish = async () => {
-    // Only proceed if quiz was completed and answer was submitted successfully
     if (quizResult && questionData && skillId && userId) {
       const answeredChallenge = {
-        answerId: `temp-${Date.now()}`, // Temporary ID until server assigns one
+        answerId: `temp-${Date.now()}`,
         challengeId: challengeId,
         skillId: skillId,
         skillName: skill,
-        difficulty: 5, // Default, could be passed in params
+        difficulty: 5,
         question: questionData.question,
-        options: questionData.answers.map(a => a.text),
+        options: questionData.answers.map((a: { text: string }) => a.text),
         selectedOption: quizResult.selectedOption,
         correctOption: quizResult.correctOption,
         isCorrect: quizResult.isCorrect,
@@ -206,25 +276,37 @@ const SkillAssessmentScreen = () => {
       };
 
       try {
-        // Fetch current skill progress from API
-        console.log('[Quiz] 🔄 Fetching skill progress for navigation...');
-        const userSkills = await fetchUserSkills({ userId });
-        const skillData = userSkills?.find(s => s.skillId === skillId);
+        // Get current cache data from TanStack Query
+        const cachedUserSkills = queryClient.getQueryData<GetUserSkillsResponse>(
+          skillsKeys.user(userId)
+        );
+        const cachedHistory = queryClient.getQueryData<GetChallengeHistoryResponse>(
+          skillsKeys.history(userId, skillId)
+        );
+        
+        // Calculate progress from cached data
+        const skillData = cachedUserSkills?.find((s) => s.skillId === skillId);
         const progress = skillData ? skillData.accuracy * 100 : 0;
         
-        console.log('[Quiz] ✅ Navigating to assessment with progress:', progress);
+        console.log('[Quiz] ✅ Navigating to assessment with cached data:', {
+          progress,
+          historyCount: cachedHistory?.length || 0,
+        });
         
-        // Challenge already removed from pending in handleSubmitAnswer
-        // Navigate explicitly to assessment with all required params
+        // Navigate with initialData to prevent flicker
         navigateTo('assessment', { 
           skill, 
           skillId, 
           progress,
           answeredChallenge: JSON.stringify(answeredChallenge),
+          initialData: {
+            userSkills: cachedUserSkills,
+            history: cachedHistory,
+          },
         });
       } catch (error) {
-        console.error('[Quiz] ❌ Failed to fetch skill progress:', error);
-        // Fallback: navigate without progress data
+        console.error('[Quiz] ❌ Failed to navigate with cached data:', error);
+        // Fallback: navigate without initialData
         navigateTo('assessment', { 
           skill, 
           skillId, 
@@ -233,13 +315,11 @@ const SkillAssessmentScreen = () => {
         });
       }
     } else if (skill && skillId) {
-      // If quiz was not completed but we have route params, navigate to assessment
       navigateTo('assessment', { 
         skill, 
         skillId,
       });
     } else {
-      // Fallback: navigate to skills if no route params available
       router.navigate('/(tabs)/(skills)');
     }
   };
@@ -252,7 +332,7 @@ const SkillAssessmentScreen = () => {
       challengeId={challengeId}
       userId={userId || ''}
       onSubmitAnswer={handleSubmitAnswer}
-      isFinishing={isProcessing}
+      isFinishing={submitMutation.isPending}
     />
   );
 };

@@ -24,19 +24,22 @@ export type ApiHookReturnType<
 export type ApiOptions<
   TRequest extends z.Schema | null = null,
   TResponse extends z.Schema | null = null,
+  TStorageParams = any,
 > = (TRequest extends z.Schema
   ? { requestData?: z.infer<TRequest>; autoFetch?: boolean }
-  : { requestData?: never; autoFetch?: never }) &
+  : { requestData?: never; autoFetch?: boolean }) &
   (TResponse extends z.Schema
     ? {
       selector?: never;
       globalState?: never;
       clearDataOnCall?: boolean;
+      storageProps?: TStorageParams; // Type-safe storage key parameters
     }
     : {
       selector?: never;
       globalState?: never;
       clearDataOnCall?: boolean;
+      storageProps?: TStorageParams; // Type-safe storage key parameters
     });
 type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

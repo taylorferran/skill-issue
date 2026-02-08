@@ -362,4 +362,50 @@ export const styles = StyleSheet.create({
   challengeDate: {
     ...createTextStyle("xs", "regular", "secondary"),
   },
+
+  // Calibration Card
+  calibrationCard: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    padding: Theme.spacing["2xl"],
+    marginBottom: Theme.spacing.lg,
+    ...Theme.shadows.card,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.border,
+  },
+
+  calibrationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.md,
+    marginBottom: Theme.spacing.md,
+  },
+
+  calibrationTitle: {
+    ...createTextStyle("lg", "bold", "primary"),
+    color: Theme.colors.primary.main,
+  },
+
+  calibrationDescription: {
+    ...createTextStyle("sm", "regular", "secondary"),
+    marginBottom: Theme.spacing.lg,
+    lineHeight: 20,
+  },
+
+  startCalibrationButton: {
+    backgroundColor: Theme.colors.primary.main,
+    borderRadius: Theme.borderRadius.lg,
+    paddingVertical: Theme.spacing.lg,
+    paddingHorizontal: Theme.spacing.xl,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Theme.spacing.sm,
+    ...Theme.shadows.card,
+  },
+
+  startCalibrationButtonText: {
+    ...createTextStyle("base", "bold", "primary"),
+    color: Theme.colors.text.inverse,
+  },
 }) 

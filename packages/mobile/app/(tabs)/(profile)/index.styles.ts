@@ -326,4 +326,78 @@ export const styles = StyleSheet.create({
     ...createTextStyle("base", "bold", "inverse"),
   },
 
+  // Account Settings
+  accountSettingsCard: {
+    backgroundColor: Theme.colors.background.secondary,
+    borderRadius: Theme.borderRadius.xl,
+    borderWidth: Theme.borderWidth.thin,
+    borderColor: Theme.colors.primary.medium,
+    overflow: "hidden",
+    ...Theme.shadows.card,
+  },
+  accountSettingsCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.lg,
+  },
+  accountSettingsCardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Theme.spacing.lg,
+    flex: 1,
+    flexShrink: 1,
+  },
+  accountSettingsIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: Theme.borderRadius.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  accountSettingsCardHeaderText: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  accountSettingsCardTitle: {
+    ...createTextStyle("base", "bold", "primary"),
+  },
+  accountSettingsCardSubtitle: {
+    ...createTextStyle("xs", "regular", "secondary"),
+    marginTop: Theme.spacing.xs / 2,
+  },
+  accountSettingsCardDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.primary.light,
+    marginHorizontal: Theme.spacing.lg,
+  },
+  accountSettingsCardContent: {
+    padding: Theme.spacing.lg,
+  },
+
+  // Stacked pickers layout (title and picker inline, rows stacked vertically)
+  accountSettingsCardContentStacked: {
+    flexDirection: "column",
+    padding: Theme.spacing.lg,
+    gap: Theme.spacing.md,
+  },
+  stackedPickerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: Theme.spacing.md,
+  },
+  stackedPickerLabel: {
+    ...createTextStyle("sm", "medium", "primary"),
+    flexShrink: 0,
+  },
+  stackedPickerDivider: {
+    height: 1,
+    backgroundColor: Theme.colors.primary.light,
+  },
+  pickerWrapper: {
+    width: 160,
+    flexShrink: 0,
+  },
 });

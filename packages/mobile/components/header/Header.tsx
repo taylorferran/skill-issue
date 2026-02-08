@@ -31,17 +31,18 @@ export function CustomHeader({
   // Show back button for any non-root route
   const canGoBack = !isRootRoute;
 
-  const isQuizRoute = pathname?.includes("quiz");
-  const isAssessmentRoute = pathname?.includes("assessment") && !isQuizRoute;
+  const isCalibrationRoute = pathname?.includes("calibration");
+  const isQuizRoute = pathname?.includes("quiz") && !isCalibrationRoute;
+  const isAssessmentRoute = pathname?.includes("assessment") && !isQuizRoute && !isCalibrationRoute;
 
-  // Subscribe to timer updates when on quiz route
+  // Subscribe to timer updates when on quiz or calibration route
   useEffect(() => {
-    if (!isQuizRoute) {
+    if (!isQuizRoute && !isCalibrationRoute) {
       setElapsedTime(0);
       return;
     }
 
-    console.log(`[Header] 🎯 Quiz route detected, subscribing to timer`);
+    console.log(`[Header] 🎯 ${isCalibrationRoute ? 'Calibration' : 'Quiz'} route detected, subscribing to timer`);
     
     // Subscribe to timer events
     const unsubscribe = quizTimerEmitter.subscribe((time) => {
@@ -50,17 +51,17 @@ export function CustomHeader({
     });
 
     return () => {
-      console.log(`[Header] 🧹 Quiz route leaving, unsubscribing`);
+      console.log(`[Header] 🧹 ${isCalibrationRoute ? 'Calibration' : 'Quiz'} route leaving, unsubscribing`);
       unsubscribe();
       setElapsedTime(0);
     };
-  }, [isQuizRoute]);
+  }, [isQuizRoute, isCalibrationRoute]);
 
   let displayTitle = "Skill Issue";
   if (navigationTitle) {
     displayTitle = navigationTitle;
-  } else if (isQuizRoute) {
-    // For quiz route, show empty title or question counter
+  } else if (isQuizRoute || isCalibrationRoute) {
+    // For quiz/calibration routes, show empty title or question counter
     // We could also emit question metadata through the emitter if needed
     displayTitle = "";
   } else if (isProfileRoute) {
@@ -72,8 +73,8 @@ export function CustomHeader({
   }
 
   const handleBackPress = () => {
-    if (isQuizRoute) {
-      // When on quiz route, always navigate back to assessment with the skill params
+    if (isQuizRoute || isCalibrationRoute) {
+      // When on quiz/calibration route, always navigate back to assessment with the skill params
       const skill = searchParams.skill as string;
       const skillId = searchParams.skillId as string | undefined;
       
@@ -122,13 +123,13 @@ export function CustomHeader({
             ]}
           >
             <MaterialIcons
-              name={isQuizRoute ? "close" : "arrow-back"}
+              name={isQuizRoute || isCalibrationRoute ? "close" : "arrow-back"}
               size={Theme.iconSize.md}
               color={Theme.colors.primary.main}
             />
           </Pressable>
         )}
-        {!isQuizRoute && (
+        {!isQuizRoute && !isCalibrationRoute && (
           <View style={styles.logoBox}>
             <Ionicons
               name="diamond"
@@ -140,13 +141,14 @@ export function CustomHeader({
         <Text
           style={[styles.title, { color: Theme.colors.text.primary }]}
           numberOfLines={1}
+          ellipsizeMode="tail"
         >
           {displayTitle}
         </Text>
       </View>
       {/* Right Actions */}
       <View style={styles.actionsContainer}>
-        {isQuizRoute ? (
+        {(isQuizRoute || isCalibrationRoute) ? (
           <QuizTimer elapsedTime={elapsedTime} />
         ) : null}
       </View>

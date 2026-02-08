@@ -96,6 +96,12 @@ export const styles = StyleSheet.create({
     letterSpacing: -0.2,
     lineHeight: 14,
   },
+  badgeContainer: {
+    marginTop: Theme.spacing.sm,
+  },
+  iconWrapper: {
+    position: 'relative',
+  },
   iconContainer: {
     backgroundColor: Theme.colors.primary.main,
     width: 64,
@@ -120,6 +126,26 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: '100%',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: Theme.colors.error.main,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: Theme.colors.background.secondary,
+    zIndex: 10,
+  },
+  pendingBadgeText: {
+    color: Theme.colors.text.inverse,
+    fontSize: 10,
+    fontWeight: Theme.typography.fontWeight.bold,
   },
   
   // Legacy styles (kept for compatibility)

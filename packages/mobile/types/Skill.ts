@@ -10,6 +10,7 @@ export type Skill = {
   subtopics: number;
   aiPowered: boolean;
   isPrimary: boolean;
+  needsCalibration?: boolean;
 }
 
 // Icon mappings for skill categories

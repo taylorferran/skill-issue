@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useGetPendingChallenges } from '@/api-routes/getPendingChallenges';
+import { useQuery } from '@tanstack/react-query';
+import { fetchPendingChallenges, skillsKeys } from '@/api/routes';
 import { useUser } from '@/contexts/UserContext';
 import { notificationEventEmitter } from '@/utils/notificationEvents';
 import type { Challenge } from '@/types/Quiz';
@@ -24,16 +25,20 @@ interface UseNotificationsReturn {
  */
 export function useNotifications(): UseNotificationsReturn {
   const { userId } = useUser();
-  const { 
-    execute: fetchPendingChallenges, 
-    data, 
-    isLoading, 
+
+  // Use TanStack Query for fetching pending challenges
+  const {
+    data: challenges = [],
+    isLoading,
     isFetching,
-    error 
-  } = useGetPendingChallenges({ clearDataOnCall: false });
-  
-  const [challenges, setChallenges] = useState<Challenge[]>([]);
-  const isInitialMount = useRef(true);
+    error,
+    refetch
+  } = useQuery({
+    queryKey: userId ? skillsKeys.pending(userId) : ['pending-challenges', 'no-user'],
+    queryFn: () => userId ? fetchPendingChallenges(userId) : Promise.resolve([]),
+    enabled: !!userId,
+    // Uses global defaults: refetchOnMount: 'always' for background refresh
+  });
 
   // Calculate unread count (all pending challenges are unread)
   const unreadCount = challenges.length > 9 ? 10 : challenges.length;
@@ -44,32 +49,17 @@ export function useNotifications(): UseNotificationsReturn {
     return String(challenges.length);
   };
 
-  // Fetch challenges function
+  // Fetch challenges function - now uses refetch
   const refresh = useCallback(async () => {
     if (!userId) return;
     
     try {
       console.log('[useNotifications] 🔄 Refreshing challenges...');
-      await fetchPendingChallenges({ userId });
+      await refetch();
     } catch (err) {
       console.error('[useNotifications] ❌ Failed to refresh:', err);
     }
-  }, [userId, fetchPendingChallenges]);
-
-  // Initial fetch on mount
-  useEffect(() => {
-    if (userId && isInitialMount.current) {
-      isInitialMount.current = false;
-      refresh();
-    }
-  }, [userId, refresh]);
-
-  // Update challenges when data changes (background refresh support)
-  useEffect(() => {
-    if (data) {
-      setChallenges(data);
-    }
-  }, [data]);
+  }, [userId, refetch]);
 
   // Listen for notification events
   useEffect(() => {
@@ -87,7 +77,7 @@ export function useNotifications(): UseNotificationsReturn {
     isLoading,
     isFetching,
     refresh,
-    error,
+    error: error instanceof Error ? error : null,
     // Expose formatted count getter as a property
     formattedCount: getFormattedCount(),
   } as UseNotificationsReturn & { formattedCount: string };

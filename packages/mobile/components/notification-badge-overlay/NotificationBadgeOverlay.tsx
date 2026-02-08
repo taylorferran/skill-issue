@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,17 +7,20 @@ import {
   Alert,
   TouchableOpacity,
   ScrollView,
+  AppState,
+  type AppStateStatus,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePathname } from 'expo-router';
 import { Theme } from '@/theme/Theme';
 import { useNotificationStore } from '@/stores/notificationStore';
-import { useGetPendingChallenges } from '@/api-routes/getPendingChallenges';
+import { fetchChallenge, fetchPendingChallenges, skillsKeys, challengeKeys } from '@/api/routes';
 import { useUser } from '@/contexts/UserContext';
-import { useGetChallenge } from '@/api-routes/getChallenge';
+import { useAuth as useClerkAuth } from '@clerk/clerk-expo';
 import { challengeToMCQQuestion, type Challenge } from '@/types/Quiz';
 import { navigateTo } from '@/navigation/navigation';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 function truncateText(text: string, maxLength: number = 70): string {
   if (text.length <= maxLength) return text;
@@ -34,42 +37,49 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const { userId } = useUser();
+  const { isSignedIn } = useClerkAuth();
   const { pendingChallenges, setPendingChallenges } = useNotificationStore();
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const [hasInitialFetchCompleted, setHasInitialFetchCompleted] = useState(false);
-  const { execute: fetchPendingChallenges } = useGetPendingChallenges({ clearDataOnCall: false });
-  const { execute: fetchChallenge } = useGetChallenge();
+  const queryClient = useQueryClient();
 
-  // Hide notification bar on quiz pages
+  // TanStack Query for pending challenges - always refetch on mount
+  const { data: challengesData } = useQuery({
+    queryKey: userId ? skillsKeys.pending(userId) : ['pending-challenges', 'no-user'],
+    queryFn: () => userId ? fetchPendingChallenges(userId) : Promise.resolve([]),
+    enabled: !!userId,
+  });
+
+  // Refetch pending challenges when app comes to foreground
+  const appState = useRef(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        console.log('[NotificationBadgeOverlay] App came to foreground, refetching pending challenges...');
+        if (userId) {
+          queryClient.invalidateQueries({ queryKey: skillsKeys.pending(userId) });
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [userId, queryClient]);
+
+  // Hide notification bar on quiz and calibration pages
   const isQuizPage = pathname?.includes('/assessment/quiz');
+  const isCalibrationPage = pathname?.includes('/assessment/calibration');
 
   // Calculate display values
   const count = pendingChallenges.length;
   const displayCount = count > 9 ? '9+' : String(count);
   const showBadge = count > 0;
 
-  // Fetch challenges only on FIRST mount (not on subsequent userId changes or re-renders)
-  // After initial fetch, the badge updates via local operations only:
-  // - Push notifications add via addPendingChallenge() in notifications.ts
-  // - Quiz completion removes via removePendingChallenge() in the quiz page
+  // Update pending challenges whenever data changes - server is source of truth
   useEffect(() => {
-    if (!userId || hasInitialFetchCompleted) return;
-
-    const loadChallenges = async () => {
-      try {
-        console.log('[NotificationBadgeOverlay] Loading initial challenges on first mount...');
-        const challenges = await fetchPendingChallenges({ userId });
-        if (challenges) {
-          setPendingChallenges(challenges);
-        }
-        setHasInitialFetchCompleted(true);
-      } catch (err) {
-        console.error('[NotificationBadgeOverlay] Failed to load challenges:', err);
-      }
-    };
-
-    loadChallenges();
-  }, [userId, fetchPendingChallenges, setPendingChallenges, hasInitialFetchCompleted]);
+    if (challengesData) {
+      setPendingChallenges(challengesData);
+    }
+  }, [challengesData, setPendingChallenges]);
 
   // Note: We intentionally do NOT listen for notification events to auto-refresh from server.
   // Push notifications add challenges directly via addPendingChallenge() in notifications.ts
@@ -93,7 +103,10 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
 
     try {
       // Fetch full challenge details
-      const fullChallenge = await fetchChallenge({ challengeId: challenge.challengeId });
+      const fullChallenge = await queryClient.fetchQuery({
+        queryKey: challengeKeys.detail(challenge.challengeId),
+        queryFn: () => fetchChallenge(challenge.challengeId),
+      });
 
       console.log('[NotificationBadgeOverlay] Full challenge loaded:', {
         challengeId: fullChallenge.id,
@@ -120,10 +133,10 @@ export const NotificationBadgeOverlay = React.memo(function NotificationBadgeOve
       console.error('[NotificationBadgeOverlay] Failed to load challenge:', error);
       Alert.alert('Error', 'Failed to load challenge. Please try again.');
     }
-  }, [fetchChallenge]);
+  }, [queryClient]);
 
-  // Don't show notification button if user is not signed in or on quiz pages
-  if (!userId || isQuizPage) {
+  // Don't show notification button if user is not signed in or on quiz/calibration pages
+  if (!userId || !isSignedIn || isQuizPage || isCalibrationPage) {
     return null;
   }
 

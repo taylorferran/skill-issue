@@ -17,7 +17,7 @@ export const styles = StyleSheet.create({
   statCard: {
     gap: Theme.spacing.sm,
     borderRadius: Theme.borderRadius.xl,
-    padding: Theme.spacing.xl,
+    padding: Theme.spacing.md,
     backgroundColor: Theme.colors.background.secondary,
     borderWidth: Theme.borderWidth.thin,
     borderColor: Theme.colors.primary.medium,

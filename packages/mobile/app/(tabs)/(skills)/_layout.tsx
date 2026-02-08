@@ -13,7 +13,10 @@ export default function SkillsStack() {
         name="index" 
         options={{ headerBackVisible: false }}  // Root screen - no back button
       />
+      <Stack.Screen name="[skill]/index" />
+      <Stack.Screen name="create/index" />
       <Stack.Screen name="assessment/index" />
+      <Stack.Screen name="assessment/calibration/index" />
       <Stack.Screen name="assessment/quiz/index" />
     </Stack>
   );

@@ -25,6 +25,11 @@ const pages = {
       progress: z.number().optional(),
       isNewSkill: z.boolean().optional(),
       answeredChallenge: z.string().optional(),
+      initialData: z.object({
+        userSkills: z.any().optional(),
+        pending: z.any().optional(),
+        history: z.any().optional(),
+      }).optional(),
     }),
   },
   quiz: {
@@ -34,6 +39,13 @@ const pages = {
       skillId: z.string().uuid(),
       data: QuizStateSchema,
       challengeId: z.string().uuid(),
+    }),
+  },
+  calibration: {
+    path: "/(tabs)/(skills)/assessment/calibration" as const,
+    params: z.object({
+      skill: z.string(),
+      skillId: z.string().uuid(),
     }),
   },
   
