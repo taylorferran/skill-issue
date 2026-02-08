@@ -1,0 +1,23 @@
+{
+  "prompts": {
+    "fdf7bc86-725e-474b-af5d-9627f253346e": {
+      "7": {
+        "prompt": "You are generating a multiple-choice challenge to test knowledge and competence. \\n\\nSKILL: US State Geography\\nDESCRIPTION: US states, capitals, borders, and geographical features\\nDIFFICULTY LEVEL: 7/10\\n\\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\\n\\nRULES:\\n- Difficulty 7 means: Evaluating edge cases\\n- Clearly phrase the question to ensure comprehension without complex constructs\\n- Question must be answerable in under 30 seconds\\n- 4 options, only 1 correct\\n- Randomly shuffle the order of correct answer among the options\\n- Distractors should be clear, related to the question, and require specific knowledge to be disqualified\\n- Ensure each distractor fits logically within the geographical context\\n- Include a brief, clear explanation of why the answer is correct\\n- Tailor the question specifically to the described skill\\n- Make sure the correct answer is explicit and unambiguous\\n- Verify factual correctness for all elements, ensuring logical consistency\\n- Ensure premises do not contradict geographical facts or each other\\n\\nBREVITY REQUIREMENTS (CRITICAL):\\n- Question: 25 words maximum, use direct and accessible language\\n- Options: 12 words maximum each, ensure clarity\\n- Explanation: 50 words maximum, concise but clear reasoning\\n- Avoid: storytelling, complex sentences, excessive context, verbose setups, filler words\\n- Focus: Test the concept directly, use straightforward questions\\n\\nExamples of good brevity:\\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\\n\\n\u2713 \"What is the capital of France?\"\\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\\n\\nOUTPUT FORMAT (strict JSON, all fields required):\\n- \"question\" field must have precisely one question\\n- \"options\" array must contain exactly 4 options\\n- \"correctAnswerIndex\" must ensure exactly one correct index\\n- \"explanation\" must provide reasoning\\n- \"actualDifficulty\" must state the difficulty level\\n\\nCHECK THAT ALL FIELDS AND REQUIREMENTS ARE MET AND STRUCTURALLY VALID\\nGenerate the challenge now: ",
+        "baseline_score": 0.48900000000000005,
+        "best_score": 0.8020000000000002,
+        "improvement": 0.3130000000000001,
+        "improvement_percent": 64.00817995910022,
+        "refinements": 5,
+        "optimized_at": "2026-02-08T12:03:36.464534",
+        "status": "deployed"
+      }
+    }
+  },
+  "metadata": {
+    "created_at": "2026-02-08T11:54:25.584626",
+    "last_updated": "2026-02-08T12:03:36.464546",
+    "skills_optimized": [
+      "fdf7bc86-725e-474b-af5d-9627f253346e"
+    ]
+  }
+}

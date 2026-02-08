@@ -32,7 +32,6 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-import requests
 import opik
 from opik_optimizer import EvolutionaryOptimizer, MetaPromptOptimizer, ChatPrompt
 from opik_optimizer.algorithms.hierarchical_reflective_optimizer import HierarchicalReflectiveOptimizer
@@ -266,58 +265,39 @@ def register_prompt_with_opik(
     This enables:
     - Version tracking (Opik auto-creates new version if content changed)
     - A/B testing capabilities
-    - Filtering by skill/level tags in Opik UI
+    - Viewing version history in Opik UI
 
     Prompt naming: challenge_prompt_{skill_id}_level_{level}
-    Tags: skill:{skill_name}, level:{level}
 
-    Uses REST API directly since Python SDK doesn't expose tags parameter.
+    Uses Python SDK which automatically handles versioning:
+    - If prompt name exists with different content → new version created
+    - If prompt name exists with same content → returns existing version
     """
     try:
         prompt_name = f"challenge_prompt_{skill_id}_level_{level}"
-        tags = [f"skill:{skill_name}", f"level:{level}"]
+        improvement_percent = ((best_score - baseline_score) / baseline_score * 100) if baseline_score > 0 else 0
 
-        # Use Opik REST API directly to support tags (Python SDK doesn't expose this)
-        headers = {
-            "Authorization": OPIK_API_KEY,
-            "Content-Type": "application/json",
-        }
-        if OPIK_WORKSPACE:
-            headers["Comet-Workspace"] = OPIK_WORKSPACE
-
-        payload = {
-            "name": prompt_name,
-            "template": prompt_content,
-            "tags": tags,
-            "metadata": {
-                "skill_id": skill_id,
-                "skill_name": skill_name,
-                "level": level,
-                "baseline_score": baseline_score,
-                "best_score": best_score,
-                "improvement_percent": ((best_score - baseline_score) / baseline_score * 100) if baseline_score > 0 else 0,
-                "optimized_at": datetime.now().isoformat(),
-            },
-            "change_description": f"Optimized at {datetime.now().isoformat()}",
+        metadata = {
+            "skill_id": skill_id,
+            "skill_name": skill_name,
+            "level": level,
+            "baseline_score": baseline_score,
+            "best_score": best_score,
+            "improvement_percent": improvement_percent,
+            "optimized_at": datetime.now().isoformat(),
         }
 
-        response = requests.post(
-            "https://www.comet.com/opik/api/v1/private/prompts",
-            headers=headers,
-            json=payload,
+        # Use Opik Python SDK - it automatically handles versioning
+        # If prompt exists with different content, a new version is created
+        prompt = opik.Prompt(
+            name=prompt_name,
+            prompt=prompt_content,
+            metadata=metadata,
         )
 
-        if response.ok:
-            data = response.json()
-            commit = data.get("latest_version", {}).get("commit", "unknown")
-            print(f"[Optimizer] Registered prompt with Opik: {prompt_name}")
-            print(f"[Optimizer] Tags: {', '.join(tags)}")
-            print(f"[Optimizer] Commit: {commit}")
-        elif response.status_code == 409:
-            # Prompt already exists with same content - that's fine
-            print(f"[Optimizer] Prompt already exists in Opik: {prompt_name}")
-        else:
-            print(f"[Optimizer] Warning: Opik API returned {response.status_code}: {response.text}")
+        print(f"[Optimizer] Registered prompt with Opik: {prompt_name}")
+        print(f"[Optimizer] Version: {prompt.commit}")
+        print(f"[Optimizer] Improvement: {improvement_percent:.1f}%")
 
     except Exception as e:
         # Don't fail the whole operation if Opik registration fails
