@@ -203,6 +203,39 @@ export class PromptOptimizer {
       return null;
     }
 
+    // Check if rating has changed since last optimization
+    if (params.avgRating !== undefined) {
+      const { data: lastCompleted } = await supabase
+        .from('prompt_optimization_queue')
+        .select('id, avg_rating_at_trigger, completed_at')
+        .eq('skill_id', params.skillId)
+        .eq('difficulty_level', params.level)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastCompleted && lastCompleted.avg_rating_at_trigger !== null) {
+        const lastRating = parseFloat(lastCompleted.avg_rating_at_trigger);
+        const currentRating = params.avgRating;
+        const ratingDiff = Math.abs(currentRating - lastRating);
+
+        // Only re-optimize if rating has changed by at least 0.1 points
+        if (ratingDiff < 0.1) {
+          console.log(
+            `[PromptOptimizer] Skipping optimization - rating unchanged: ${params.skillId} level ${params.level} ` +
+            `(last: ${lastRating.toFixed(2)}, current: ${currentRating.toFixed(2)})`
+          );
+          return null;
+        }
+
+        console.log(
+          `[PromptOptimizer] Rating changed significantly: ${lastRating.toFixed(2)} → ${currentRating.toFixed(2)} ` +
+          `(${ratingDiff >= 0 ? '+' : ''}${(currentRating - lastRating).toFixed(2)})`
+        );
+      }
+    }
+
     // Create queue entry
     const queueEntry: OptimizationQueueInsert = {
       skill_id: params.skillId,
@@ -334,13 +367,14 @@ export class PromptOptimizer {
         console.log(`[PromptOptimizer] Dataset already exists: ${datasetName}`);
       }
 
-      console.log(`[PromptOptimizer] Running Python optimizer for ${skill.name} level ${job.difficulty_level}`);
+      console.log(`[PromptOptimizer] Running Python optimizer (HRPO) for ${skill.name} level ${job.difficulty_level}`);
 
-      // Run Python optimization
+      // Run Python optimization using HierarchicalReflectiveOptimizer
       const result = await runOptimization({
         skillId: job.skill_id,
         level: job.difficulty_level,
         refinements: CONFIG.refinements,
+        optimizerType: 'hrpo',
       });
 
       console.log(`[PromptOptimizer] Optimization complete: ${result.baselineScore} → ${result.bestScore}`);

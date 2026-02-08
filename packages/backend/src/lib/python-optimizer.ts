@@ -42,7 +42,7 @@ export async function runOptimization(params: OptimizationParams): Promise<Optim
     skillId,
     level,
     refinements = 5,
-    optimizerType = 'evolutionary',
+    optimizerType = 'hrpo', // Use HierarchicalReflectiveOptimizer by default
   } = params;
 
   // Path to optimization directory
@@ -172,7 +172,7 @@ function parseOptimizationResult(
     bestScore,
     improvementPercent,
     refinements,
-    method: 'evolutionary', // Default, could parse from metadata
+    method: 'hrpo', // HierarchicalReflectiveOptimizer
   };
 }
 

@@ -32,10 +32,15 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import litellm
 import opik
 from opik_optimizer import EvolutionaryOptimizer, MetaPromptOptimizer, ChatPrompt
 from opik_optimizer.algorithms.hierarchical_reflective_optimizer import HierarchicalReflectiveOptimizer
 from opik.evaluation.metrics.score_result import ScoreResult
+
+# Configure LiteLLM to automatically add dummy user messages for Anthropic
+# This fixes: "Anthropic requires at least one non-system message"
+litellm.modify_params = True
 
 from config import (
     validate_config,
