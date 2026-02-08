@@ -6,8 +6,14 @@
  */
 
 import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import * as path from 'path';
 import * as fs from 'fs';
+
+// ES modules don't have __dirname, so we need to create it
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 export interface OptimizationResult {
   optimizedPrompt: string;

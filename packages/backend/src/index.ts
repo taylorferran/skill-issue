@@ -19,12 +19,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Log all requests for debugging
-app.use((req, _res, next) => {
-  console.log(`[Request] ${req.method} ${req.url}`);
-  console.log(`[Request] Headers:`, JSON.stringify(req.headers, null, 2));
-  next();
-});
+// Request logging (controlled by LOG_LEVEL)
+const LOG_LEVEL = process.env.LOG_LEVEL || 'info'; // 'debug', 'info', 'warn', 'error', 'none'
+
+if (LOG_LEVEL === 'debug') {
+  // Verbose logging - includes headers
+  app.use((req, _res, next) => {
+    console.log(`[Request] ${req.method} ${req.url}`);
+    console.log(`[Request] Headers:`, JSON.stringify(req.headers, null, 2));
+    next();
+  });
+} else if (LOG_LEVEL === 'info') {
+  // Standard logging - just method and URL, skip health checks
+  app.use((req, _res, next) => {
+    if (!req.url.startsWith('/api/health')) {
+      console.log(`[Request] ${req.method} ${req.url}`);
+    }
+    next();
+  });
+}
+// LOG_LEVEL 'warn', 'error', or 'none' = no request logging
 
 // Middleware
 app.use(express.json());
