@@ -2,9 +2,9 @@
 
 ## Overview
 
-Skill Issue is an autonomous, agent-based learning system that builds and maintains real competence by periodically sending short challenges to users via push notifications. Instead of tracking content consumption or study time, the system measures whether a skill is actually usable at the moment it is tested.
+Skill Issue is an autonomous learning system that tests real competence by periodically sending short challenges via push notifications. Instead of tracking study time or content consumption, it measures whether you can actually use a skill when tested.
 
-The system adapts automatically: challenge difficulty, timing, and frequency change based on real user outcomes. LLMs are used as tools inside a broader autonomous system, not as a monolithic brain. Every LLM call, agent decision, and quality evaluation is traced and scored in [Opik](https://www.comet.com/opik) for full observability, prompt optimization, and continuous improvement.
+The system adapts automatically based on user performance. Three autonomous agents handle scheduling, challenge generation, and skill progression. Every LLM call and agent decision is traced in [Opik](https://www.comet.com/opik) for observability and continuous improvement.
 
 ## Core Product Principles
 
@@ -27,7 +27,7 @@ The system adapts automatically: challenge difficulty, timing, and frequency cha
 | **Database** | Supabase (PostgreSQL) |
 | **AI - Challenge Generation** | Anthropic Claude SDK (Claude Haiku 4.5) |
 | **AI - Dataset Generation** | OpenAI GPT-4o |
-| **AI - Prompt Optimization** | Opik Optimizer (EvolutionaryOptimizer, HRPO, MetaPrompt) |
+| **AI - Prompt Optimization** | Opik Optimizer (HRPO, EvolutionaryOptimizer, MetaPrompt) |
 | **Observability** | Opik - tracing, feedback scores, prompt versioning, datasets, experiments |
 | **Push Notifications** | Expo Server SDK |
 | **Containerization** | Docker (multi-stage Node 18 Alpine) |
@@ -58,7 +58,8 @@ Agent 1 - Scheduling Decision
   |
   v
 Agent 2 - Challenge Design
-  Generates MCQ challenge via Claude -> Validates structure -> LLM-as-Judge quality gate
+  Checks question pool for reusable high-quality questions
+  If none found -> Generates MCQ via Claude -> Validates structure -> LLM-as-Judge quality gate
   If validation or judge fails -> regenerate (up to retry limit)
   |
   v
@@ -72,16 +73,20 @@ Push Notification -> User answers -> Agent 3 processes response
 ### Challenge Generation Flow
 
 ```
-Challenge Generation (Claude Haiku 4.5)
-  -> Structural Validation (4 answer options, question length, JSON format)
-    -> LLM-as-Judge Evaluation (5 quality dimensions, weighted composite score)
-      -> Pass (>= 0.7 composite, no dimension below 0.4 veto threshold)
-        -> Save to DB & send push notification
-      -> Fail
-        -> Regenerate (flow repeats, max retries configurable)
+Check Question Pool
+  -> Found high-quality match?
+    -> Reuse existing question (saves API calls)
+  -> Not found?
+    -> Generate new challenge (Claude Haiku 4.5)
+      -> Structural Validation (4 answer options, question length, JSON format)
+        -> LLM-as-Judge Evaluation (5 quality dimensions, weighted composite score)
+          -> Pass (>= 0.7 composite, no dimension below 0.4 veto threshold)
+            -> Save to DB & question pool -> Send push notification
+          -> Fail
+            -> Regenerate (flow repeats, max retries configurable)
 ```
 
-The structural validation step prevents unnecessary LLM-as-Judge calls. If validation fails or the judge score is too low, generation restarts automatically.
+The question pool significantly reduces LLM API calls by reusing high-quality questions across users. Questions are eligible for reuse if they have an average rating of 2.0+ stars or haven't been rated yet.
 
 ### LLM-as-Judge
 
@@ -101,19 +106,21 @@ Each evaluation is recorded as feedback scores on the Opik trace, so you can see
 
 ## Opik Integration
 
-Opik is deeply integrated throughout the system for observability, evaluation, prompt versioning, and optimization. Here's everything we use it for:
+Opik is deeply integrated throughout the system for observability, evaluation, prompt versioning, and optimization.
 
 ### Tracing & Spans
 
 Every operation is traced with hierarchical spans:
 
-- **`challenge_generation`** - The most important trace. Contains all challenge generation LLM calls and LLM-as-Judge evaluation calls as nested spans. When a challenge fails the judge and gets regenerated, you can see each attempt as a separate span within the trace. Each `llm_judge_evaluation` span has a feedback tab showing per-dimension scores, and the parent `challenge_generation` trace shows the scores of the winning challenge.
+- **`challenge_generation`** - Contains all challenge generation LLM calls and LLM-as-Judge evaluation calls as nested spans. When a challenge fails the judge and gets regenerated, you can see each attempt as a separate span within the trace. Each `llm_judge_evaluation` span has a feedback tab showing per-dimension scores, and the parent `challenge_generation` trace shows the scores of the winning challenge.
   - [Example: Challenge succeeding on 3rd attempt after failing judge twice](https://www.comet.com/opik/omorris95/projects/019bec3e-4610-7572-8d58-3793d75a4068/traces?traces_filters=%5B%5D&time_range=alltime&size=100&height=small&trace=019c3c7a-f68a-7906-9a62-2828144222bb&span=&trace_panel_filters=%5B%5D&traceTab=details&thread=)
   - [Example: Challenge passing on first attempt](https://www.comet.com/opik/omorris95/projects/019bec3e-4610-7572-8d58-3793d75a4068/traces?traces_filters=%5B%5D&time_range=alltime&size=100&height=small&trace=019c3931-d423-7d70-9385-3be121db31f6&span=&trace_panel_filters=%5B%5D&traceTab=feedback_scores&thread=)
 - **`scheduling_tick`** - Root trace for each scheduler run, linking to individual challenge traces
 - **`scheduling_decision`** - Agent 1's decision about which users to challenge
 - **`skill_state_update`** - Agent 3's difficulty adjustments after a user answers
 - **`answer_submission`** - User answer processing
+- **`dataset_generation_examples`** - Dataset creation for prompt optimization
+- **`prompt_optimization`** - Full optimization run with refinement iterations
 
 ### Feedback Scores
 
@@ -121,41 +128,44 @@ Feedback scores are attached at both the span and trace level:
 - **Span-level**: Each `llm_judge_evaluation` span shows per-dimension scores (clarity, difficulty alignment, distractor quality, educational value, skill relevance)
 - **Trace-level**: The parent `challenge_generation` trace shows the final winning challenge's scores
 - **Answer feedback**: Correct/incorrect outcomes are scored on answer submission traces
+- **User ratings**: 1-5 star ratings from users feed back into question quality tracking
 
 ### Prompt Versioning
 
-Prompts are saved to Opik with full version history, so you can track how prompts evolve over time as optimization runs improve them:
-- [Example: Challenge generation prompt with version history](https://www.comet.com/opik/omorris95/prompts/019c390b-409d-75b9-a5d3-9a487f4882d2?tab=prompt&activeVersionId=019c390b-40a8-77e0-861b-7805f926296a)
+Prompts are saved to Opik with full version history. When optimization improves a prompt, the new version is stored with metrics showing baseline vs. improved scores. The admin dashboard shows all versions, their performance, and which is currently active.
 
 ### Datasets & Experiments
 
-- **Test datasets** are generated per skill per difficulty level (e.g., `skill_{id}_level_{3}_examples`), initially populated with GPT-4o-generated example challenges
-- These datasets will later be populated with real user data: questions with good user feedback, high skill accuracy, etc.
-- **Experiments** run the baseline prompt against these datasets and measure quality via our LLM-as-Judge metric
-- After prompt optimization, experiments can be re-run to compare metrics between the optimized and previous prompt
+- **Test datasets** are generated per skill per difficulty level (e.g., `skill_{id}_level_{7}_examples`)
+- Datasets contain 5 high-quality example challenges generated by GPT-4o
+- These serve as benchmarks for measuring prompt quality during optimization
+- **Experiments** run prompts against these datasets and measure quality via LLM-as-Judge
+- After optimization, experiments compare metrics between baseline and optimized prompts
 
-### Prompt Optimization
+### Automated Prompt Optimization
 
-When a new skill is created, the system:
-1. Generates test datasets for each difficulty level (1-10)
-2. Runs the baseline prompt through the optimizer against these datasets
-3. If improved prompts are found, they get promoted as the prompt for that skill and difficulty level
-4. Optimized prompts are saved to Opik with a commit history showing each version
+The system monitors question quality continuously and optimizes prompts automatically:
 
-The optimizer can also be triggered automatically:
-- When test data has been populated with real user data
-- When metrics for a certain skill/difficulty level drop below a threshold
+**How it works:**
+1. Every hour, checks average user ratings for each skill+level combination
+2. When ratings drop below 2.5 stars (with 10+ rated questions), triggers optimization
+3. Automatically generates benchmark dataset if it doesn't exist (5 examples via GPT-4o)
+4. Runs Opik's **HRPO** (HierarchicalReflectiveOptimizer) with 5 refinement cycles
+5. HRPO analyzes why prompts fail and hierarchically refines them through reasoning
+6. Measures quality using the same LLM-as-Judge metric (5 dimensions, composite score)
+7. If improved, automatically deploys the optimized prompt
+8. Won't re-optimize unless rating changes by 0.1+ points (prevents wasteful reruns)
 
-We support three optimizer types via Opik's optimizer library:
-- **EvolutionaryOptimizer** (default) - Mutates prompts across generations
-- **HierarchicalReflectiveOptimizer (HRPO)** - Reflective analysis with hierarchical refinement
+**Optimizer types supported:**
+- **HierarchicalReflectiveOptimizer (HRPO)** - Default. Uses reflective analysis and structured reasoning
+- **EvolutionaryOptimizer** - Mutates prompts across generations
 - **MetaPromptOptimizer** - Uses meta-prompting to generate candidate prompts
 
-[Example optimization run with before/after comparison](https://www.comet.com/opik/omorris95/optimizations/019c3d2d-59fc-78e5-9b52-9ccfb5f39f2d/compare?optimizations=%5B%22019c3d38-603c-78f3-a33c-c56afccb6058%22%5D)
+The admin dashboard shows optimization status, pending jobs, low-rated skills, and full version history with scores.
 
 ### A/B Testing
 
-Prompt variants can be registered in Opik and selected via weighted random assignment. Each variant is tagged on the trace so you can compare performance between prompt versions directly in the Opik dashboard.
+Prompt variants can be registered in Opik and selected via weighted random assignment. Each variant is tagged on the trace so you can compare performance between prompt versions in the Opik dashboard. Currently disabled by default (`AB_TEST_CHALLENGE_PROMPT_ENABLED=false`).
 
 ## Package Details
 
@@ -167,11 +177,13 @@ Express-based API server that orchestrates the core system:
 - LLM-as-Judge quality gate with 5-dimension evaluation
 - Full Opik tracing with hierarchical spans, feedback scores, and prompt versioning
 - Question pool for reusing high-quality challenges across users
+- Automated prompt optimization scheduler (hourly checks)
+- Admin dashboard for viewing prompts, optimization status, and triggering manual optimization
 - A/B testing support for prompt variants
 - Push notification delivery via Expo Server SDK
 - Cron-based scheduling with configurable intervals
 
-**Key Dependencies**: Express, @anthropic-ai/sdk, @supabase/supabase-js, node-cron, expo-server-sdk, openai, zod
+**Key Dependencies**: Express, @anthropic-ai/sdk, @supabase/supabase-js, node-cron, expo-server-sdk, openai, opik, zod
 
 ### `@learning-platform/mobile`
 
@@ -179,7 +191,7 @@ React Native mobile app built with Expo 54:
 - Cross-platform iOS/Android
 - User authentication via Clerk
 - Challenge quiz interface with answer submission
-- Feedback collection (confidence, difficulty ratings)
+- Feedback collection (confidence, difficulty ratings, 1-5 star quality ratings)
 - Push notification handling for challenge delivery
 - Skill browsing and selection
 - Calibration assessments
@@ -210,10 +222,11 @@ Prompt optimization system using Opik's optimizer library:
 - Per-skill, per-difficulty-level prompt optimization
 - Prompts are "baked" with concrete values before optimization (no template variables)
 - Uses LLM-as-Judge as the quality metric for the optimizer
-- Supports EvolutionaryOptimizer, HRPO, and MetaPromptOptimizer
-- Exports optimized prompts with baseline vs. improved scores
+- Supports HRPO (default), EvolutionaryOptimizer, and MetaPromptOptimizer
+- Exports optimized prompts with baseline vs. improved scores to JSON and database
+- Called by TypeScript backend via subprocess when optimization is triggered
 
-**Key Dependencies**: opik, opik-optimizer, anthropic, openai (via litellm), supabase, python-dotenv
+**Key Dependencies**: opik, opik-optimizer, anthropic, openai, litellm, supabase, python-dotenv
 
 ## Development
 
@@ -233,10 +246,37 @@ pnpm start
 cd packages/web
 pnpm dev
 
-# Run prompt optimization (Python)
+# Run prompt optimization (Python) - normally called automatically by backend
 cd optimization
 pip install -r requirements.txt
-python optimize_challenge_prompt.py --skill <skill_id> --level 3
+python optimize_challenge_prompt.py --skill <skill_id> --level 3 --optimizer hrpo
+```
+
+## Environment Configuration
+
+Key environment variables for the backend:
+
+```bash
+# Prompt Optimization (automated)
+PROMPT_OPTIMIZATION_ENABLED=true
+PROMPT_OPTIMIZATION_RATING_THRESHOLD=2.5
+PROMPT_OPTIMIZATION_MIN_QUESTIONS=10
+PROMPT_OPTIMIZATION_CHECK_INTERVAL_HOURS=1
+PROMPT_OPTIMIZATION_AUTO_DEPLOY=true
+PROMPT_OPTIMIZATION_MAX_CONCURRENT_JOBS=2
+PROMPT_OPTIMIZATION_REFINEMENTS=5
+
+# Question Pool (reduces API costs)
+QUESTION_POOL_ENABLED=true
+QUESTION_POOL_MIN_RATING=2.0
+ADD_GENERATED_TO_POOL=true
+
+# LLM Settings
+LLM_TEMPERATURE=0.7
+LLM_MAX_TOKENS=400
+
+# A/B Testing
+AB_TEST_CHALLENGE_PROMPT_ENABLED=false
 ```
 
 ## Documentation
