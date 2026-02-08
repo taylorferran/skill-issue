@@ -49,6 +49,7 @@ RUN npm install --omit=dev \
   @anthropic-ai/sdk@^0.30.1 \
   node-cron@^3.0.3 \
   expo-server-sdk@^3.7.0 \
+  openai@^6.18.0 \
   zod@^3.22.4
 
 # Set environment to production

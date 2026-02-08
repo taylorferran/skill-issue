@@ -1,0 +1,23 @@
+{
+  "prompts": {
+    "5a0f6aed-f7df-4403-88ee-5126d735fd9b": {
+      "9": {
+        "prompt": "You are generating a multiple-choice challenge to test knowledge and competence.\n\nSKILL: Japanese Kanji\nDESCRIPTION: Recognition and meaning of Japanese Kanji characters\nDIFFICULTY LEVEL: 9/10\n\nGenerate a single MCQ challenge that tests real competence in this skill at this difficulty level.\n\nRULES:\n- Difficulty 9 means: Expert-level synthesis\n- Question must be answerable in under 30 seconds\n- 4 options, only 1 correct\n- Randomly shuffle the order of correct answer among the options\n- Distractors should be plausible, internally consistent, and realistic around the theme while being subtly incorrect\n- Include a brief explanation of why the answer is correct\n- Tailor the question specifically to the skill described above\n- Make sure the correct answer is not ambiguous or debatable\n- **Avoid explicit guidance within the question and around options; rely on complexity and depth of knowledge**\n\nBREVITY REQUIREMENTS (CRITICAL):\n- Question: 25 words maximum, no unnecessary words\n- Options: 12 words maximum each, direct answers only\n- Explanation: 50 words maximum, concise reasoning\n- Avoid: storytelling, excessive context, verbose setups, filler words\n- Focus: Test the concept directly and efficiently\n\n**CLARITY GUIDELINES (ADDED):**\n- Use straightforward language and common terms to avoid misunderstandings\n- Ensure terms and phrasing are precise and familiar to the target audience\n- Avoid obscure or technical jargon unless essential, providing explanations if needed\n- Phrase the question and options so there is no room for misinterpretation\n\n**DIFFICULTY GUIDELINES (ADDED):**\n- Leverage the depth and nuance of Kanji knowledge consistent with expert-level synthesis\n- Ensure complexity by exploring deeper meaning and less common elements\n- Avoid reducing challenge through overt hinting or including overt information that guides toward the answer\n\nExamples of good brevity:\n\u2713 \"Which sorting algorithm has O(n log n) average time complexity?\"\n\u2717 \"When implementing a search on a large dataset, which algorithm would be best?\"\n\n\u2713 \"What is the capital of France?\"\n\u2717 \"If you were traveling through Europe and wanted to visit the capital city of France, which city would you go to?\"\n\nOUTPUT FORMAT (strict JSON):\n{\n  \"question\": \"...\",\n  \"options\": [\"A...\", \"B...\", \"C...\", \"D...\"],\n  \"correctAnswerIndex\": 0,\n  \"explanation\": \"...\",\n  \"actualDifficulty\": 9\n}\n\nGenerate the challenge now:\n",
+        "baseline_score": 0.655,
+        "best_score": 0.7390000000000001,
+        "improvement": 0.08400000000000007,
+        "improvement_percent": 12.824427480916043,
+        "refinements": 5,
+        "optimized_at": "2026-02-06T15:27:05.591901",
+        "status": "pending"
+      }
+    }
+  },
+  "metadata": {
+    "created_at": "2026-02-06T15:27:05.591888",
+    "last_updated": "2026-02-06T15:27:05.591905",
+    "skills_optimized": [
+      "5a0f6aed-f7df-4403-88ee-5126d735fd9b"
+    ]
+  }
+}

@@ -268,14 +268,12 @@ export interface DatasetItem {
   metadata?: Record<string, unknown>;
 }
 
-export interface ChallengeScenario {
-  scenario: string;
-  expected_concepts: string[];
-  difficulty: number;
-}
-
+/**
+ * Result from generating an example-based dataset.
+ * Each item has empty input and example challenge in expected_output.
+ */
 export interface DatasetGenerationResult {
   datasetName: string;
   itemsCreated: number;
-  scenarios: ChallengeScenario[];
+  examples?: GeneratedChallenge[];  // For new example-based datasets
 }
