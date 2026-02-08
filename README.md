@@ -4,7 +4,7 @@
 
 Skill Issue is an autonomous learning system that tests real competence by periodically sending short challenges via push notifications. Instead of tracking study time or content consumption, it measures whether you can actually use a skill when tested.
 
-The system adapts automatically based on user performance. Three autonomous agents handle scheduling, challenge generation, and skill progression. Every LLM call and agent decision is traced in [Opik](https://www.comet.com/opik) for observability and continuous improvement.
+The system continuously improves itself. Three autonomous agents handle scheduling, challenge generation, and skill progression. When users rate questions poorly, **Opik automatically optimizes the prompts** used to generate those questions—analyzing what went wrong and improving them through reasoning-based refinement, these prompts are then immediately used by the system. Every LLM call and agent decision is traced in Opik for full observability.
 
 ## Core Product Principles
 
@@ -12,6 +12,7 @@ The system adapts automatically based on user performance. Three autonomous agen
 - **Measurement over teaching** - Test real ability in the moment
 - **Short interruptions, not study sessions** - Quick challenges that fit into your day
 - **Autonomous adaptation** - System learns from your performance automatically
+- **Self-improving prompts** - Opik automatically optimizes question generation when quality drops
 - **Strong observability and evaluation** - Every LLM call and agent decision is traced and scored via Opik
 
 ## Technology Stack
@@ -39,7 +40,6 @@ The system adapts automatically based on user performance. Three autonomous agen
   /packages
     /backend       - Express API server with autonomous agents, LLM-as-Judge, Opik tracing
     /mobile        - React Native mobile app (Expo 54)
-    /web           - React web dashboard (Vite)
     /shared        - Common TypeScript types, schemas, API clients
   /optimization    - Python prompt optimization system (Opik Optimizer)
 ```
@@ -198,15 +198,6 @@ React Native mobile app built with Expo 54:
 
 **Key Dependencies**: Expo 54, React Native 0.81, @clerk/clerk-expo, expo-notifications, @tanstack/react-query, zustand, expo-router
 
-### `@learning-platform/web`
-
-React web dashboard:
-- User dashboard and skill management
-- Alternative interface to the mobile app
-- Built with Vite 5 for fast development
-
-**Key Dependencies**: React 19, Vite 5, @clerk/clerk-react, react-router-dom
-
 ### `@learning-platform/shared`
 
 Shared TypeScript package:
@@ -242,10 +233,6 @@ pnpm dev
 cd packages/mobile
 pnpm start
 
-# Run web app
-cd packages/web
-pnpm dev
-
 # Run prompt optimization (Python) - normally called automatically by backend
 cd optimization
 pip install -r requirements.txt
@@ -278,9 +265,3 @@ LLM_MAX_TOKENS=400
 # A/B Testing
 AB_TEST_CHALLENGE_PROMPT_ENABLED=false
 ```
-
-## Documentation
-
-- `AGENTS.md` - Detailed system architecture and development principles
-- `docs/API_REFERENCE.md` - API endpoints and usage
-- `optimization/README.md` - Prompt optimization usage and configuration

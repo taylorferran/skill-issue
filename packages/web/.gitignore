@@ -1,6 +1,0 @@
-dist
-.npmrc
-node_modules
-logs
-*.logs
-*.local
