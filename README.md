@@ -6,6 +6,14 @@ Skill Issue is an autonomous learning system that tests real competence by perio
 
 The system continuously improves itself. Three autonomous agents handle scheduling, challenge generation, and skill progression. When users rate questions poorly, **Opik automatically optimizes the prompts** used to generate those questions—analyzing what went wrong and improving them through reasoning-based refinement, these prompts are then immediately used by the system. Every LLM call and agent decision is traced in Opik for full observability.
 
+## Download
+
+<p align="center">
+  <img src="siqrcode.png" alt="Download QR Code" width="200" />
+  <br />
+  Scan to download the Android app
+</p>
+
 ## Core Product Principles
 
 - **Competence over content** - Measure what you can do, not what you've read
